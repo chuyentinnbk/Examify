@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # MariaDB Database
+  # ----------------------------------------------------------------------------
+  mariadb:
+    image: mariadb:11.4
+    container_name: examify_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_password
+      MYSQL_DATABASE: examify_db
+      MYSQL_USER: examify_user
+      MYSQL_PASSWORD: examify_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - examify_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Redis Cache & Queue
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    container_name: examify_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - examify_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Next.js Web Application
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: examify_app
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: "mysql://examify_user:examify_password@mariadb:3306/examify_db"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: "redis://redis:6379"
+      STORAGE_EXAMS_PATH: "/app/storage/exams"
+      STORAGE_LOGS_PATH: "/app/storage/logs"
+    ports:
+      - "3000:3000"
+    volumes:
+      - storage_exams:/app/storage/exams
+      - storage_logs:/app/storage/logs
+    networks:
+      - examify_network
+
+  # ----------------------------------------------------------------------------
+  # BullMQ Mail Worker Service
+  # ----------------------------------------------------------------------------
+  mail_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: examify_mail_worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      mariadb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "mysql://examify_user:examify_password@mariadb:3306/examify_db"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: "redis://redis:6379"
+    networks:
+      - examify_network
+
+volumes:
+  mariadb_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_exams:
+    driver: local
+  storage_logs:
+    driver: local
+
+networks:
+  examify_network:
+    driver: bridge

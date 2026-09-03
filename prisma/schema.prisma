@@ -1,0 +1,250 @@
+// ==============================================================================
+// Examify Prisma Schema (MariaDB / MySQL)
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  TEACHER
+}
+
+enum ExamType {
+  MIN_15
+  MID_TERM
+  FINAL_TERM
+  ENTRANCE
+}
+
+enum ExamStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum CognitiveLevel {
+  KNOWLEDGE
+  COMPREHENSION
+  APPLICATION
+  HIGH_APPLICATION
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+}
+
+// ------------------------------------------------------------------------------
+// Authentication & User Management
+// ------------------------------------------------------------------------------
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  fullName     String      @map("full_name")
+  role         Role        @default(TEACHER)
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  exams        Exam[]
+  auditLogs    AuditLog[]
+
+  @@index([role])
+  @@index([email])
+  @@map("users")
+}
+
+// ------------------------------------------------------------------------------
+// System Settings & Lock
+// ------------------------------------------------------------------------------
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String   @db.Text
+  isLocked    Boolean  @default(false) @map("is_locked")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+// ------------------------------------------------------------------------------
+// Curriculum Hierarchy: Level -> Grade -> Subject -> Semester -> Topic -> Lesson
+// ------------------------------------------------------------------------------
+
+model CurriculumLevel {
+  id        String   @id @default(uuid())
+  name      String   // e.g., Primary School, Lower Secondary, Upper Secondary
+  code      String   @unique // e.g., PRIMARY, LOWER_SEC, UPPER_SEC
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  grades    Grade[]
+
+  @@map("curriculum_levels")
+}
+
+model Grade {
+  id        String          @id @default(uuid())
+  name      String          // e.g., Grade 10, Grade 11, Grade 12
+  code      String          // e.g., G10, G11, G12
+  levelId   String          @map("level_id")
+  level     CurriculumLevel @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  order     Int             @default(0)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  subjects  Subject[]
+
+  @@unique([levelId, code])
+  @@map("grades")
+}
+
+model Subject {
+  id        String   @id @default(uuid())
+  name      String   // e.g., Mathematics, Physics, Chemistry, Literature
+  code      String   // e.g., MATH, PHYS, CHEM, LIT
+  gradeId   String   @map("grade_id")
+  grade     Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  semesters Semester[]
+
+  @@unique([gradeId, code])
+  @@map("subjects")
+}
+
+model Semester {
+  id        String   @id @default(uuid())
+  name      String   // e.g., Semester 1, Semester 2, Full Year
+  code      String   // e.g., SEM_1, SEM_2
+  subjectId String   @map("subject_id")
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  topics    Topic[]
+
+  @@unique([subjectId, code])
+  @@map("semesters")
+}
+
+model Topic {
+  id          String   @id @default(uuid())
+  name        String   // e.g., Quadratic Equations, Thermodynamics
+  description String?  @db.Text
+  semesterId  String   @map("semester_id")
+  semester    Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  lessons     Lesson[]
+
+  @@map("topics")
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  name        String   // e.g., Solving Quadratics with Discriminant Formula
+  description String?  @db.Text
+  topicId     String   @map("topic_id")
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  exams       Exam[]
+
+  @@map("lessons")
+}
+
+// ------------------------------------------------------------------------------
+// Exam Generation & Metadata
+// ------------------------------------------------------------------------------
+
+model Exam {
+  id                    String         @id @default(uuid())
+  title                 String
+  examType              ExamType       @map("exam_type")
+  status                ExamStatus     @default(DRAFT)
+  teacherId             String         @map("teacher_id")
+  teacher               User           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  lessonId              String?        @map("lesson_id")
+  lesson                Lesson?        @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  // Curriculum Snapshot (JSON string of levels, grades, subject, topic, lesson names)
+  curriculumMetadata    String?        @map("curriculum_metadata") @db.Text
+
+  durationMinutes       Int            @default(45) @map("duration_minutes")
+  totalPoints           Float          @default(10.0) @map("total_points")
+  totalQuestions        Int            @default(20) @map("total_questions")
+
+  // Cognitive distribution matrix e.g. { "KNOWLEDGE": 40, "COMPREHENSION": 30, "APPLICATION": 20, "HIGH_APPLICATION": 10 }
+  cognitiveMatrix       String?        @map("cognitive_matrix") @db.Text
+
+  // Teacher custom prompt passed after prompt guard sanitization
+  customPrompt          String?        @map("custom_prompt") @db.Text
+
+  // AI execution details
+  aiProvider            String         @map("ai_provider") // "openai" | "gemini" | "self-hosted"
+  aiModel               String         @map("ai_model")
+  promptSnapshot        String?        @map("prompt_snapshot") @db.LongText
+  rawOutput             String?        @map("raw_output") @db.LongText
+  structuredJson        String?        @map("structured_json") @db.LongText
+  filePath              String?        @map("file_path") // storage/exams/YYYY/MM/{id}.json
+
+  errorMessage          String?        @map("error_message") @db.Text
+
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  @@index([teacherId])
+  @@index([examType])
+  @@index([status])
+  @@map("exams")
+}
+
+// ------------------------------------------------------------------------------
+// Structured Audit Log
+// ------------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g., SETUP_SYSTEM, LOGIN, LOGOUT, GENERATE_EXAM, PROMPT_INJECTION_ALERT, RATE_LIMIT_BLOCK
+  entity    String   // e.g., SYSTEM, USER, EXAM, SECURITY
+  entityId  String?  @map("entity_id")
+  clientIp  String?  @map("client_ip")
+  country   String?  // Resolved via geoip-lite (e.g., "VN", "US", "JP")
+  userAgent String?  @map("user_agent") @db.Text
+  details   String?  @db.LongText // JSON payload for deep auditing
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
