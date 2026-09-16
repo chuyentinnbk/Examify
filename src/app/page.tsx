@@ -1,130 +1,125 @@
+'use client';
+
 import React from 'react';
+import { AppProvider, useAppStore } from '@/lib/store/app-store';
+import Sidebar from '@/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import ToastContainer from '@/components/layout/Toast';
 
-export default function HomePage() {
+import DashboardView from '@/components/views/DashboardView';
+import CreateExamView from '@/components/views/CreateExamView';
+import EditorView from '@/components/views/EditorView';
+import ProfileView from '@/components/views/ProfileView';
+import AdminView from '@/components/views/AdminView';
+import LoginView from '@/components/views/LoginView';
+import SetupWizardView from '@/components/views/SetupWizardView';
+
+function AppContent() {
+  const { currentRoute, isSetupRequired, token } = useAppStore();
+
+  // If setup status is still being determined, show the smooth centered loading screen
+  if (isSetupRequired === null) {
+    return (
+      <main className="w-full min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col items-center justify-center text-center max-w-sm w-full mx-auto">
+          {/* Logo with Glow Effect */}
+          <div className="relative w-20 h-20 mb-5 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl animate-pulse" />
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white">
+              <span className="material-symbols-outlined text-3xl">school</span>
+            </div>
+          </div>
+
+          {/* System Title */}
+          <div className="flex items-center justify-center gap-1.5 mb-1.5">
+            <span className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Examify</span>
+            <span className="text-xl font-extrabold text-blue-600">AI</span>
+            <span className="text-[10px] font-extrabold uppercase bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 ml-1">
+              Beta
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6">
+            Hệ Thống Khảo Thí &amp; Tạo Đề Thi Thông Minh
+          </p>
+
+          {/* Indeterminate Progress Track */}
+          <div className="w-52 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative mb-3">
+            <div className="absolute top-0 bottom-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full animate-indeterminate" />
+          </div>
+
+          <p className="text-[11px] text-slate-400 font-medium">
+            Đang tải dữ liệu cấu hình hệ thống...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // Full-screen setup view - Only show if setup is strictly required and not yet configured
+  if (currentRoute === '#setup-wizard' && isSetupRequired === true) {
+    return (
+      <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+        <SetupWizardView />
+        <ToastContainer />
+      </div>
+    );
+  }
+
+  // Authentication Guard: If no valid token or route is #login, enforce LoginView
+  if (!token || currentRoute === '#login') {
+    return (
+      <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <LoginView />
+        <ToastContainer />
+      </div>
+    );
+  }
+
+  // Active view renderer for dashboard workspace
+  const renderActiveView = () => {
+    switch (currentRoute) {
+      case '#create-exam':
+      case '#create':
+        return <CreateExamView />;
+      case '#editor':
+        return <EditorView />;
+      case '#profile':
+        return <ProfileView />;
+      case '#admin':
+        return <AdminView />;
+      case '#dashboard':
+      default:
+        return <DashboardView />;
+    }
+  };
+
   return (
-    <main style={{ minHeight: '100vh', padding: '3rem 1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <header style={{ textAlign: 'center', marginBottom: '4rem' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.85rem', borderRadius: '9999px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', marginBottom: '1.25rem' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#93c5fd' }}>Architecture Ready & Active</span>
-        </div>
-        <h1 style={{ fontSize: '3rem', fontWeight: 800, letterSpacing: '-0.025em', marginBottom: '1rem' }}>
-          Examify <span className="glow-gradient">Full-Stack AI Exam Engine</span>
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', maxWidth: '700px', margin: '0 auto' }}>
-          Next.js App Router skeleton architecture with MariaDB Prisma ORM, Redis sliding window security, anti-prompt injection defense, and multi-AI strategy adapters.
-        </p>
-      </header>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
+      {/* Global Sidebar */}
+      <Sidebar />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
-        {/* Module 1 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🛡️</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Self-Hosted Security</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            Zero Cloudflare dependencies. Redis sliding window log rate limiting, GeoIP country resolution, and strict session invalidation.
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#60a5fa', fontFamily: 'monospace' }}>
-            src/middleware.ts &bull; src/core/security/
-          </div>
-        </div>
+      {/* Main Content Area */}
+      <div className="md:pl-64 flex flex-col min-h-screen transition-all">
+        {/* Global Header */}
+        <Header />
 
-        {/* Module 2 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🧠</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Anti-Prompt Injection</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            Multi-layer defense against jailbreaks (DAN, Persona switching), delimiter hijacking (<code style={{ color: '#ec4899' }}>&lt;system&gt;, [INST]</code>), and homoglyph evasion.
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#a78bfa', fontFamily: 'monospace' }}>
-            src/core/security/prompt-guard.ts
-          </div>
-        </div>
-
-        {/* Module 3 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚡</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Multi-AI Provider Strategy</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            Pluggable <code style={{ color: '#34d399' }}>IAIProvider</code> architecture supporting OpenAI GPT-4o, Google Gemini, and Self-Hosted LLMs (vLLM/Ollama).
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#34d399', fontFamily: 'monospace' }}>
-            src/core/ai/ (OpenAI, Gemini, SelfHosted)
-          </div>
-        </div>
-
-        {/* Module 4 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📊</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Curriculum Hierarchy Matrix</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            6-level taxonomy (Levels &rarr; Grades &rarr; Subjects &rarr; Semesters &rarr; Topics &rarr; Lessons) paired with 4 exam types and cognitive distribution matrices.
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontFamily: 'monospace' }}>
-            prisma/schema.prisma &bull; src/core/ai/prompt-builder.ts
-          </div>
-        </div>
-
-        {/* Module 5 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>💾</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Dual-Channel Storage & Audit</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            Atomic exam JSON artifact writes to <code style={{ color: '#93c5fd' }}>/storage/exams/</code> and dual-written audit logs (MariaDB + Winston daily rotating files).
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#93c5fd', fontFamily: 'monospace' }}>
-            src/core/storage/ &bull; src/core/logger/
-          </div>
-        </div>
-
-        {/* Module 6 */}
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>✉️</div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Async BullMQ Mail Engine</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-            Redis-backed message queue for background transactional emails with concurrency handling, exponential backoff retries, and SMTP transporter.
-          </p>
-          <div style={{ fontSize: '0.8rem', color: '#f43f5e', fontFamily: 'monospace' }}>
-            src/core/mail/ (Queue & Worker)
-          </div>
-        </div>
+        {/* View Body */}
+        <main className="flex-1 mt-16 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {renderActiveView()}
+        </main>
       </div>
 
-      <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem' }}>Quick Actions & Verification</h3>
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/docs" className="btn-primary">
-            📖 Explore Scalar API Docs (/docs)
-          </a>
-          <a
-            href="/setup"
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              background: 'rgba(255, 255, 255, 0.05)',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-            }}
-          >
-            Launch Setup Wizard (/setup)
-          </a>
-          <a
-            href="/api/v1/setup"
-            target="_blank"
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              background: 'rgba(255, 255, 255, 0.05)',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-            }}
-          >
-            Check Setup API Status
-          </a>
-        </div>
-      </div>
-    </main>
+      {/* Dynamic Toast Notifications */}
+      <ToastContainer />
+    </div>
+  );
+}
+
+export default function ExamifyApp() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }

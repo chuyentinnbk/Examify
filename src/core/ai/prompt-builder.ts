@@ -73,13 +73,15 @@ export class ExamPromptBuilder {
     const systemPrompt = `You are an elite educational assessment and pedagogical examination engine ("Examify AI").
 Your sole objective is to author high-quality, academically rigorous, and curriculum-aligned exam questions formatted strictly as a single valid JSON object.
 
-### MANDATORY RULES:
-1. OUTPUT ONLY RAW VALID JSON. Never output markdown code fences (like \`\`\`json), markdown explanations, or introductory text.
-2. The entire exam output must follow the specified JSON schema strictly.
-3. Questions must be unambiguous, mathematically and factually precise, and appropriate for the specified grade level.
-4. Ensure all multiple-choice questions have exactly 4 plausible options (A, B, C, D) with exactly one unequivocally correct option.
-5. Provide concise, step-by-step explanations and clear scoring rubrics for all questions.
-6. The primary language for question text, options, and explanations must be: ${language}.`;
+### CRITICAL ANTI-DUPLICATION & QUALITY RULES:
+1. ABSOLUTELY ZERO DUPLICATE QUESTIONS: Every single question in the generated exam must be 100% unique, distinct, and independent. Under NO circumstances should two questions have identical, repetitive, or near-identical problem statements, parameters, contexts, or answer choices.
+2. DIVERSE CURRICULUM COVERAGE: Broadly distribute questions across different topics, sub-skills, theories, and practical applications within the specified subject and grade.
+3. OUTPUT ONLY RAW VALID JSON: Never output markdown code fences (like \`\`\`json), markdown explanations, or conversational filler.
+4. STRICT JSON SCHEMA: The entire exam output must adhere strictly to the JSON schema.
+5. PRECISE & PEDAGOGICAL: Questions must be unambiguous, factually accurate according to Vietnam's GDPT 2018 standards, and mathematically verified.
+6. FOUR DISTINCT OPTIONS: Every multiple-choice question must have exactly 4 unique options (A, B, C, D) with exactly one correct option.
+7. DETAILED EXPLANATIONS: Provide step-by-step explanations and clear scoring rubrics for all questions.
+8. LANGUAGE: All content, options, and explanations must be in: ${language}.`;
 
     // 3. Assemble Curriculum Hierarchy Details
     const curriculumHierarchy = `
@@ -104,7 +106,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
 `.trim();
 
     // 5. Assemble User Prompt
-    let userPrompt = `Generate a complete exam with the following specifications:
+    let userPrompt = `Generate a complete exam of exactly ${totalQuestions} DISTINCT AND UNIQUE questions with the following specifications:
 
 ### EXAM CLASSIFICATION:
 - Exam Type: ${examSpecs.name}
@@ -115,6 +117,7 @@ ${curriculumHierarchy}
 
 ### EXAM MATRIX & CONSTRAINTS:
 ${matrixSpecs}
+- IMPORTANT: All ${totalQuestions} questions MUST BE COMPLETELY UNIQUE. Do not repeat any questions, numbers, or problem types!
 
 ### REQUIRED JSON SCHEMA SPECIFICATION:
 {
@@ -130,10 +133,15 @@ ${matrixSpecs}
       "questionNumber": 1,
       "type": "MULTIPLE_CHOICE | TRUE_FALSE | SHORT_ANSWER | ESSAY",
       "cognitiveLevel": "KNOWLEDGE | COMPREHENSION | APPLICATION | HIGH_APPLICATION",
-      "content": "string (The question statement, formatted with LaTeX math if needed)",
-      "options": ["A. option1", "B. option2", "C. option3", "D. option4"],
-      "correctAnswer": "string (e.g., 'A' or the exact answer)",
-      "explanation": "string (Step-by-step pedagogical explanation)",
+      "content": "string (The question statement, formatted with LaTeX math $...$ if needed)",
+      "options": [
+        "First option content (WITHOUT leading A. prefix)",
+        "Second option content (WITHOUT leading B. prefix)",
+        "Third option content (WITHOUT leading C. prefix)",
+        "Fourth option content (WITHOUT leading D. prefix)"
+      ],
+      "correctAnswer": "A | B | C | D",
+      "explanation": "string (Step-by-step pedagogical explanation with LaTeX math if needed)",
       "points": 0.5
     }
   ]

@@ -6,7 +6,6 @@ import { AIFactory, SupportedAIProvider } from '@/core/ai/ai-factory';
 import { PromptGuard } from '@/core/security/prompt-guard';
 import { StorageManager } from '@/core/storage/storage-manager';
 import { AuditLogger } from '@/core/logger/audit-logger';
-import { MailQueueService } from '@/core/mail/mail.queue';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
 
@@ -34,7 +33,8 @@ const GenerateExamSchema = z.object({
     })
     .optional(),
   customPrompt: z.string().max(1500).optional(),
-  aiProvider: z.enum(['openai', 'gemini', 'self-hosted']).optional(),
+  aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
+  aiModel: z.string().optional(),
   language: z.string().default('Vietnamese'),
 });
 
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
       // 3. Resolve AI Provider & Execute with Auto-Fallback Pool
       const selectedProvider = payload.aiProvider || (process.env.DEFAULT_AI_PROVIDER as SupportedAIProvider) || 'gemini';
-      const initialProvider = AIFactory.getProvider(selectedProvider);
+      const initialProvider = AIFactory.getProvider(selectedProvider, { model: payload.aiModel });
 
       // 4. Create initial DRAFT record in database
       const examRecord = await prisma.exam.create({
@@ -149,6 +149,64 @@ export async function POST(req: NextRequest) {
           `AI exam generation failed: ${generationResult.error || 'Unknown error'}`,
           502
         );
+      }
+
+      // 5.5 Deduplicate and ensure 100% uniqueness of all questions
+      if (generationResult.examData?.questions && Array.isArray(generationResult.examData.questions)) {
+        const { getCurriculumQuestion } = await import('@/lib/curriculum-questions');
+        const seenSignatures = new Set<string>();
+        const uniqueQuestions: any[] = [];
+        const existingContents: string[] = [];
+
+        for (let i = 0; i < generationResult.examData.questions.length; i++) {
+          const q = generationResult.examData.questions[i];
+          const signature = (q.content || '')
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}]+/gu, '')
+            .slice(0, 80);
+
+          if (!signature || seenSignatures.has(signature)) {
+            const levelMap: Record<string, string> = {
+              KNOWLEDGE: 'Nhận biết',
+              COMPREHENSION: 'Thông hiểu',
+              APPLICATION: 'Vận dụng',
+              HIGH_APPLICATION: 'Vận dụng cao',
+            };
+            const levelStr = levelMap[q.cognitiveLevel] || 'Thông hiểu';
+            const fresh = getCurriculumQuestion(
+              payload.curriculum.subject,
+              payload.curriculum.grade,
+              levelStr,
+              i,
+              existingContents
+            );
+
+            const replacement = {
+              questionNumber: i + 1,
+              type: q.type || 'MULTIPLE_CHOICE',
+              cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
+              content: fresh.content,
+              options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
+              correctAnswer: fresh.correctAnswer,
+              explanation: fresh.explanation,
+              points: q.points || payload.totalPoints / payload.totalQuestions,
+            };
+            uniqueQuestions.push(replacement);
+            seenSignatures.add(fresh.content.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').slice(0, 80));
+            existingContents.push(fresh.content);
+          } else {
+            seenSignatures.add(signature);
+            existingContents.push(q.content);
+            q.questionNumber = i + 1;
+            if (Array.isArray(q.options)) {
+              q.options = q.options.map((opt: string) =>
+                typeof opt === 'string' ? opt.replace(/^[A-D\d]+[\.\:\)\-\s]+/i, '').trim() : opt
+              );
+            }
+            uniqueQuestions.push(q);
+          }
+        }
+        generationResult.examData.questions = uniqueQuestions;
       }
 
       // 6. Save JSON Artifact to Local File Storage (/storage/exams/YYYY/MM/{id}.json)
@@ -203,24 +261,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 9. Enqueue Background Email Notification to Teacher via BullMQ
-      if (teacherEmail) {
-        try {
-          await MailQueueService.enqueue({
-            type: 'EXAM_GENERATED',
-            to: teacherEmail,
-            recipientName: teacherName,
-            subject: `Exam Ready: ${payload.title}`,
-            examId: updatedExam.id,
-            examTitle: payload.title,
-            examType: payload.examType,
-            questionCount: generationResult.examData.questions?.length || payload.totalQuestions,
-            viewUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/exams/${updatedExam.id}`,
-          });
-        } catch (mailError) {
-          console.warn('⚠️ [GenerateExam] Mail queue warning:', mailError);
-        }
-      }
+
 
       return apiSuccess(
         {

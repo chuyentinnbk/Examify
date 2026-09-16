@@ -136,4 +136,27 @@ export class JwtService {
       console.warn('⚠️ [JwtService] Error revoking session in Redis:', (error as Error).message);
     }
   }
+
+  /**
+   * Signs a short-lived temporary token (10 minutes) for 2FA verification after password check
+   */
+  public static createPending2FAToken(payload: { userId: string; email: string }): string {
+    return jwt.sign({ ...payload, is2FAPending: true }, JWT_SECRET, { expiresIn: '10m' });
+  }
+
+  /**
+   * Verifies the short-lived 2FA temporary token
+   */
+  public static verifyPending2FAToken(token: string): { userId: string; email: string } | null {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+      if (!decoded || !decoded.is2FAPending || !decoded.userId) {
+        return null;
+      }
+      return { userId: decoded.userId as string, email: decoded.email as string };
+    } catch {
+      return null;
+    }
+  }
 }
+

@@ -9,9 +9,10 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
+     * - assets (static assets: CSS, JS, images)
      * - favicon.ico, sitemap.xml, robots.txt
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/((?!_next/static|_next/image|assets|favicon.ico|sitemap.xml|robots.txt).*)',
   ],
 };
 
@@ -75,6 +76,7 @@ export async function middleware(req: NextRequest) {
   // 2. JWT Authentication & Session Header Enrichment for Protected Routes
   // ----------------------------------------------------------------------------
   const isProtectedApi =
+    pathname === '/api/v1/auth/me' ||
     pathname.startsWith('/api/v1/exams') ||
     pathname.startsWith('/api/v1/curriculum') ||
     pathname.startsWith('/api/v1/admin');

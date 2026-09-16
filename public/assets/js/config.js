@@ -1,0 +1,101 @@
+// Tailwind Configuration & Design Tokens for EduExam.AI
+window.tailwind = window.tailwind || {};
+window.tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-variant": "#d3e4fe",
+        "on-secondary": "#ffffff",
+        "on-tertiary": "#ffffff",
+        "background": "#f8f9ff",
+        "surface-container-high": "#dce9ff",
+        "on-secondary-container": "#5c647a",
+        "on-tertiary-fixed-variant": "#004e5c",
+        "secondary-fixed": "#dae2fd",
+        "on-tertiary-container": "#3cccea",
+        "surface-bright": "#f8f9ff",
+        "on-primary-fixed-variant": "#173bab",
+        "primary": "#00288e",
+        "on-primary-fixed": "#001453",
+        "on-tertiary-fixed": "#001f26",
+        "primary-fixed": "#dde1ff",
+        "secondary-container": "#dae2fd",
+        "surface-container-lowest": "#ffffff",
+        "outline": "#757684",
+        "error-container": "#ffdad6",
+        "surface-dim": "#cbdbf5",
+        "surface": "#f8f9ff",
+        "inverse-primary": "#b8c4ff",
+        "surface-container-highest": "#d3e4fe",
+        "tertiary-fixed-dim": "#4cd7f6",
+        "primary-container": "#1e40af",
+        "on-error": "#ffffff",
+        "on-surface": "#0b1c30",
+        "tertiary-container": "#005362",
+        "inverse-on-surface": "#eaf1ff",
+        "inverse-surface": "#213145",
+        "on-secondary-fixed": "#131b2e",
+        "on-primary": "#ffffff",
+        "on-surface-variant": "#444653",
+        "on-error-container": "#93000a",
+        "on-background": "#0b1c30",
+        "error": "#ba1a1a",
+        "surface-container": "#e5eeff",
+        "surface-container-low": "#eff4ff",
+        "surface-tint": "#3755c3",
+        "secondary-fixed-dim": "#bec6e0",
+        "secondary": "#565e74",
+        "on-secondary-fixed-variant": "#3f465c",
+        "tertiary": "#003a46",
+        "primary-fixed-dim": "#b8c4ff",
+        "on-primary-container": "#a8b8ff",
+        "tertiary-fixed": "#acedff",
+        "outline-variant": "#c4c5d5"
+      },
+      borderRadius: {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      spacing: {
+        "margin": "2rem",
+        "gutter": "1.5rem",
+        "space-md": "1rem",
+        "space-sm": "0.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-xl": "2.5rem",
+        "space-lg": "1.5rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem"
+      },
+      fontFamily: {
+        "headline-md": ["Be Vietnam Pro", "sans-serif"],
+        "headline-lg-mobile": ["Be Vietnam Pro", "sans-serif"],
+        "headline-lg": ["Be Vietnam Pro", "sans-serif"],
+        "headline-xl": ["Be Vietnam Pro", "sans-serif"],
+        "body-lg": ["Be Vietnam Pro", "sans-serif"],
+        "body-md": ["Be Vietnam Pro", "sans-serif"],
+        "headline-xl-mobile": ["Be Vietnam Pro", "sans-serif"],
+        "body-sm": ["Be Vietnam Pro", "sans-serif"],
+        "headline-sm": ["Be Vietnam Pro", "sans-serif"],
+        "label-md": ["Be Vietnam Pro", "sans-serif"],
+        "label-sm": ["Be Vietnam Pro", "sans-serif"]
+      },
+      fontSize: {
+        "headline-md": ["20px", { lineHeight: "26px", fontWeight: "600" }],
+        "headline-lg-mobile": ["22px", { lineHeight: "28px", fontWeight: "600" }],
+        "headline-lg": ["28px", { lineHeight: "36px", fontWeight: "600" }],
+        "headline-xl": ["36px", { lineHeight: "44px", fontWeight: "700" }],
+        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+        "headline-xl-mobile": ["28px", { lineHeight: "36px", fontWeight: "700" }],
+        "body-sm": ["12px", { lineHeight: "18px", fontWeight: "400" }],
+        "headline-sm": ["16px", { lineHeight: "22px", fontWeight: "600" }],
+        "label-md": ["13px", { lineHeight: "18px", fontWeight: "500" }],
+        "label-sm": ["11px", { lineHeight: "16px", fontWeight: "600" }]
+      }
+    }
+  }
+};

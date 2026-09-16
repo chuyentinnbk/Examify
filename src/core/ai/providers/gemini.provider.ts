@@ -19,13 +19,13 @@ export class GeminiProvider implements IAIProvider {
     const rawKeys = config?.apiKey || process.env.GEMINI_API_KEY || '';
     this.keyPool = new KeyPoolManager('Gemini', rawKeys);
 
-    // Support comma-separated models list: "gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash"
-    const rawModels = (config?.model || process.env.GEMINI_MODEL || 'gemini-1.5-flash')
+    // Support comma-separated models list: "gemini-3.6-flash, gemini-3.7-flash, gemini-flash-latest"
+    const rawModels = (config?.model || process.env.GEMINI_MODEL || 'gemini-3.6-flash')
       .split(/[,;]+/)
       .map((m) => m.trim())
       .filter((m) => m.length > 0);
 
-    this.modelName = rawModels[0] || 'gemini-1.5-flash';
+    this.modelName = rawModels[0] || 'gemini-3.6-flash';
     this.fallbackModels = rawModels;
   }
 

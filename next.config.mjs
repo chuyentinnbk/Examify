@@ -16,6 +16,20 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/setup',
+        destination: '/#setup-wizard',
+        permanent: false,
+      },
+      {
+        source: '/dashboard',
+        destination: '/#dashboard',
+        permanent: false,
+      },
+    ];
+  },
   webpack: (config, { isServer, nextRuntime }) => {
     if (nextRuntime === 'edge') {
       config.resolve.alias = {

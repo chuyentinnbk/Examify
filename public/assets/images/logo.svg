@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" fill="none">
+  <rect width="44" height="44" x="8" y="8" rx="10" fill="url(#gradLogo)"/>
+  <path d="M22 19L38 19C40.2091 19 42 20.7909 42 23V39C42 41.2091 40.2091 43 38 43H22C19.7909 43 18 41.2091 18 39V23C18 20.7909 19.7909 19 22 19Z" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M24 26L36 26" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M24 31L32 31" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M24 36L29 36" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="36" cy="35" r="3.5" fill="#38BDF8"/>
+  <path d="M36 33.5V36.5M34.5 35H37.5" stroke="#0F172A" stroke-width="1.2" stroke-linecap="round"/>
+  <text x="62" y="32" font-family="'Be Vietnam Pro', system-ui, sans-serif" font-weight="800" font-size="20" fill="#0F172A" letter-spacing="-0.5">EduExam<tspan fill="#2563EB">.AI</tspan></text>
+  <text x="62" y="45" font-family="'Be Vietnam Pro', system-ui, sans-serif" font-weight="500" font-size="10.5" fill="#64748B" letter-spacing="0.2">HỆ THỐNG KHẢO THÍ &amp; TẠO ĐỀ</text>
+  <defs>
+    <linearGradient id="gradLogo" x1="8" y1="8" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+</svg>

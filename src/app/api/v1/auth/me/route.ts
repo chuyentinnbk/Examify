@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
         fullName: true,
         role: true,
         isActive: true,
+        twoFactorEnabled: true,
         createdAt: true,
       },
     });
@@ -25,7 +26,21 @@ export async function GET(req: NextRequest) {
       return apiError('User not found', 404);
     }
 
-    return apiSuccess({ user });
+    const instSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'institution_name' },
+    });
+
+    const avatarSetting = await prisma.systemSetting.findUnique({
+      where: { key: `avatar_style_${userId}` },
+    });
+
+    return apiSuccess({
+      user: {
+        ...user,
+        institutionName: instSetting?.value || 'Hệ thống Khảo thí Examify',
+        avatarStyle: avatarSetting?.value || 'identicon',
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Database error';
     return apiError(message, 500);

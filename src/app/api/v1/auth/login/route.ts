@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const validation = LoginSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.flatten().fieldErrors, 422, 'Invalid login credentials');
+      return apiError(validation.error.flatten().fieldErrors, 422, 'Thông tin đăng nhập không hợp lệ');
     }
 
     const { email, password } = validation.data;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         { attemptedEmail: email },
         { ip: clientIp, userAgent }
       );
-      return apiError('Invalid email or password', 401);
+      return apiError('Email hoặc mật khẩu không chính xác', 401);
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
@@ -44,43 +44,66 @@ export async function POST(req: NextRequest) {
         { userId: user.id, email: user.email },
         { ip: clientIp, userAgent, userId: user.id }
       );
-      return apiError('Invalid email or password', 401);
+      return apiError('Email hoặc mật khẩu không chính xác', 401);
     }
 
-    const session = await JwtService.createSession(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        fullName: user.fullName,
-      },
-      {
-        ipAddress: clientIp,
-        userAgent,
-      }
-    );
+    // 1. If 2FA is NOT enabled (default), log in directly!
+    if (!user.twoFactorEnabled) {
+      const session = await JwtService.createSession(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          fullName: user.fullName,
+        },
+        {
+          ipAddress: clientIp,
+          userAgent,
+        }
+      );
 
-    await AuditLogger.log({
-      action: 'LOGIN_SUCCESS',
-      entity: 'USER',
-      entityId: user.id,
+      await AuditLogger.log({
+        action: 'LOGIN_SUCCESS',
+        entity: 'USER',
+        entityId: user.id,
+        userId: user.id,
+        clientIp,
+        userAgent,
+      });
+
+      return apiSuccess({
+        requires2FA: false,
+        token: session.token,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          twoFactorEnabled: false,
+        },
+        expiresAt: session.expiresAt,
+      });
+    }
+
+    // 2. 2FA is ENABLED by user in account settings -> issue temporary token and require 2FA OTP
+    const tempToken = JwtService.createPending2FAToken({
       userId: user.id,
-      clientIp,
-      userAgent,
+      email: user.email,
     });
 
     return apiSuccess({
-      token: session.token,
+      requires2FA: true,
+      tempToken,
       user: {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        twoFactorEnabled: true,
       },
-      expiresAt: session.expiresAt,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Login failed';
+    const message = error instanceof Error ? error.message : 'Đăng nhập thất bại';
     return apiError(message, 500);
   }
 }

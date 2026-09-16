@@ -1,9 +1,10 @@
 import { ExamGenerationPayload, ExamGenerationResult, IAIProvider, ProviderConfig } from './types';
 import { OpenAIProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { ClaudeProvider } from './providers/claude.provider';
 import { SelfHostedProvider } from './providers/self-hosted.provider';
 
-export type SupportedAIProvider = 'openai' | 'gemini' | 'self-hosted';
+export type SupportedAIProvider = 'openai' | 'gemini' | 'claude' | 'self-hosted' | 'custom-mcp';
 
 export class AIFactory {
   /**
@@ -21,16 +22,23 @@ export class AIFactory {
 
     switch (activeProvider) {
       case 'openai':
+      case 'chatgpt':
         return new OpenAIProvider(config);
 
       case 'gemini':
       case 'google':
         return new GeminiProvider(config);
 
+      case 'claude':
+      case 'anthropic':
+        return new ClaudeProvider(config);
+
       case 'self-hosted':
       case 'ollama':
       case 'vllm':
       case 'local':
+      case 'custom-mcp':
+      case 'mcp':
         return new SelfHostedProvider(config);
 
       default:
