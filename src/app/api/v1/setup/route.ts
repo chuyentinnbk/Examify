@@ -274,17 +274,14 @@ export async function POST(req: NextRequest) {
 
     // 3. Ensure Database Schema is pushed if database is fresh
     try {
-      const prismaCliPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
-      if (fs.existsSync(prismaCliPath)) {
-        execSync(`node "${prismaCliPath}" db push --skip-generate --accept-data-loss`, {
-          env: { ...process.env, ...envUpdates, DATABASE_URL: effectiveDbUrl },
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 45000,
-        });
-      } else {
-        execSync('npx prisma db push --skip-generate --accept-data-loss', {
-          env: { ...process.env, ...envUpdates, DATABASE_URL: effectiveDbUrl },
+      const tablesExist = await prisma.user.count().then(() => true).catch(() => false);
+      if (!tablesExist) {
+        const prismaCliPath = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
+        const pushCmd = fs.existsSync(prismaCliPath)
+          ? `node "${prismaCliPath}" db push --skip-generate --accept-data-loss`
+          : 'npx prisma db push --skip-generate --accept-data-loss';
+        execSync(pushCmd, {
+          env: { ...process.env, ...envUpdates, DATABASE_URL: effectiveDbUrl, PRISMA_HIDE_UPDATE_MESSAGE: 'true' },
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
           timeout: 45000,
