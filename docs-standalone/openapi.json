@@ -1,35 +1,4 @@
-export interface OpenAPISpec {
-  openapi: string;
-  info: {
-    title: string;
-    version: string;
-    description: string;
-    contact?: {
-      name?: string;
-      email?: string;
-      url?: string;
-    };
-    license?: {
-      name: string;
-      url?: string;
-    };
-  };
-  servers: Array<{
-    url: string;
-    description?: string;
-  }>;
-  tags: Array<{
-    name: string;
-    description: string;
-  }>;
-  paths: Record<string, Record<string, unknown>>;
-  components: {
-    securitySchemes: Record<string, unknown>;
-    schemas: Record<string, unknown>;
-  };
-}
-
-export const openApiSpec: OpenAPISpec = {
+{
   "openapi": "3.0.3",
   "info": {
     "title": "Examify API Documentation",
@@ -2739,4 +2708,4 @@ export const openApiSpec: OpenAPISpec = {
       }
     }
   }
-};
+}

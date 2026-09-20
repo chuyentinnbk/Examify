@@ -35,14 +35,34 @@ export async function PUT(
     const updateData: any = {};
 
     if (body.title) updateData.title = body.title;
-    if (body.duration) updateData.durationMinutes = body.duration;
+    // Parse existing structuredJson
+    let existingStructured: Record<string, any> = {};
+    try {
+      if (existing.structuredJson) {
+        existingStructured = JSON.parse(existing.structuredJson);
+      }
+    } catch {
+      // ignore
+    }
+
+    const newStructured: Record<string, any> = {
+      ...existingStructured,
+      title: body.title || existingStructured.title || existing.title,
+    };
+
     if (body.questions) {
       updateData.totalQuestions = body.questions.length;
-      updateData.structuredJson = JSON.stringify({
-        title: body.title || existing.title,
-        questions: body.questions,
-      });
+      newStructured.questions = body.questions;
     }
+    if (body.department !== undefined) newStructured.department = body.department;
+    if (body.schoolName !== undefined) newStructured.schoolName = body.schoolName;
+    if (body.sessionTitle !== undefined) newStructured.sessionTitle = body.sessionTitle;
+    if (body.academicYear !== undefined) newStructured.academicYear = body.academicYear;
+    if (body.sectionTitles !== undefined) newStructured.sectionTitles = body.sectionTitles;
+    if (body.sectionDescriptions !== undefined) newStructured.sectionDescriptions = body.sectionDescriptions;
+    if (body.code !== undefined) newStructured.code = body.code;
+
+    updateData.structuredJson = JSON.stringify(newStructured);
 
     if (body.matrix) {
       updateData.cognitiveMatrix = JSON.stringify({

@@ -141,30 +141,199 @@ body {
   }
 }
 
-/* Print Optimization for Exams */
+/* Print Optimization for Exams (Chuẩn in ấn Bộ GD&ĐT trên khổ A4) */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 18mm 15mm;
+
+    /* Xóa sạch các header mặc định của trình duyệt (loại bỏ URL, ngày giờ, website title) */
+    @top-left { content: none !important; }
+    @top-center { content: none !important; }
+    @top-right { content: none !important; }
+    @bottom-left { content: none !important; }
+    @bottom-center { content: none !important; }
+
+    /* VẪN GIỮ LẠI SỐ TRANG (Chuẩn kỳ thi Việt Nam: Trang 1 / 2 hoặc Trang 1 / 3) */
+    @bottom-right {
+      content: "Trang " counter(page) " / " counter(pages);
+      font-family: 'Times New Roman', Times, serif !important;
+      font-size: 10pt !important;
+      font-style: italic !important;
+      color: #000000 !important;
+    }
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
-  }
-  #sidebar-root, #header-root, #toast-container, .no-print {
-    display: none !important;
-  }
-  #content-wrapper {
-    padding-left: 0 !important;
-  }
-  main#main-view {
-    padding-top: 0 !important;
-  }
-  .modal-backdrop {
-    position: static !important;
-    background: transparent !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
     padding: 0 !important;
   }
-  .modal-content {
-    box-shadow: none !important;
-    border: none !important;
+
+  /* Hide all web UI chrome */
+  aside,
+  header,
+  nav,
+  #sidebar-root,
+  #header-root,
+  #toast-container,
+  .no-print,
+  button,
+  select,
+  input[type="checkbox"],
+  .material-symbols-outlined {
+    display: none !important;
+  }
+
+  /* Remove sidebar offsets & wrapper margins */
+  .md\:pl-64,
+  #content-wrapper {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
     max-width: 100% !important;
+  }
+
+  .view-container,
+  .max-w-5xl,
+  .max-w-7xl {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Clean print cards */
+  .bg-white,
+  .dark\:bg-slate-900,
+  .dark\:bg-slate-950 {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: #000000 !important;
+  }
+
+  /* Prevent question cards from breaking awkwardly */
+  .question-card,
+  [class*="rounded-2xl border"] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 2px 0 !important;
+    margin-bottom: 8px !important;
+    box-shadow: none !important;
+  }
+
+  /* Khung đóng hộp Mã đề thi khi in (Chuẩn Bộ GD&ĐT) */
+  .exam-code-box {
+    border: 1.5pt solid #000000 !important;
+    display: inline-flex !important;
+    padding: 2px 12px !important;
+    background: transparent !important;
+    color: #000000 !important;
+  }
+
+  /* Đảm bảo các ô input tiêu đề xuất xứ đề khi in ra giấy là chữ in phẳng chuẩn */
+  input {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #000000 !important;
+    outline: none !important;
+  }
+
+  /* Bảng in câu hỏi trắc nghiệm Đúng / Sai chuẩn Bộ GD&ĐT (GDPT 2018 / 2025) */
+  table.tf-print-table,
+  .tf-print-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: 1.2pt solid #000000 !important;
+    margin-top: 5px !important;
+    margin-bottom: 8px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    background: transparent !important;
+  }
+
+  table.tf-print-table thead,
+  .tf-print-table thead {
+    display: table-header-group !important;
+  }
+
+  table.tf-print-table tr,
+  .tf-print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  table.tf-print-table th,
+  .tf-print-table th,
+  table.tf-print-table td,
+  .tf-print-table td {
+    border: 1pt solid #000000 !important;
+    color: #000000 !important;
+    background: transparent !important;
+    padding: 3.5px 6px !important;
+    font-size: 11pt !important;
+  }
+
+  table.tf-print-table th,
+  .tf-print-table th {
+    font-weight: bold !important;
+    text-align: center !important;
+  }
+
+  /* Adaptive Exam Options Print Formatting */
+  .exam-options-grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 0 !important;
+    margin-top: 3px !important;
+    padding: 0 !important;
+  }
+
+  .exam-opt-col-4 {
+    width: 25% !important;
+    padding: 1px 4px !important;
+    box-sizing: border-box !important;
+  }
+
+  .exam-opt-col-2 {
+    width: 50% !important;
+    padding: 1px 4px !important;
+    box-sizing: border-box !important;
+  }
+
+  .exam-opt-col-1 {
+    width: 100% !important;
+    padding: 1px 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .exam-opt-item {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print\:break-before-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .katex {
+    font-size: 1.05em !important;
   }
 }
 
@@ -186,4 +355,18 @@ body {
   transform-origin: 0% 50%;
   width: 100%;
 }
+
+/* html2pdf.js overlay fix - ensures html2canvas renders with 100% opacity and never blank */
+.html2pdf__overlay {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+.html2pdf__container {
+  height: auto !important;
+  min-height: 100% !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
 

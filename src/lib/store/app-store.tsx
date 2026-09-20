@@ -16,6 +16,8 @@ export interface QuestionOption {
   isCorrect: boolean;
 }
 
+export type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
+
 export interface ExamQuestion {
   id: number | string;
   order: string;
@@ -23,6 +25,8 @@ export interface ExamQuestion {
   levelClass?: string;
   topic: string;
   content: string;
+  type?: QuestionType | string;
+  section?: string;
   options: QuestionOption[];
   points: number;
   correctAnswer: string;
@@ -31,11 +35,16 @@ export interface ExamQuestion {
 
 export interface ExamItem {
   id: string;
+  code?: string;
   title: string;
   subject: string;
   grade: string;
   term: string;
   year: string;
+  sessionTitle?: string;
+  academicYear?: string;
+  sectionTitles?: Record<string, string>;
+  sectionDescriptions?: Record<string, string>;
   questionsCount: number;
   duration: number;
   status: 'approved' | 'review' | 'draft';
@@ -44,7 +53,34 @@ export interface ExamItem {
   updatedAt: string;
   matrix: ExamMatrix;
   isAiGenerated: boolean;
+  department?: string;
+  schoolName?: string;
   questions?: ExamQuestion[];
+}
+
+/**
+ * Rút gọn và chuẩn hóa Mã đề thi theo chuẩn kỳ thi Việt Nam (3 chữ số: 101, 102, 134...).
+ */
+export function formatExamCode(id?: string, code?: string): string {
+  if (code && code.trim()) return code.trim();
+  if (!id) return '101';
+  const cleanId = id.trim();
+  // Nếu đã là 3-4 chữ số (ví dụ '101', '134') thì dùng luôn
+  if (/^\d{3,4}$/.test(cleanId)) return cleanId;
+  // Lấy các chữ số cuối cùng
+  const digits = cleanId.replace(/\D/g, '');
+  if (digits.length >= 3) {
+    return digits.slice(-3);
+  }
+  if (digits.length > 0) {
+    return digits.padStart(3, '1');
+  }
+  // Băm chuỗi ra số ngẫu nhiên cố định từ 101 đến 999
+  let hash = 0;
+  for (let i = 0; i < cleanId.length; i++) {
+    hash = (hash * 31 + cleanId.charCodeAt(i)) % 900;
+  }
+  return String(101 + Math.abs(hash));
 }
 
 export interface UserProfile {

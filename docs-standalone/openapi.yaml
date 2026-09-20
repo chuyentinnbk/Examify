@@ -1,0 +1,1875 @@
+openapi: 3.0.3
+info:
+  title: Examify API Documentation
+  version: 1.0.0
+  description: >-
+    **Examify** is a production-grade, self-hosted AI Exam Generation &
+    Assessment Platform built on Next.js 15 (App Router), MariaDB (Prisma ORM),
+    Redis, and multi-model AI adapters (Google Gemini, OpenAI, Anthropic Claude,
+    and Self-Hosted/vLLM/Ollama).
+
+
+    ### Core Security & Platform Highlights:
+
+    - **Zero Cloudflare Dependencies**: Self-hosted Redis Sliding Window rate
+    limiting and MaxMind GeoIP resolution.
+
+    - **Strict Role-Based Access Control**: `ADMIN` and `TEACHER` roles with
+    token blacklisting in Redis.
+
+    - **Two-Factor Authentication (2FA)**: Built-in TOTP (Google Authenticator)
+    with QR code setup and challenge verification.
+
+    - **Anti-Prompt Injection Guard**: Advanced multi-tier sanitization and
+    jailbreak defense for teacher custom instructions.
+
+    - **Permanent Initialization Lock**: One-time initial setup endpoint locked
+    permanently once root admin is created.
+
+    - **Comprehensive Audit Trail**: Immutable system logs recording security
+    events, authentication attempts, AI synthesis, and administrative updates.
+  contact:
+    name: Examify Engineering Team
+    email: admin@examify.local
+    url: http://localhost:3000
+  license:
+    name: Proprietary
+servers:
+  - url: /api/v1
+    description: Examify API v1 Base Path
+tags:
+  - name: Setup & System
+    description: Zero-day system initialization, connection diagnostics, and
+      permanent lock management
+  - name: Authentication & Profile
+    description: JWT issuance, session validation, 2FA TOTP challenges, password
+      management, and user profiles
+  - name: Curriculum
+    description: Hierarchical Vietnamese K-12 curriculum taxonomy (Levels -> Grades
+      -> Subjects -> Semesters -> Topics -> Lessons)
+  - name: Exams & Synthesis
+    description: Multi-AI exam generation, question regeneration, manual
+      creation/editing, and cognitive matrix distribution
+  - name: AI Configuration
+    description: Multi-provider AI model discovery (Gemini, OpenAI, Claude,
+      Local/vLLM), API key management, and default model settings
+  - name: Admin - Teachers
+    description: Teacher account administration, quota monitoring, role assignment,
+      and 2FA reset (ADMIN only)
+  - name: Admin - Security & GeoIP
+    description: Redis sliding-window rate limit tuning, GeoIP country
+      blocking/whitelisting, and IP simulation testing (ADMIN only)
+  - name: Admin - Audit Logs
+    description: System-wide immutable security, operational audit logging, and
+      suspicious activity tracking (ADMIN only)
+  - name: API Specifications
+    description: Live machine-readable OpenAPI 3.0.3 specification downloads (JSON and YAML)
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Provide your JWT bearer token in the Authorization header (e.g.
+        `Bearer eyJhbGciOi...`).
+  schemas:
+    StandardResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully.
+        data:
+          type: object
+    StandardError:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Resource not found or validation failure.
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        errors:
+          type: object
+          description: Field-level validation error details
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: d3b07384-d113-460d-9b16-f288e2c4908a
+        email:
+          type: string
+          format: email
+          example: teacher@examify.local
+        fullName:
+          type: string
+          example: ThS. Nguyễn Văn An
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - TEACHER
+          example: TEACHER
+        school:
+          type: string
+          example: THPT Chuyên Trần Phú
+        twoFactorEnabled:
+          type: boolean
+          example: false
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+    CognitiveMatrix:
+      type: object
+      description: Bloom taxonomy percentage distribution (must sum to 100%).
+      properties:
+        knowledge:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 40
+          description: Nhận biết (%)
+        comprehension:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 30
+          description: Thông hiểu (%)
+        application:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 20
+          description: Vận dụng (%)
+        highApplication:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 10
+          description: Vận dụng cao (%)
+    QuestionOption:
+      type: object
+      properties:
+        key:
+          type: string
+          example: A
+        text:
+          type: string
+          example: x = 2 hoặc x = -3
+        isCorrect:
+          type: boolean
+          example: false
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          example: q-1
+        questionNumber:
+          type: integer
+          example: 1
+        type:
+          type: string
+          enum:
+            - multiple_choice
+            - true_false
+            - short_answer
+            - essay
+          example: multiple_choice
+        cognitiveLevel:
+          type: string
+          enum:
+            - KNOWLEDGE
+            - COMPREHENSION
+            - APPLICATION
+            - HIGH_APPLICATION
+          example: COMPREHENSION
+        level:
+          type: string
+          example: Thông hiểu
+        content:
+          type: string
+          example: "Cho hàm số \\(y = f(x)\\) có bảng biến thiên như hình vẽ. Số điểm cực
+            trị của hàm số là:"
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionOption"
+        correctAnswer:
+          type: string
+          example: B
+        explanation:
+          type: string
+          example: Đạo hàm đổi dấu 2 lần qua các điểm cực trị.
+        points:
+          type: number
+          example: 0.25
+    ExamItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: b1b52817-820d-41d9-adfe-55c8293546c1
+        title:
+          type: string
+          example: Đề thi Khảo sát chất lượng Toán 12 - Học kỳ 1
+        subject:
+          type: string
+          example: Toán học
+        grade:
+          type: string
+          example: Lớp 12
+        term:
+          type: string
+          example: Học kỳ 1
+        duration:
+          type: integer
+          example: 90
+        status:
+          type: string
+          enum:
+            - approved
+            - review
+            - draft
+          example: approved
+        totalQuestions:
+          type: integer
+          example: 22
+        matrix:
+          $ref: "#/components/schemas/CognitiveMatrix"
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AuditLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: log-102938
+        action:
+          type: string
+          example: EXAM_GENERATED
+        entity:
+          type: string
+          example: Exam
+        entityId:
+          type: string
+          example: b1b52817-820d-41d9-adfe-55c8293546c1
+        userId:
+          type: string
+          example: usr-admin-01
+        user:
+          type: object
+          properties:
+            fullName:
+              type: string
+              example: Nguyễn Văn An
+            email:
+              type: string
+              example: an.nguyen@spt.edu.vn
+        clientIp:
+          type: string
+          example: 14.161.22.45
+        country:
+          type: string
+          example: VN
+        userAgent:
+          type: string
+          example: Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+        details:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+    TeacherItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: GV-001
+        name:
+          type: string
+          example: ThS. Nguyễn Văn An
+        email:
+          type: string
+          example: an.nguyen@spt.edu.vn
+        role:
+          type: string
+          example: Tổ trưởng chuyên môn
+        department:
+          type: string
+          example: Toán - Tin học
+        twoFactorEnabled:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+          example: active
+        tokensUsed:
+          type: integer
+          example: 142500
+        createdAt:
+          type: string
+          format: date-time
+    ModelInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: gemini-2.0-flash
+        name:
+          type: string
+          example: Gemini 2.0 Flash
+        provider:
+          type: string
+          enum:
+            - gemini
+            - openai
+            - claude
+            - self-hosted
+          example: gemini
+        description:
+          type: string
+          example: High performance, low latency generation
+        isDefault:
+          type: boolean
+          example: true
+paths:
+  /setup:
+    get:
+      tags:
+        - Setup & System
+      summary: Kiểm tra trạng thái khởi tạo hệ thống (Setup Status)
+      description: Kiểm tra xem hệ thống đã được cấu hình tài khoản Quản trị viên tối
+        cao (root ADMIN) hay chưa.
+      responses:
+        "200":
+          description: Trạng thái khởi tạo của hệ thống
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      isInitialized:
+                        type: boolean
+                        example: true
+                      setupRequired:
+                        type: boolean
+                        example: false
+                      institutionName:
+                        type: string
+                        example: Trường THPT Chuyên Trần Phú
+                      adminEmail:
+                        type: string
+                        example: admin@examify.local
+    post:
+      tags:
+        - Setup & System
+      summary: Khởi tạo hệ thống lần đầu & Tạo Root ADMIN (Khóa vĩnh viễn sau đó)
+      description: Tạo tài khoản Quản trị viên tối cao và cấu hình hệ thống ban đầu
+        (MySQL, Redis, AI API keys). Sau khi tạo thành công, endpoint này bị
+        khóa vĩnh viễn (HTTP 403).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - fullName
+                - institutionName
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@examify.local
+                password:
+                  type: string
+                  minLength: 8
+                  example: AdminP@ssw0rd2026
+                fullName:
+                  type: string
+                  example: Quản trị viên Hệ thống
+                institutionName:
+                  type: string
+                  example: Trường THPT Chuyên Trần Phú
+                database:
+                  type: object
+                  properties:
+                    host:
+                      type: string
+                      default: localhost
+                    port:
+                      type: integer
+                      default: 3306
+                    user:
+                      type: string
+                      default: root
+                    password:
+                      type: string
+                      default: ""
+                    database:
+                      type: string
+                      default: examify
+                redis:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    host:
+                      type: string
+                      default: localhost
+                    port:
+                      type: integer
+                      default: 6379
+                    password:
+                      type: string
+                      default: ""
+                    db:
+                      type: integer
+                      default: 0
+                ai:
+                  type: object
+                  properties:
+                    defaultProvider:
+                      type: string
+                      enum:
+                        - gemini
+                        - openai
+                        - claude
+                        - self-hosted
+                      default: gemini
+                    geminiApiKey:
+                      type: string
+                      example: AIzaSy...
+                    geminiModel:
+                      type: string
+                      default: gemini-2.0-flash
+                    openaiApiKey:
+                      type: string
+                      example: sk-proj-...
+                    openaiModel:
+                      type: string
+                      default: gpt-4o-mini
+      responses:
+        "201":
+          description: Khởi tạo hệ thống thành công và trả về JWT Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Hệ thống đã được thiết lập thành công.
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: eyJhbGciOiJIUzI1Ni...
+                      user:
+                        $ref: "#/components/schemas/UserResponse"
+        "403":
+          description: Hệ thống đã được khởi tạo trước đó. Không thể thiết lập lại.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /setup/test-connection:
+    post:
+      tags:
+        - Setup & System
+      summary: Kiểm tra kết nối dịch vụ (MySQL, Redis, AI Provider)
+      description: Kiểm tra tính hợp lệ và độ trễ phản hồi (latency) của cơ sở dữ liệu
+        MySQL, Redis Cache hoặc API key của các nhà cung cấp AI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - config
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - mysql
+                    - redis
+                    - gemini
+                    - openai
+                    - claude
+                    - self-hosted
+                  example: gemini
+                config:
+                  type: object
+                  description: Thông tin kết nối tương ứng với từng loại dịch vụ
+                  example:
+                    apiKey: AIzaSy...
+      responses:
+        "200":
+          description: Kết nối kiểm tra thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Kết nối Google Gemini thành công
+                  data:
+                    type: object
+                    properties:
+                      latencyMs:
+                        type: integer
+                        example: 320
+                      modelCount:
+                        type: integer
+                        example: 12
+        "400":
+          description: Kết nối thất bại hoặc thông số không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/login:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Đăng nhập người dùng & Cấp phiên JWT
+      description: "Xác thực tài khoản bằng email và mật khẩu. Nếu tài khoản bật xác
+        thực hai yếu tố (2FA), hệ thống trả về mã `requires2FA: true` và
+        `tempToken` để tiếp tục xác thực TOTP."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: teacher@examify.local
+                password:
+                  type: string
+                  example: TeacherP@ss123
+      responses:
+        "200":
+          description: Đăng nhập thành công (hoặc yêu cầu mã 2FA)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: eyJhbGciOiJIUzI1Ni...
+                      user:
+                        $ref: "#/components/schemas/UserResponse"
+                      requires2FA:
+                        type: boolean
+                        example: false
+                      tempToken:
+                        type: string
+                        description: Token tạm thời dùng cho bước verify 2FA
+        "401":
+          description: Email hoặc mật khẩu không chính xác
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/register:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Đăng ký tài khoản Giáo viên mới
+      description: Tạo tài khoản giáo viên với vai trò `TEACHER`. Tự động kích hoạt
+        hoặc chờ phê duyệt tùy cài đặt hệ thống.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fullName
+                - email
+                - password
+              properties:
+                fullName:
+                  type: string
+                  example: ThS. Trần Thị Mai
+                email:
+                  type: string
+                  format: email
+                  example: mai.tran@spt.edu.vn
+                password:
+                  type: string
+                  minLength: 6
+                  example: MaiTran@2026
+                school:
+                  type: string
+                  example: Trường THPT Chuyên Sư Phạm
+      responses:
+        "201":
+          description: Tạo tài khoản thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+        "400":
+          description: Email đã tồn tại hoặc dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/logout:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Đăng xuất & Thu hồi phiên JWT trên Redis
+      description: Thu hồi token hiện tại bằng cách lưu vào danh sách đen (Blacklist)
+        trong Redis cho đến khi hết hạn tự nhiên.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Đăng xuất thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+  /auth/me:
+    get:
+      tags:
+        - Authentication & Profile
+      summary: Lấy thông tin tài khoản hiện tại
+      description: Trả về hồ sơ cá nhân, vai trò, trường học và trạng thái bảo mật của
+        phiên đăng nhập hiện tại.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Thông tin tài khoản xác thực
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Chưa đăng nhập hoặc token đã hết hạn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/profile:
+    put:
+      tags:
+        - Authentication & Profile
+      summary: Cập nhật hồ sơ cá nhân
+      description: Cập nhật họ tên, trường công tác hoặc kiểu avatar đại diện.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  example: PGS. TS. Nguyễn Văn An
+                school:
+                  type: string
+                  example: Đại học Quốc gia Hà Nội
+                avatarStyle:
+                  type: string
+                  example: bottts
+      responses:
+        "200":
+          description: Cập nhật thông tin thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Đổi mật khẩu tài khoản
+      description: Đổi mật khẩu tài khoản hiện tại bằng cách xác minh mật khẩu cũ và
+        đặt mật khẩu mới tối thiểu 6 ký tự.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  example: OldPassword123
+                newPassword:
+                  type: string
+                  minLength: 6
+                  example: NewStrongPassword@2026
+      responses:
+        "200":
+          description: Đổi mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+        "400":
+          description: Mật khẩu cũ không chính xác hoặc mật khẩu mới không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/2fa/setup:
+    get:
+      tags:
+        - Authentication & Profile
+      summary: Khởi tạo thiết lập 2FA (TOTP Secret & QR Code)
+      description: Sinh khóa bí mật Base32 và mã QR tương thích với ứng dụng Google
+        Authenticator / Microsoft Authenticator.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Khóa bí mật và mã QR 2FA
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      secret:
+                        type: string
+                        example: JBSWY3DPEHPK3PXP
+                      qrCodeUri:
+                        type: string
+                        example: data:image/png;base64,iVBORw0KGgo...
+  /auth/2fa/verify:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Xác minh mã TOTP trong quá trình đăng nhập (Bước 2)
+      description: Xác minh mã số 6 chữ số từ ứng dụng xác thực cùng với token phiên
+        tạm `tempToken` nhận được từ bước đăng nhập.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tempToken
+                - code
+              properties:
+                tempToken:
+                  type: string
+                  example: temp-2fa-token-xyz
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: "582914"
+      responses:
+        "200":
+          description: Xác thực 2FA thành công, cấp JWT Bearer Token chính thức
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: eyJhbGciOiJIUzI1Ni...
+                      user:
+                        $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Mã xác thực 2FA không đúng hoặc đã hết hạn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /auth/2fa/toggle:
+    post:
+      tags:
+        - Authentication & Profile
+      summary: Bật hoặc tắt bảo mật hai lớp (2FA)
+      description: Kích hoạt hoặc vô hiệu hóa bảo vệ xác thực hai yếu tố trên tài
+        khoản của người dùng.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum:
+                    - enable
+                    - disable
+                  example: enable
+                code:
+                  type: string
+                  example: "123456"
+                  description: Mã TOTP 6 số để xác nhận khi bật
+      responses:
+        "200":
+          description: Thay đổi trạng thái 2FA thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+  /curriculum:
+    get:
+      tags:
+        - Curriculum
+      summary: Lấy cây danh mục chương trình giáo dục K-12
+      description: "Trả về toàn bộ phân cấp chương trình giáo dục: Cấp học (THCS,
+        THPT) -> Khối lớp (10, 11, 12) -> Môn học -> Học kỳ -> Chủ đề -> Bài
+        học."
+      parameters:
+        - name: level
+          in: query
+          required: false
+          description: "Lọc theo mã cấp học (ví dụ: THPT, THCS)"
+          schema:
+            type: string
+            example: THPT
+        - name: grade
+          in: query
+          required: false
+          description: "Lọc theo mã khối lớp (ví dụ: 12, 11, 10)"
+          schema:
+            type: string
+            example: "12"
+      responses:
+        "200":
+          description: Cây danh mục chương trình chuẩn
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                          example: Trung học Phổ thông
+                        code:
+                          type: string
+                          example: THPT
+                        grades:
+                          type: array
+                          items:
+                            type: object
+  /exams:
+    get:
+      tags:
+        - Exams & Synthesis
+      summary: Danh sách đề thi của người dùng (hoặc tất cả nếu là ADMIN)
+      description: Lấy danh sách các đề thi đã tạo, trạng thái kiểm duyệt, số câu hỏi
+        và ma trận nhận thức tương ứng.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Danh sách đề thi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ExamItem"
+    post:
+      tags:
+        - Exams & Synthesis
+      summary: Tạo hoặc lưu cập nhật đề thi thủ công (Upsert)
+      description: Lưu toàn bộ cấu trúc đề thi gồm tiêu đề, môn, khối lớp, danh sách
+        câu hỏi, phương án, đáp án và ma trận nhận thức vào cơ sở dữ liệu.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  description: Để trống nếu tạo mới, hoặc truyền UUID nếu cập nhật đề thi đã có
+                title:
+                  type: string
+                  example: Đề thi Khảo sát Toán 12 Học kỳ 1
+                subject:
+                  type: string
+                  default: Toán học
+                  example: Toán học
+                grade:
+                  type: string
+                  default: Lớp 12
+                  example: Lớp 12
+                term:
+                  type: string
+                  default: Học kỳ 1
+                  example: Học kỳ 1
+                duration:
+                  type: integer
+                  default: 45
+                  example: 90
+                status:
+                  type: string
+                  enum:
+                    - approved
+                    - review
+                    - draft
+                  default: approved
+                matrix:
+                  $ref: "#/components/schemas/CognitiveMatrix"
+                questions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Question"
+      responses:
+        "201":
+          description: Lưu đề thi thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã lưu đề thi thành công vào cơ sở dữ liệu
+                  data:
+                    type: object
+                    properties:
+                      examId:
+                        type: string
+                        format: uuid
+  /exams/{id}:
+    put:
+      tags:
+        - Exams & Synthesis
+      summary: Cập nhật đề thi đã lưu
+      description: Chỉnh sửa nội dung đề thi, thông tin trường/sở, tiêu đề kỳ thi, mã
+        đề hoặc danh sách câu hỏi.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Mã định danh UUID của đề thi
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                department:
+                  type: string
+                  example: SỞ GIÁO DỤC VÀ ĐÀO TẠO HẢI PHÒNG
+                schoolName:
+                  type: string
+                  example: TRƯỜNG THPT CHUYÊN TRẦN PHÚ
+                sessionTitle:
+                  type: string
+                  example: KỲ THI KHẢO SÁT CHẤT LƯỢNG ĐẦU NĂM
+                academicYear:
+                  type: string
+                  example: NĂM HỌC 2025 - 2026
+                code:
+                  type: string
+                  example: "101"
+                status:
+                  type: string
+                  enum:
+                    - approved
+                    - review
+                    - draft
+                questions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Question"
+      responses:
+        "200":
+          description: Cập nhật đề thi thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+        "403":
+          description: Không có quyền chỉnh sửa đề thi này
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+        "404":
+          description: Không tìm thấy đề thi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+    delete:
+      tags:
+        - Exams & Synthesis
+      summary: Xóa đề thi khỏi cơ sở dữ liệu
+      description: Xóa đề thi vĩnh viễn (chỉ người tạo hoặc ADMIN mới có quyền xóa).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Đã xóa đề thi thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+        "403":
+          description: Không có quyền xóa đề thi này
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+        "404":
+          description: Không tìm thấy đề thi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /exams/generate:
+    post:
+      tags:
+        - Exams & Synthesis
+      summary: Khởi tạo đề thi tự động bằng Trí tuệ Nhân tạo (AI)
+      description: Sinh trọn vẹn một đề thi chuẩn Bộ GD&ĐT dựa trên phân phối ma trận
+        nhận thức Bloom, cấp học, môn thi, và hướng dẫn tùy biến của giáo viên
+        (có bộ lọc PromptGuard chống Jailbreak).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - curriculum
+                - examType
+              properties:
+                title:
+                  type: string
+                  minLength: 3
+                  example: Đề thi Khảo sát Toán 12
+                curriculum:
+                  type: object
+                  required:
+                    - level
+                    - grade
+                    - subject
+                    - semester
+                  properties:
+                    level:
+                      type: string
+                      example: THPT
+                    grade:
+                      type: string
+                      example: Lớp 12
+                    subject:
+                      type: string
+                      example: Toán học
+                    semester:
+                      type: string
+                      example: Học kỳ 1
+                    topic:
+                      type: string
+                      example: Ứng dụng đạo hàm khảo sát hàm số
+                    lesson:
+                      type: string
+                      example: Cực trị của hàm số
+                examType:
+                  type: string
+                  enum:
+                    - MIN_15
+                    - MID_TERM
+                    - FINAL_TERM
+                    - ENTRANCE
+                  example: MID_TERM
+                durationMinutes:
+                  type: integer
+                  default: 45
+                  example: 45
+                totalPoints:
+                  type: number
+                  default: 10
+                  example: 10
+                totalQuestions:
+                  type: integer
+                  default: 20
+                  example: 20
+                cognitiveMatrix:
+                  $ref: "#/components/schemas/CognitiveMatrix"
+                customPrompt:
+                  type: string
+                  maxLength: 1500
+                  example: Tăng cường các câu hỏi liên hệ thực tiễn và tối ưu hóa cho kỳ thi THPT
+                    Quốc gia.
+                aiProvider:
+                  type: string
+                  enum:
+                    - gemini
+                    - openai
+                    - claude
+                    - self-hosted
+                    - custom-mcp
+                  example: gemini
+                aiModel:
+                  type: string
+                  example: gemini-2.0-flash
+                language:
+                  type: string
+                  default: Vietnamese
+      responses:
+        "201":
+          description: Tạo đề thi thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tạo đề thi thành công
+                  data:
+                    type: object
+                    properties:
+                      examId:
+                        type: string
+                        format: uuid
+                      title:
+                        type: string
+                      status:
+                        type: string
+                        example: COMPLETED
+                      examData:
+                        $ref: "#/components/schemas/ExamItem"
+        "400":
+          description: Phát hiện mã độc Prompt Injection hoặc tham số không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+        "429":
+          description: Vượt quá giới hạn gọi AI đồng thời hoặc giới hạn lượt yêu cầu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+        "502":
+          description: Lỗi phản hồi từ nhà cung cấp mô hình AI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardError"
+  /exams/regenerate-question:
+    post:
+      tags:
+        - Exams & Synthesis
+      summary: Tạo lại 1 câu hỏi cụ thể trong đề thi
+      description: Yêu cầu AI sinh lại một câu hỏi duy nhất với mức độ nhận thức (Nhận
+        biết, Thông hiểu, Vận dụng, Vận dụng cao), dạng câu hỏi và chủ đề yêu
+        cầu mà không làm thay đổi các câu hỏi khác.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject:
+                  type: string
+                  default: Toán học
+                  example: Toán học
+                grade:
+                  type: string
+                  default: Lớp 12
+                  example: Lớp 12
+                level:
+                  type: string
+                  default: Thông hiểu
+                  example: Vận dụng
+                type:
+                  type: string
+                  enum:
+                    - multiple_choice
+                    - true_false
+                    - short_answer
+                    - essay
+                  default: multiple_choice
+                currentTopic:
+                  type: string
+                  example: Tích phân và ứng dụng
+                customPrompt:
+                  type: string
+                  example: Tạo câu hỏi ứng dụng thực tế về diện tích hình phẳng
+                existingQuestions:
+                  type: array
+                  items:
+                    type: string
+                  description: Danh sách các câu hỏi hiện có trong đề để tránh sinh trùng lặp nội
+                    dung
+                aiProvider:
+                  type: string
+                  enum:
+                    - gemini
+                    - openai
+                    - claude
+                    - self-hosted
+      responses:
+        "200":
+          description: Tạo câu hỏi thay thế thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Question"
+  /ai/models:
+    get:
+      tags:
+        - AI Configuration
+      summary: Khám phá danh sách mô hình AI khả dụng (Live Discovery)
+      description: Tự động kết nối tới API của Gemini, OpenAI, Claude hoặc trạm tự lưu
+        trữ (vLLM/Ollama) để lấy danh sách các model khả dụng mới nhất.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - gemini
+              - openai
+              - claude
+              - self-hosted
+      responses:
+        "200":
+          description: Danh sách mô hình AI khả dụng
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ModelInfo"
+  /ai/settings:
+    get:
+      tags:
+        - AI Configuration
+      summary: Xem cấu hình AI hệ thống hiện tại (ADMIN only)
+      description: Lấy thông tin nhà cung cấp mặc định, model đang dùng, số lượng API
+        keys đã nạp và trạng thái trạm tự lưu trữ.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Cấu hình AI hiện hành
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      defaultProvider:
+                        type: string
+                        example: gemini
+                      geminiModel:
+                        type: string
+                        example: gemini-2.0-flash
+                      geminiKeysCount:
+                        type: integer
+                        example: 2
+                      openaiModel:
+                        type: string
+                        example: gpt-4o-mini
+                      openaiKeysCount:
+                        type: integer
+                        example: 1
+                      claudeModel:
+                        type: string
+                        example: claude-3-5-sonnet
+                      claudeKeysCount:
+                        type: integer
+                        example: 0
+                      selfHostedBaseUrl:
+                        type: string
+                        example: http://localhost:8000/v1
+                      dailyTokenLimit:
+                        type: integer
+                        example: 500000
+    post:
+      tags:
+        - AI Configuration
+      summary: Cập nhật cấu hình & API Keys của các mô hình AI (ADMIN only)
+      description: Cập nhật nhà cung cấp mặc định, nạp danh sách xoay vòng API Keys
+        (Multi-Key Pool Rotation) và điều chỉnh tham số nhiệt độ (temperature).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                defaultProvider:
+                  type: string
+                  enum:
+                    - gemini
+                    - openai
+                    - claude
+                    - self-hosted
+                geminiApiKeys:
+                  type: string
+                  description: Các key phân tách bằng dấu phẩy hoặc xuống dòng
+                geminiModel:
+                  type: string
+                  example: gemini-2.0-flash
+                openaiApiKeys:
+                  type: string
+                  description: Các key phân tách bằng dấu phẩy
+                openaiModel:
+                  type: string
+                  example: gpt-4o-mini
+                claudeApiKeys:
+                  type: string
+                claudeModel:
+                  type: string
+                  example: claude-3-5-sonnet
+                selfHostedBaseUrl:
+                  type: string
+                  example: http://localhost:11434/v1
+                temperature:
+                  type: number
+                  minimum: 0
+                  maximum: 2
+                  default: 0.7
+      responses:
+        "200":
+          description: Lưu cấu hình AI thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+  /admin/teachers:
+    get:
+      tags:
+        - Admin - Teachers
+      summary: Danh sách tài khoản giáo viên & Thống kê sử dụng (ADMIN only)
+      description: Lấy danh sách tất cả giáo viên trong trường, số lượng token AI đã
+        dùng, trạng thái 2FA và trạng thái tài khoản.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Danh sách giáo viên
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TeacherItem"
+    post:
+      tags:
+        - Admin - Teachers
+      summary: Thêm tài khoản giáo viên mới trực tiếp (ADMIN only)
+      description: Tạo tài khoản giáo viên với mật khẩu khởi tạo, tự động gán tổ bộ
+        môn và quyền hạn giảng dạy.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                  example: Cô Nguyễn Thị Hoa
+                email:
+                  type: string
+                  format: email
+                  example: hoa.nguyen@spt.edu.vn
+                role:
+                  type: string
+                  default: Giáo viên
+                  example: Giáo viên chính khóa
+                department:
+                  type: string
+                  default: Toán học
+                  example: Khoa học Tự nhiên
+                password:
+                  type: string
+                  minLength: 6
+                  default: Examify@123
+      responses:
+        "201":
+          description: Thêm giáo viên thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+    put:
+      tags:
+        - Admin - Teachers
+      summary: Cập nhật trạng thái hoặc Đặt lại 2FA của giáo viên (ADMIN only)
+      description: Khóa / mở khóa tài khoản giáo viên (`active` / `suspended`), hoặc
+        đặt lại trạng thái 2FA nếu giáo viên mất thiết bị xác thực.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  example: GV-001
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - suspended
+                reset2FA:
+                  type: boolean
+                  description: Đặt true nếu muốn vô hiệu hóa 2FA để giáo viên cài lại
+      responses:
+        "200":
+          description: Cập nhật tài khoản giáo viên thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+  /admin/security:
+    get:
+      tags:
+        - Admin - Security & GeoIP
+      summary: Xem cấu hình bảo mật, Rate Limit & Chặn quốc gia GeoIP (ADMIN only)
+      description: Lấy cấu hình cửa sổ giới hạn lượt gọi (Sliding Window Rate Limiter)
+        và danh sách quốc gia được phép / bị chặn truy cập.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Cấu hình bảo mật hệ thống
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      rateLimiting:
+                        type: object
+                        properties:
+                          windowSeconds:
+                            type: integer
+                            example: 60
+                          authMaxRequests:
+                            type: integer
+                            example: 20
+                          apiMaxRequests:
+                            type: integer
+                            example: 120
+                      geoBlocking:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                            example: true
+                          defaultAction:
+                            type: string
+                            enum:
+                              - ALLOW
+                              - BLOCK
+                            example: ALLOW
+                          allowedCountries:
+                            type: array
+                            items:
+                              type: string
+                            example:
+                              - VN
+                              - US
+                              - JP
+                          blockedCountries:
+                            type: array
+                            items:
+                              type: string
+    post:
+      tags:
+        - Admin - Security & GeoIP
+      summary: Cập nhật chính sách Rate Limiting & GeoIP Blocking (ADMIN only)
+      description: Điều chỉnh giới hạn số yêu cầu mỗi phút và chính sách chặn địa lý
+        (GeoIP Blocking) tự lưu trữ.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rateLimiting:
+                  type: object
+                  properties:
+                    windowSeconds:
+                      type: integer
+                      default: 60
+                    authMaxRequests:
+                      type: integer
+                      default: 20
+                    apiMaxRequests:
+                      type: integer
+                      default: 120
+                geoBlocking:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    defaultAction:
+                      type: string
+                      enum:
+                        - ALLOW
+                        - BLOCK
+                    allowedCountries:
+                      type: array
+                      items:
+                        type: string
+                    blockedCountries:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        "200":
+          description: Lưu cấu hình bảo mật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardResponse"
+    put:
+      tags:
+        - Admin - Security & GeoIP
+      summary: Mô phỏng kiểm tra quyền truy cập của một địa chỉ IP (ADMIN only)
+      description: Công cụ chẩn đoán nhanh giúp kiểm tra một IP cụ thể (hoặc mã quốc
+        gia) sẽ bị chặn hay được phép truy cập theo chính sách hiện hành.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip:
+                  type: string
+                  example: 14.161.22.45
+                country:
+                  type: string
+                  example: VN
+      responses:
+        "200":
+          description: Kết quả mô phỏng đánh giá truy cập
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      testIp:
+                        type: string
+                        example: 14.161.22.45
+                      testCountry:
+                        type: string
+                        example: VN
+                      isAllowed:
+                        type: boolean
+                        example: true
+                      reason:
+                        type: string
+                        example: Quốc gia VN nằm trong danh sách cho phép
+  /admin/logs:
+    get:
+      tags:
+        - Admin - Audit Logs
+      summary: Truy vấn nhật ký kiểm toán hệ thống (Audit Logs) (ADMIN only)
+      description: Lấy danh sách nhật ký kiểm toán bất biến (Immutable Audit Logs) ghi
+        nhận các sự kiện bảo mật, đăng nhập, sinh đề thi, và thay đổi cài đặt.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+            example: EXAM_GENERATED
+      responses:
+        "200":
+          description: Danh sách nhật ký kiểm toán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLogItem"
+    post:
+      tags:
+        - Admin - Audit Logs
+      summary: Tìm kiếm & Lọc nhật ký kiểm toán nâng cao (ADMIN only)
+      description: Tìm kiếm nhật ký kiểm toán theo dải thời gian, IP người dùng, loại
+        sự kiện hoặc từ khóa chi tiết.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                userId:
+                  type: string
+                clientIp:
+                  type: string
+                keyword:
+                  type: string
+                limit:
+                  type: integer
+                  default: 100
+      responses:
+        "200":
+          description: Kết quả lọc nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLogItem"
+  /docs/openapi.json:
+    get:
+      tags:
+        - API Specifications
+      summary: Tải tài liệu đặc tả OpenAPI 3.0.3 dạng JSON
+      description: Cung cấp toàn bộ tài liệu đặc tả API chuẩn OpenAPI 3.0.3 dưới dạng
+        tệp JSON để nhập vào Postman, Insomnia hoặc các công cụ tự động hóa.
+      responses:
+        "200":
+          description: Đặc tả OpenAPI 3.0.3 dạng JSON
+          content:
+            application/json:
+              schema:
+                type: object
+  /docs/openapi.yaml:
+    get:
+      tags:
+        - API Specifications
+      summary: Tải tài liệu đặc tả OpenAPI 3.0.3 dạng YAML
+      description: Cung cấp toàn bộ tài liệu đặc tả API chuẩn OpenAPI 3.0.3 dưới dạng
+        YAML chuẩn để tích hợp Swagger UI, Redoc hoặc CI/CD pipeline.
+      responses:
+        "200":
+          description: Đặc tả OpenAPI 3.0.3 dạng YAML
+          content:
+            text/yaml:
+              schema:
+                type: string

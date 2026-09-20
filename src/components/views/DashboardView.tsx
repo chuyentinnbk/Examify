@@ -2,16 +2,21 @@
 
 import React, { useState } from 'react';
 import { useAppStore, ExamItem } from '@/lib/store/app-store';
+import PortalModal from '@/components/common/PortalModal';
 import UserAvatar from '@/components/common/UserAvatar';
 
 export default function DashboardView() {
   const { exams, user, setCurrentRoute, setActiveExam, deleteExam, showToast } = useAppStore();
-  const [filter, setFilter] = useState<'all' | 'approved' | 'review' | 'draft'>('all');
+  const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [previewExam, setPreviewExam] = useState<ExamItem | null>(null);
 
   const filteredExams = exams.filter((exam) => {
-    const matchesFilter = filter === 'all' || exam.status === filter;
+    let matchesFilter = true;
+    if (filter === 'math') matchesFilter = exam.subject.includes('Toán');
+    else if (filter === 'natural') matchesFilter = exam.subject.includes('Lý') || exam.subject.includes('Hóa') || exam.subject.includes('Sinh') || exam.subject.includes('KHTN');
+    else if (filter === 'social') matchesFilter = exam.subject.includes('Anh') || exam.subject.includes('Văn') || exam.subject.includes('Sử') || exam.subject.includes('Địa');
+
     const matchesSearch =
       search === '' ||
       exam.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -26,27 +31,13 @@ export default function DashboardView() {
     setCurrentRoute('#editor');
   };
 
-  const getStatusBadge = (status: ExamItem['status']) => {
-    switch (status) {
-      case 'approved':
-        return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-            Đã duyệt
-          </span>
-        );
-      case 'review':
-        return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-            Chờ phản biện
-          </span>
-        );
-      default:
-        return (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-            Bản nháp
-          </span>
-        );
-    }
+  const getStatusBadge = (status?: any) => {
+    return (
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 flex items-center gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        Chính thức
+      </span>
+    );
   };
 
   const getSubjectIcon = (subject: string) => {
@@ -151,9 +142,9 @@ export default function DashboardView() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
           {[
             { key: 'all', label: 'Tất cả đề thi', count: exams.length },
-            { key: 'approved', label: 'Đã duyệt', count: exams.filter((e) => e.status === 'approved').length },
-            { key: 'review', label: 'Chờ phản biện', count: exams.filter((e) => e.status === 'review').length },
-            { key: 'draft', label: 'Bản nháp', count: exams.filter((e) => e.status === 'draft').length },
+            { key: 'math', label: 'Toán học', count: exams.filter((e) => e.subject.includes('Toán')).length },
+            { key: 'natural', label: 'KHTN / Lý - Hóa - Sinh', count: exams.filter((e) => e.subject.includes('Lý') || e.subject.includes('Hóa') || e.subject.includes('Sinh') || e.subject.includes('KHTN')).length },
+            { key: 'social', label: 'Tiếng Anh & Xã hội', count: exams.filter((e) => e.subject.includes('Anh') || e.subject.includes('Văn') || e.subject.includes('Sử') || e.subject.includes('Địa')).length },
           ].map((pill) => {
             const isActive = filter === pill.key;
             return (
@@ -319,71 +310,24 @@ export default function DashboardView() {
         </div>
       )}
 
-      {/* Preview Modal */}
-      {previewExam && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400">{previewExam.id}</span>
-                {getStatusBadge(previewExam.status)}
-              </div>
+      {/* Preview Modal via PortalModal */}
+      <PortalModal
+        isOpen={Boolean(previewExam)}
+        onClose={() => setPreviewExam(null)}
+        title={previewExam ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400">{previewExam.id}</span>
+            {getStatusBadge(previewExam.status)}
+          </div>
+        ) : undefined}
+        maxWidth="max-w-2xl"
+        footer={
+          previewExam ? (
+            <div className="w-full flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setPreviewExam(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4">
-              <h2 className="text-lg font-bold text-slate-900">{previewExam.title}</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-slate-400 block text-[10px]">Môn học</span>
-                  <span className="font-bold text-slate-800">{previewExam.subject}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-slate-400 block text-[10px]">Khối lớp</span>
-                  <span className="font-bold text-slate-800">{previewExam.grade}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-slate-400 block text-[10px]">Thời gian làm bài</span>
-                  <span className="font-bold text-slate-800">{previewExam.duration} phút</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-slate-400 block text-[10px]">Tổng số câu</span>
-                  <span className="font-bold text-slate-800">{previewExam.questionsCount} câu</span>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Phân bổ Bloom (Ma trận đề)
-                </h4>
-                <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold">
-                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Nhận biết: {previewExam.matrix.easy}%
-                  </div>
-                  <div className="p-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
-                    Thông hiểu: {previewExam.matrix.medium}%
-                  </div>
-                  <div className="p-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                    Vận dụng: {previewExam.matrix.hard}%
-                  </div>
-                  <div className="p-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
-                    Vận dụng cao: {previewExam.matrix.veryHard}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setPreviewExam(null)}
-                className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -394,15 +338,59 @@ export default function DashboardView() {
                   setPreviewExam(null);
                   handleEdit(target);
                 }}
-                className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">edit_document</span>
                 <span>Mở trong Trình Biên tập</span>
               </button>
             </div>
+          ) : undefined
+        }
+      >
+        {previewExam && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{previewExam.title}</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Môn học</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{previewExam.subject}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Khối lớp</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{previewExam.grade}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Thời gian làm bài</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{previewExam.duration} phút</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Tổng số câu</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{previewExam.questionsCount} câu</span>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Phân bổ Bloom (Ma trận đề)
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
+                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  Nhận biết: {previewExam.matrix.easy}%
+                </div>
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  Thông hiểu: {previewExam.matrix.medium}%
+                </div>
+                <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  Vận dụng: {previewExam.matrix.hard}%
+                </div>
+                <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                  Vận dụng cao: {previewExam.matrix.veryHard}%
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </PortalModal>
     </div>
   );
 }

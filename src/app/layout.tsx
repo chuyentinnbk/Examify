@@ -39,6 +39,7 @@ export default function RootLayout({
         <script src="https://cdn.tailwindcss.com"></script>
         {/* App Design Tokens & Tailwind Configuration */}
         <script src="/assets/js/config.js"></script>
+
       </head>
       <body className="bg-background font-body-md text-on-surface antialiased select-auto min-h-screen">
         {children}

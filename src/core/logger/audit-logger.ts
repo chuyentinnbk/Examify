@@ -71,7 +71,7 @@ export const fileLogger = winston.createLogger({
 
 export interface AuditEventPayload {
   action: string;
-  entity: string;
+  entity: string; // 'INPUT' | 'OUTPUT' | 'SECURITY' | 'SYSTEM' | 'EXAM' | 'USER'
   entityId?: string | null;
   userId?: string | null;
   clientIp?: string | null;
@@ -120,6 +120,77 @@ export class AuditLogger {
         event,
       });
     }
+  }
+
+  /**
+   * Logs an inbound HTTP Request (INPUT category)
+   */
+  public static async logRequest(data: {
+    method: string;
+    path: string;
+    clientIp?: string | null;
+    country?: string | null;
+    userAgent?: string | null;
+    userId?: string | null;
+    query?: Record<string, unknown> | null;
+    body?: Record<string, unknown> | null;
+    headersSummary?: Record<string, string> | null;
+  }): Promise<void> {
+    await this.log({
+      action: `HTTP_${data.method.toUpperCase()} ${data.path}`,
+      entity: 'INPUT',
+      userId: data.userId,
+      clientIp: data.clientIp,
+      country: data.country,
+      userAgent: data.userAgent,
+      details: {
+        type: 'REQUEST_INPUT',
+        method: data.method,
+        path: data.path,
+        query: data.query,
+        body: data.body,
+        headers: data.headersSummary,
+        receivedAt: new Date().toISOString(),
+      },
+      level: 'info',
+    });
+  }
+
+  /**
+   * Logs an outbound HTTP Response or AI Generation (OUTPUT category)
+   */
+  public static async logResponse(data: {
+    method: string;
+    path: string;
+    statusCode: number;
+    latencyMs?: number;
+    clientIp?: string | null;
+    country?: string | null;
+    userId?: string | null;
+    responseData?: Record<string, unknown> | null;
+    tokensUsed?: number;
+    error?: string | null;
+  }): Promise<void> {
+    const isError = data.statusCode >= 400;
+    await this.log({
+      action: `HTTP_${data.statusCode} ${data.method.toUpperCase()} ${data.path}`,
+      entity: 'OUTPUT',
+      userId: data.userId,
+      clientIp: data.clientIp,
+      country: data.country,
+      details: {
+        type: 'RESPONSE_OUTPUT',
+        method: data.method,
+        path: data.path,
+        statusCode: data.statusCode,
+        latencyMs: data.latencyMs,
+        tokensUsed: data.tokensUsed,
+        response: data.responseData,
+        error: data.error,
+        sentAt: new Date().toISOString(),
+      },
+      level: isError ? (data.statusCode >= 500 ? 'error' : 'warn') : 'info',
+    });
   }
 
   public static async securityAlert(

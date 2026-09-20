@@ -12,6 +12,7 @@ import EditorView from '@/components/views/EditorView';
 import ProfileView from '@/components/views/ProfileView';
 import AdminView from '@/components/views/AdminView';
 import LoginView from '@/components/views/LoginView';
+import RegisterView from '@/components/views/RegisterView';
 import SetupWizardView from '@/components/views/SetupWizardView';
 
 function AppContent() {
@@ -66,6 +67,16 @@ function AppContent() {
     );
   }
 
+  // Registration View: Show RegisterView when route is #register
+  if (currentRoute === '#register') {
+    return (
+      <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <RegisterView />
+        <ToastContainer />
+      </div>
+    );
+  }
+
   // Authentication Guard: If no valid token or route is #login, enforce LoginView
   if (!token || currentRoute === '#login') {
     return (
@@ -95,18 +106,20 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
       {/* Global Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="md:pl-64 flex flex-col min-h-screen transition-all">
+      <div className="md:pl-64 flex flex-col flex-1 min-w-0 min-h-screen transition-all">
         {/* Global Header */}
         <Header />
 
         {/* View Body */}
-        <main className="flex-1 mt-16 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {renderActiveView()}
+        <main className="flex-1 w-full mt-16 p-4 md:p-6 lg:p-8 flex flex-col">
+          <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col">
+            {renderActiveView()}
+          </div>
         </main>
       </div>
 

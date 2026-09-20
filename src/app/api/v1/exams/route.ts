@@ -56,9 +56,11 @@ export async function GET(req: NextRequest) {
         // ignore
       }
 
+      let structuredMeta: Record<string, any> | null = null;
       try {
         if (e.structuredJson) {
           const structured = JSON.parse(e.structuredJson);
+          structuredMeta = structured;
           const rawQ = structured.questions || [];
           questions = rawQ.map((q: any, idx: number) => {
             const rawOptions = q.options || ['A', 'B', 'C', 'D'];
@@ -114,29 +116,36 @@ export async function GET(req: NextRequest) {
 
       const statusMap: Record<string, 'approved' | 'review' | 'draft'> = {
         COMPLETED: 'approved',
-        GENERATING: 'review',
-        DRAFT: 'draft',
-        FAILED: 'draft',
+        GENERATING: 'approved',
+        DRAFT: 'approved',
+        FAILED: 'approved',
       };
 
       const statusLabelMap: Record<string, string> = {
-        COMPLETED: 'Đã duyệt',
-        GENERATING: 'Chờ phản biện',
-        DRAFT: 'Bản nháp',
-        FAILED: 'Lỗi',
+        COMPLETED: 'Chính thức',
+        GENERATING: 'Chính thức',
+        DRAFT: 'Chính thức',
+        FAILED: 'Chính thức',
       };
 
       return {
         id: e.id,
+        code: structuredMeta?.code || undefined,
         title: e.title,
         subject: curriculum.subject || 'Toán học',
         grade: curriculum.grade || 'Lớp 12',
         term: curriculum.semester || 'Học kỳ 1',
         year: '2024-2025',
+        sessionTitle: structuredMeta?.sessionTitle || undefined,
+        academicYear: structuredMeta?.academicYear || undefined,
+        department: structuredMeta?.department || undefined,
+        schoolName: structuredMeta?.schoolName || undefined,
+        sectionTitles: structuredMeta?.sectionTitles || undefined,
+        sectionDescriptions: structuredMeta?.sectionDescriptions || undefined,
         questionsCount: questions.length > 0 ? questions.length : e.totalQuestions,
         duration: e.durationMinutes,
-        status: statusMap[e.status] || 'draft',
-        statusLabel: statusLabelMap[e.status] || 'Bản nháp',
+        status: 'approved',
+        statusLabel: 'Chính thức',
         author: e.teacher?.fullName || 'Giáo viên',
         updatedAt: new Date(e.updatedAt).toLocaleDateString('vi-VN'),
         matrix: cognitiveMatrix,
@@ -159,7 +168,7 @@ const CreateManualExamSchema = z.object({
   grade: z.string().default('Lớp 12'),
   term: z.string().default('Học kỳ 1'),
   duration: z.number().default(45),
-  status: z.enum(['approved', 'review', 'draft']).default('draft'),
+  status: z.enum(['approved', 'review', 'draft']).default('approved'),
   matrix: z
     .object({
       easy: z.number().default(40),
@@ -208,12 +217,7 @@ export async function POST(req: NextRequest) {
       questions: data.questions,
     });
 
-    const statusEnum =
-      data.status === 'approved'
-        ? ExamStatus.COMPLETED
-        : data.status === 'review'
-        ? ExamStatus.GENERATING
-        : ExamStatus.DRAFT;
+    const statusEnum = ExamStatus.COMPLETED;
 
     const examPayload = {
       title: data.title,

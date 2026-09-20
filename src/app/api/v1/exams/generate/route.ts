@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
             q.questionNumber = i + 1;
             if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
-                typeof opt === 'string' ? opt.replace(/^[A-D\d]+[\.\:\)\-\s]+/i, '').trim() : opt
+                typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt
               );
             }
             uniqueQuestions.push(q);

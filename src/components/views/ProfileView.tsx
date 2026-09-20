@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store/app-store';
+import PortalModal from '@/components/common/PortalModal';
 import UserAvatar from '@/components/common/UserAvatar';
 import { GRAVATAR_STYLES, GravatarDefault } from '@/lib/gravatar';
 
@@ -506,92 +507,82 @@ export default function ProfileView() {
         </div>
       </div>
 
-      {/* 2FA SETUP MODAL */}
-      {showSetupModal && setupData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-lg">verified_user</span>
-                </div>
-                <h3 className="text-sm font-bold text-slate-900">Kích hoạt Google Authenticator (2FA)</h3>
+      {/* 2FA SETUP MODAL via PortalModal */}
+      <PortalModal
+        isOpen={Boolean(showSetupModal && setupData)}
+        onClose={() => setShowSetupModal(false)}
+        icon="verified_user"
+        iconBg="bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+        title="Kích hoạt Google Authenticator (2FA)"
+        subtitle="Bảo mật tài khoản 2 lớp"
+        maxWidth="max-w-md"
+      >
+        {setupData && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                <strong>Bước 1:</strong> Mở app <strong>Google Authenticator</strong> trên điện thoại, bấm dấu <strong>+</strong> và quét mã QR này:
+              </p>
+              <div className="flex justify-center p-2 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={setupData.qrCode}
+                  alt="Google Authenticator QR"
+                  className="w-40 h-40 object-contain rounded-xl bg-white p-2 shadow-xs"
+                />
               </div>
-              <button
-                type="button"
-                onClick={() => setShowSetupModal(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
+              <div className="flex items-center justify-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 pt-1">
+                <span>Khóa bí mật:</span>
+                <code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">
+                  {setupData.secret}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopySecret}
+                  className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Sao chép
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-xs text-slate-700 font-medium">
-                  <strong>Bước 1:</strong> Mở app <strong>Google Authenticator</strong> trên điện thoại, bấm dấu <strong>+</strong> và quét mã QR này:
-                </p>
-                <div className="flex justify-center p-2 bg-slate-50 rounded-2xl border border-slate-200">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={setupData.qrCode}
-                    alt="Google Authenticator QR"
-                    className="w-40 h-40 object-contain rounded-xl bg-white p-2 shadow-xs"
-                  />
-                </div>
-                <div className="flex items-center justify-center gap-2 text-[11px] text-slate-600 pt-1">
-                  <span>Khóa bí mật:</span>
-                  <code className="px-2 py-0.5 rounded bg-slate-100 font-mono font-bold text-slate-800 text-xs">
-                    {setupData.secret}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={handleCopySecret}
-                    className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Sao chép
-                  </button>
-                </div>
+            <form onSubmit={handleConfirmEnable2FA} className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="space-y-1.5 text-center">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                  Bước 2: Nhập mã 6 chữ số từ app để xác nhận
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  value={confirmCode}
+                  onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••••"
+                  className="w-44 mx-auto py-2.5 text-xl font-mono tracking-[0.4em] text-center rounded-xl border-2 border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                />
               </div>
 
-              <form onSubmit={handleConfirmEnable2FA} className="space-y-3 pt-2 border-t border-slate-100">
-                <div className="space-y-1.5 text-center">
-                  <label className="text-xs font-bold text-slate-800 block">
-                    Bước 2: Nhập mã 6 chữ số từ app để xác nhận
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    required
-                    autoFocus
-                    value={confirmCode}
-                    onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="••••••"
-                    className="w-44 mx-auto py-2.5 text-xl font-mono tracking-[0.4em] text-center rounded-xl border-2 border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-xs"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSetupModal(false)}
-                    className="w-1/2 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading2FA || confirmCode.trim().length !== 6}
-                    className="w-1/2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                  >
-                    {loading2FA ? 'Đang kiểm tra...' : 'Xác nhận & Bật'}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSetupModal(false)}
+                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading2FA || confirmCode.trim().length !== 6}
+                  className="w-1/2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {loading2FA ? 'Đang kiểm tra...' : 'Xác nhận & Bật'}
+                </button>
+              </div>
+            </form>
           </div>
-        </div>
-      )}
+        )}
+      </PortalModal>
     </div>
   );
 }

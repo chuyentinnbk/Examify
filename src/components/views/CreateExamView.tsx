@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAppStore, ExamItem, ExamQuestion } from '@/lib/store/app-store';
+import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 
 interface ModelOption {
@@ -214,9 +214,46 @@ export default function CreateExamView() {
           }
           if (sig) seenSignatures.add(sig);
 
+          const rawType = String(q.type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
+          const qType: QuestionType = rawType.includes('true') || rawType.includes('dung')
+            ? 'true_false'
+            : rawType.includes('short') || rawType.includes('ngan')
+            ? 'short_answer'
+            : rawType.includes('essay') || rawType.includes('luan')
+            ? 'essay'
+            : 'multiple_choice';
+
+          let formattedOptions: any[] = [];
+          if (qType === 'true_false') {
+            const subKeys = ['a', 'b', 'c', 'd'];
+            formattedOptions = (q.options && q.options.length > 0 ? q.options : ['Ý mệnh đề a', 'Ý mệnh đề b', 'Ý mệnh đề c', 'Ý mệnh đề d']).map((opt: string, optIdx: number) => {
+              const key = subKeys[optIdx] || String(optIdx);
+              const cleanText = String(opt || '').replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const isCorrect = q.correctAnswer
+                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                : optIdx % 2 === 0;
+              return {
+                key,
+                text: cleanText || String(opt || ''),
+                isCorrect,
+              };
+            });
+          } else if (qType === 'multiple_choice') {
+            formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: string, optIdx: number) => {
+              const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
+              const cleanText = String(opt || '').replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              return {
+                key,
+                text: cleanText || String(opt || ''),
+                isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
+              };
+            });
+          }
+
           uniqueFormatted.push({
             id: idx + 1,
             order: `Câu ${String(uniqueFormatted.length + 1).padStart(2, '0')}`,
+            type: qType,
             level:
               q.cognitiveLevel === 'KNOWLEDGE'
                 ? 'Nhận biết'
@@ -235,16 +272,9 @@ export default function CreateExamView() {
                 : 'bg-rose-50 text-rose-700 border-rose-200',
             topic: subject,
             content: q.content,
-            options: (q.options || ['A', 'B', 'C', 'D']).map((opt: string, optIdx: number) => {
-              const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
-              return {
-                key,
-                text: opt,
-                isCorrect: q.correctAnswer === key,
-              };
-            }),
-            points: q.points || 0.25,
-            correctAnswer: q.correctAnswer || 'A',
+            options: formattedOptions,
+            points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
+            correctAnswer: q.correctAnswer || (qType === 'essay' ? 'Xem hướng dẫn chấm' : 'A'),
             explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
           });
         });
@@ -269,8 +299,8 @@ export default function CreateExamView() {
         year: '2024-2025',
         questionsCount: questions.length,
         duration,
-        status: 'draft',
-        statusLabel: 'Bản nháp',
+        status: 'approved',
+        statusLabel: 'Chính thức',
         author: user.name,
         updatedAt: 'Vừa tạo',
         matrix: { easy, medium, hard, veryHard },

@@ -38,7 +38,33 @@ export async function middleware(req: NextRequest) {
   const country = GeoIpResolver.resolve(ip, req.headers.get('x-country-code'));
 
   // ----------------------------------------------------------------------------
-  // 1. Rate Limiting Check (Edge Sliding Window Log)
+  // 1. Geo-Blocking Evaluation (Location & IP Guard)
+  // ----------------------------------------------------------------------------
+  const geoResult = GeoIpResolver.evaluateAccess(ip, country);
+  if (!geoResult.isAllowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Geo-Blocked: Truy cập bị từ chối theo chính sách giới hạn địa lý & IP.',
+        reason: geoResult.reason,
+        client: {
+          ip: geoResult.ip,
+          country: geoResult.country,
+        },
+      },
+      {
+        status: 403,
+        headers: {
+          'X-Client-IP': ip,
+          'X-Client-Country': country,
+          'X-Geo-Blocked': 'true',
+        },
+      }
+    );
+  }
+
+  // ----------------------------------------------------------------------------
+  // 2. Rate Limiting Check (Edge Sliding Window Log)
   // ----------------------------------------------------------------------------
   const isAuthRoute = pathname.startsWith('/api/v1/auth');
   const routeCategory = isAuthRoute ? 'auth' : pathname.startsWith('/api') ? 'api' : 'web';
@@ -67,6 +93,8 @@ export async function middleware(req: NextRequest) {
           'X-RateLimit-Limit': rateResult.limit.toString(),
           'X-RateLimit-Remaining': '0',
           'X-RateLimit-Reset': Math.ceil(rateResult.resetTimeMs / 1000).toString(),
+          'X-Client-IP': ip,
+          'X-Client-Country': country,
         },
       }
     );

@@ -10,11 +10,12 @@ interface MathTextProps {
 }
 
 /**
- * Clean option prefix like "A. ", "B. ", "1. ", "(A) "
+ * Safely removes explicit option prefixes like "A. ", "B. ", "(A) "
+ * without stripping numbers or mathematical variables (e.g. "15", "D = R")
  */
 export function cleanOptionText(text: string): string {
   if (!text) return '';
-  return text.replace(/^[A-D\d]+[\.\:\)\-\s]+/i, '').trim();
+  return text.replace(/^(\(?[A-D]\)[\.\:\-\s]+|[A-D][\.\:\)]\s+)/i, '').trim() || text;
 }
 
 /**

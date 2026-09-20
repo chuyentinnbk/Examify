@@ -388,6 +388,19 @@ export const LoginView: React.FC = () => {
                       )}
                     </button>
                   </div>
+
+                  <div className="pt-3 text-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Chưa có tài khoản giáo viên?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentRoute('#register')}
+                        className="font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Đăng ký tài khoản mới
+                      </button>
+                    </p>
+                  </div>
                 </form>
               )}
 

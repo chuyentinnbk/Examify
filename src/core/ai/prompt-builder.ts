@@ -79,8 +79,12 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 3. OUTPUT ONLY RAW VALID JSON: Never output markdown code fences (like \`\`\`json), markdown explanations, or conversational filler.
 4. STRICT JSON SCHEMA: The entire exam output must adhere strictly to the JSON schema.
 5. PRECISE & PEDAGOGICAL: Questions must be unambiguous, factually accurate according to Vietnam's GDPT 2018 standards, and mathematically verified.
-6. FOUR DISTINCT OPTIONS: Every multiple-choice question must have exactly 4 unique options (A, B, C, D) with exactly one correct option.
-7. DETAILED EXPLANATIONS: Provide step-by-step explanations and clear scoring rubrics for all questions.
+6. QUESTION TYPES ACCORDING TO VIETNAM GDPT 2018 STANDARDS:
+   - MULTIPLE_CHOICE: 4 distinct choices (A, B, C, D) in "options", exactly one correct option in "correctAnswer" ("A", "B", "C", or "D").
+   - TRUE_FALSE (Đúng / Sai): 1 question statement with context, plus exactly 4 sub-items in "options" corresponding to a, b, c, d. "correctAnswer" formatted as "a: Đ, b: S, c: Đ, d: S" (or "a: Đúng, b: Sai, c: Đúng, d: Đúng").
+   - SHORT_ANSWER (Trả lời ngắn): Problem statement asking for a concise value/number. "options" must be empty array []. "correctAnswer" is the concise value (e.g. "15", "-4.5", "2024").
+   - ESSAY (Tự luận): Multi-step analytical problem. "options" must be empty array []. "correctAnswer": "Xem hướng dẫn chấm". "explanation" must provide step-by-step scoring rubric with partial points.
+7. DETAILED EXPLANATIONS: Provide step-by-step pedagogical explanations and clear scoring rubrics for all questions.
 8. LANGUAGE: All content, options, and explanations must be in: ${language}.`;
 
     // 3. Assemble Curriculum Hierarchy Details
@@ -135,12 +139,9 @@ ${matrixSpecs}
       "cognitiveLevel": "KNOWLEDGE | COMPREHENSION | APPLICATION | HIGH_APPLICATION",
       "content": "string (The question statement, formatted with LaTeX math $...$ if needed)",
       "options": [
-        "First option content (WITHOUT leading A. prefix)",
-        "Second option content (WITHOUT leading B. prefix)",
-        "Third option content (WITHOUT leading C. prefix)",
-        "Fourth option content (WITHOUT leading D. prefix)"
+        "First option content (WITHOUT leading A. prefix for MULTIPLE_CHOICE, or sub-item a for TRUE_FALSE, or empty array for SHORT_ANSWER and ESSAY)"
       ],
-      "correctAnswer": "A | B | C | D",
+      "correctAnswer": "A | B | C | D (for MULTIPLE_CHOICE) or 'a: Đ, b: S, c: Đ, d: S' (for TRUE_FALSE) or 'concise_value' (for SHORT_ANSWER) or 'Xem hướng dẫn chấm' (for ESSAY)",
       "explanation": "string (Step-by-step pedagogical explanation with LaTeX math if needed)",
       "points": 0.5
     }
