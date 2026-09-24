@@ -1426,32 +1426,67 @@ export default function EditorView() {
                   )}
 
                   {isEs && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-rose-900 dark:text-rose-300 block">
-                        Barem chấm điểm / Hướng dẫn tự luận:
-                      </label>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-rose-900 dark:text-rose-300 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm text-rose-600">menu_book</span>
+                          <span>Barem chấm điểm / Hướng dẫn tự luận:</span>
+                        </label>
+                        <span className="text-[10px] font-normal text-slate-400">
+                          Hỗ trợ công thức Toán KaTeX $...$
+                        </span>
+                      </div>
                       <textarea
-                        rows={3}
+                        rows={4}
                         value={q.explanation || ''}
                         onChange={(e) => handleUpdateQuestion(q.id, 'explanation', e.target.value)}
                         placeholder="Nhập barem chấm điểm chi tiết từng bước..."
                         className="w-full text-xs text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-rose-300 dark:border-rose-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
                       />
+                      {q.explanation && (
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 text-xs">
+                          <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">visibility</span>
+                            <span>Xem trước công thức (LaTeX Preview):</span>
+                          </div>
+                          <div className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                            <MathText content={q.explanation} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                      Lời giải chi tiết:
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={q.explanation || ''}
-                      onChange={(e) => handleUpdateQuestion(q.id, 'explanation', e.target.value)}
-                      placeholder="Nhập hướng dẫn giải chi tiết..."
-                      className="w-full text-xs text-slate-900 dark:text-slate-100 p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
+                  {!isEs && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          Lời giải chi tiết:
+                        </label>
+                        <span className="text-[10px] font-normal text-slate-400">
+                          Hỗ trợ công thức Toán KaTeX $...$
+                        </span>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={q.explanation || ''}
+                        onChange={(e) => handleUpdateQuestion(q.id, 'explanation', e.target.value)}
+                        placeholder="Nhập hướng dẫn giải chi tiết..."
+                        className="w-full text-xs text-slate-900 dark:text-slate-100 p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                      {q.explanation && (
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+                          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-xs">visibility</span>
+                            <span>Xem trước lời giải (LaTeX Preview):</span>
+                          </div>
+                          <div className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                            <MathText content={q.explanation} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex justify-end">
                     <button
@@ -1619,6 +1654,12 @@ export default function EditorView() {
                           placeholder="Ví dụ: 12, -3.5, hoặc 4/3..."
                           className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                         />
+                        {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) && (
+                          <div className="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-md border border-purple-200/80 dark:border-purple-900/40 text-xs flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Hiển thị công thức:</span>
+                            <MathText content={q.correctAnswer} inline />
+                          </div>
+                        )}
                       </div>
 
                       {/* Print Mode Line */}
@@ -1631,21 +1672,40 @@ export default function EditorView() {
                   {/* 4. TỰ LUẬN */}
                   {isEs && (
                     <div className="space-y-2 pt-1">
-                      <div className="no-print p-3.5 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-2">
+                      <div className="no-print p-3.5 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-2.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-rose-900 dark:text-rose-300 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm text-rose-600">menu_book</span>
                             <span>Barem điểm &amp; Hướng dẫn chấm tự luận:</span>
                           </label>
-                          <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Trình bày các bước chấm</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium hidden sm:inline">
+                              Trình bày các bước chấm
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingQId(q.id)}
+                              className="text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-rose-100 bg-rose-100/80 dark:bg-rose-900/50 hover:bg-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors"
+                              title="Chỉnh sửa barem chấm điểm"
+                            >
+                              <span className="material-symbols-outlined text-xs">edit</span>
+                              <span>Sửa barem</span>
+                            </button>
+                          </div>
                         </div>
-                        <textarea
-                          rows={3}
-                          value={q.explanation || ''}
-                          onChange={(e) => handleUpdateQuestion(q.id, 'explanation', e.target.value)}
-                          placeholder="Nhập barem chấm điểm chi tiết từng ý (Ví dụ: - Tìm TXĐ: 0.25đ; - Tính đạo hàm: 0.5đ...)"
-                          className="w-full text-xs text-slate-800 dark:text-slate-200 p-2.5 rounded-lg border border-rose-300 dark:border-rose-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                        />
+
+                        {q.explanation ? (
+                          <div className="w-full text-xs text-slate-800 dark:text-slate-200 p-3 rounded-lg border border-rose-200/80 dark:border-rose-900/50 bg-white/95 dark:bg-slate-900/90 leading-relaxed overflow-x-auto shadow-xs">
+                            <MathText content={q.explanation} />
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => setEditingQId(q.id)}
+                            className="text-xs text-rose-500/80 dark:text-rose-400/80 italic p-3 border border-dashed border-rose-300 dark:border-rose-800 rounded-lg cursor-pointer hover:bg-rose-100/30 transition-colors"
+                          >
+                            Chưa có barem chấm điểm. Bấm vào đây hoặc nút "Sửa barem" để thêm hướng dẫn chấm và barem chi tiết.
+                          </div>
+                        )}
                       </div>
 
                       {/* Print Mode Writing Space */}
