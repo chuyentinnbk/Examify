@@ -2,15 +2,29 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import prisma from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/utils';
+import { JwtService } from '@/core/security/jwt';
 
 const ProfileSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
+  fullName: z.string().min(2, 'Họ và tên phải có ít nhất 2 ký tự'),
   school: z.string().optional(),
   avatarStyle: z.string().optional(),
 });
 
 export async function PUT(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+  let userId = req.headers.get('x-user-id');
+
+  if (!userId) {
+    const authHeader = req.headers.get('authorization');
+    const cookieToken = req.cookies.get('examify_token')?.value;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : cookieToken;
+    if (token) {
+      const session = await JwtService.verifySession(token);
+      if (session) {
+        userId = session.userId;
+      }
+    }
+  }
+
   if (!userId) {
     return apiError('Authentication required', 401);
   }
@@ -20,7 +34,8 @@ export async function PUT(req: NextRequest) {
     const validation = ProfileSchema.safeParse(body);
 
     if (!validation.success) {
-      return apiError(validation.error.flatten().fieldErrors, 422, 'Invalid data');
+      const firstError = Object.values(validation.error.flatten().fieldErrors)[0]?.[0];
+      return apiError(firstError || 'Dữ liệu không hợp lệ', 422);
     }
 
     const { fullName, school, avatarStyle } = validation.data;
@@ -66,7 +81,7 @@ export async function PUT(req: NextRequest) {
       'Cập nhật thông tin hồ sơ thành công'
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error updating profile';
+    const message = error instanceof Error ? error.message : 'Lỗi khi cập nhật hồ sơ';
     return apiError(message, 500);
   }
 }

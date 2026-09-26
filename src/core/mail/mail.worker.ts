@@ -3,6 +3,7 @@ import nodemailer, { Transporter } from 'nodemailer';
 import { EMAIL_QUEUE_NAME } from './mail.queue';
 import { MailJobData } from './types';
 import { fileLogger } from '@/core/logger/audit-logger';
+import { isRedisConfigured } from '@/lib/redis';
 
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -116,55 +117,63 @@ function generateEmailHtml(job: MailJobData): string {
 // BullMQ Mail Worker with Multi-SMTP Fallback
 // ------------------------------------------------------------------------------
 
-export const mailWorker = new Worker<MailJobData>(
-  EMAIL_QUEUE_NAME,
-  async (job: Job<MailJobData>) => {
-    fileLogger.info(`📧 [MailWorker] Processing job ${job.id} (${job.data.type}) for ${job.data.to}`);
+export let mailWorker: Worker<MailJobData> | null = null;
 
-    const htmlContent = generateEmailHtml(job.data);
-    const mailOptions = {
-      from: fromAddress,
-      to: job.data.to,
-      subject: job.data.subject,
-      html: htmlContent,
-    };
+if (!isRedisConfigured()) {
+  fileLogger.info('ℹ️ [MailWorker] Redis is disabled (REDIS_ENABLED=false). Mail worker entering standby mode.');
+  setInterval(() => {}, 1000 * 60 * 60);
+} else {
+  mailWorker = new Worker<MailJobData>(
+    EMAIL_QUEUE_NAME,
+    async (job: Job<MailJobData>) => {
+      fileLogger.info(`📧 [MailWorker] Processing job ${job.id} (${job.data.type}) for ${job.data.to}`);
 
-    // Attempt 1: Primary SMTP
-    if (primaryTransporter) {
-      try {
-        const info = await primaryTransporter.sendMail(mailOptions);
-        fileLogger.info(`✅ [MailWorker] Sent via Primary SMTP: ${info.messageId}`);
-        return { messageId: info.messageId, status: 'delivered', provider: 'primary' };
-      } catch (primaryErr) {
-        fileLogger.warn(`⚠️ [MailWorker] Primary SMTP failed: ${(primaryErr as Error).message}. Attempting backup SMTP...`);
+      const htmlContent = generateEmailHtml(job.data);
+      const mailOptions = {
+        from: fromAddress,
+        to: job.data.to,
+        subject: job.data.subject,
+        html: htmlContent,
+      };
+
+      // Attempt 1: Primary SMTP
+      if (primaryTransporter) {
+        try {
+          const info = await primaryTransporter.sendMail(mailOptions);
+          fileLogger.info(`✅ [MailWorker] Sent via Primary SMTP: ${info.messageId}`);
+          return { messageId: info.messageId, status: 'delivered', provider: 'primary' };
+        } catch (primaryErr) {
+          fileLogger.warn(`⚠️ [MailWorker] Primary SMTP failed: ${(primaryErr as Error).message}. Attempting backup SMTP...`);
+        }
       }
-    }
 
-    // Attempt 2: Backup SMTP
-    if (backupTransporter) {
-      try {
-        const info = await backupTransporter.sendMail(mailOptions);
-        fileLogger.info(`✅ [MailWorker] Sent via Backup SMTP: ${info.messageId}`);
-        return { messageId: info.messageId, status: 'delivered', provider: 'backup' };
-      } catch (backupErr) {
-        fileLogger.error(`❌ [MailWorker] Backup SMTP failed: ${(backupErr as Error).message}`);
-        throw backupErr;
+      // Attempt 2: Backup SMTP
+      if (backupTransporter) {
+        try {
+          const info = await backupTransporter.sendMail(mailOptions);
+          fileLogger.info(`✅ [MailWorker] Sent via Backup SMTP: ${info.messageId}`);
+          return { messageId: info.messageId, status: 'delivered', provider: 'backup' };
+        } catch (backupErr) {
+          fileLogger.error(`❌ [MailWorker] Backup SMTP failed: ${(backupErr as Error).message}`);
+          throw backupErr;
+        }
       }
+
+      fileLogger.warn(`⚠️ [MailWorker] No active SMTP transporter configured. Email job skipped safely.`);
+      return { status: 'skipped', reason: 'no_smtp_configured' };
+    },
+    {
+      connection,
+      concurrency: 5,
     }
+  );
 
-    fileLogger.warn(`⚠️ [MailWorker] No active SMTP transporter configured. Email job skipped safely.`);
-    return { status: 'skipped', reason: 'no_smtp_configured' };
-  },
-  {
-    connection,
-    concurrency: 5,
-  }
-);
+  mailWorker.on('completed', (job) => {
+    fileLogger.info(`[MailWorker] Job ${job.id} completed successfully`);
+  });
 
-mailWorker.on('completed', (job) => {
-  fileLogger.info(`[MailWorker] Job ${job.id} completed successfully`);
-});
+  mailWorker.on('failed', (job, err) => {
+    fileLogger.error(`[MailWorker] Job ${job?.id} failed after retries:`, err);
+  });
+}
 
-mailWorker.on('failed', (job, err) => {
-  fileLogger.error(`[MailWorker] Job ${job?.id} failed after retries:`, err);
-});

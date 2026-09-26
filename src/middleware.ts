@@ -105,9 +105,14 @@ export async function middleware(req: NextRequest) {
   // ----------------------------------------------------------------------------
   const isProtectedApi =
     pathname === '/api/v1/auth/me' ||
+    pathname === '/api/v1/auth/change-password' ||
+    pathname === '/api/v1/auth/profile' ||
+    pathname === '/api/v1/auth/logout' ||
+    pathname.startsWith('/api/v1/auth/2fa') ||
     pathname.startsWith('/api/v1/exams') ||
     pathname.startsWith('/api/v1/curriculum') ||
-    pathname.startsWith('/api/v1/admin');
+    pathname.startsWith('/api/v1/admin') ||
+    pathname.startsWith('/api/v1/ai');
 
   if (isProtectedApi) {
     // Extract Bearer token from header or cookie

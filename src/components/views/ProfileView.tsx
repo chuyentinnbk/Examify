@@ -26,7 +26,16 @@ export default function ProfileView() {
   const [confirmCode, setConfirmCode] = useState('');
   const [loading2FA, setLoading2FA] = useState(false);
 
-  // Fetch initial 2FA status from server
+  // Sync local state when user in appStore updates
+  useEffect(() => {
+    if (user.name) setName(user.name);
+    if (user.email) setEmail(user.email);
+    if (user.role) setRole(user.role);
+    if (user.school) setSchool(user.school);
+    if (user.avatarStyle) setAvatarStyle(user.avatarStyle);
+  }, [user]);
+
+  // Fetch initial profile & 2FA status from server
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
     if (!token) return;
@@ -37,7 +46,13 @@ export default function ProfileView() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.data?.user) {
-          setTwoFactorEnabled(!!data.data.user.twoFactorEnabled);
+          const u = data.data.user;
+          setTwoFactorEnabled(!!u.twoFactorEnabled);
+          if (u.fullName) setName(u.fullName);
+          if (u.email) setEmail(u.email);
+          if (u.role) setRole(u.role === 'ADMIN' ? 'Quản trị viên Khảo thí' : 'Giáo viên bộ môn');
+          if (u.institutionName) setSchool(u.institutionName);
+          if (u.avatarStyle) setAvatarStyle(u.avatarStyle);
         }
       })
       .catch(() => {});
@@ -174,6 +189,10 @@ export default function ProfileView() {
           localStorage.setItem('examify_user', JSON.stringify(updated));
           showToast('Đã lưu thông tin tài khoản và cấu hình vào cơ sở dữ liệu!', 'success');
           return;
+        } else {
+          const errorMsg = typeof data.error === 'string' ? data.error : (data.message || 'Cập nhật thông tin thất bại');
+          showToast(errorMsg, 'error');
+          return;
         }
       }
 
@@ -228,7 +247,8 @@ export default function ProfileView() {
         setConfirmPass('');
         showToast('Đã đổi mật khẩu tài khoản thành công trong cơ sở dữ liệu!', 'success');
       } else {
-        showToast(data.error || 'Đổi mật khẩu thất bại', 'error');
+        const errorMsg = typeof data.error === 'string' ? data.error : (data.message || 'Đổi mật khẩu thất bại');
+        showToast(errorMsg, 'error');
       }
     } catch {
       showToast('Lỗi máy chủ khi đổi mật khẩu', 'error');
@@ -361,22 +381,30 @@ export default function ProfileView() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Địa chỉ Email</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Địa chỉ Email</label>
+                  <span className="text-[10px] text-slate-400 font-medium">Cố định</span>
+                </div>
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  disabled
+                  title="Địa chỉ email định danh tài khoản"
+                  className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Vai trò / Chức vụ</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Vai trò / Chức vụ</label>
+                  <span className="text-[10px] text-slate-400 font-medium">Hệ thống</span>
+                </div>
                 <input
                   type="text"
                   value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  disabled
+                  title="Vai trò tài khoản"
+                  className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed focus:outline-none"
                 />
               </div>
 
@@ -394,9 +422,10 @@ export default function ProfileView() {
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                disabled={isSavingProfile}
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
-                Cập nhật thông tin
+                {isSavingProfile ? 'Đang lưu...' : 'Cập nhật thông tin'}
               </button>
             </div>
           </form>
@@ -498,9 +527,10 @@ export default function ProfileView() {
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                disabled={isChangingPass}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer disabled:opacity-60"
               >
-                Lưu mật khẩu mới
+                {isChangingPass ? 'Đang xử lý...' : 'Lưu mật khẩu mới'}
               </button>
             </div>
           </form>
