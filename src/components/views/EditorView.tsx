@@ -744,7 +744,7 @@ export default function EditorView() {
                   <span className="material-symbols-outlined text-amber-600 text-base">rule</span>
                   <div>
                     <div>Đúng / Sai (4 ý a, b, c, d)</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Chuẩn thi tốt nghiệp GDPT 2018</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Định dạng trắc nghiệm 4 ý</div>
                   </div>
                 </button>
                 <button

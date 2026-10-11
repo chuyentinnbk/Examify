@@ -747,14 +747,14 @@ function generateProceduralQuestion(
     topic: `${subject} - Chuyên đề ${index + 1}`,
     content: `[Kiến thức ${level} ${index + 1}] Trong chương trình ${subject} ${grade}, đặc điểm cốt lõi của quy luật ${index + 1} được biểu diễn qua yếu tố nào?`,
     options: [
-      { key: 'A', text: `Phương án đặc trưng ${index + 1}A chuẩn hóa GDPT`, isCorrect: true },
+      { key: 'A', text: `Phương án đặc trưng ${index + 1}A chuẩn hóa kiến thức`, isCorrect: true },
       { key: 'B', text: `Phương án so sánh ${index + 1}B`, isCorrect: false },
       { key: 'C', text: `Phương án đối chiếu ${index + 1}C`, isCorrect: false },
       { key: 'D', text: `Phương án loại suy ${index + 1}D`, isCorrect: false },
     ],
     points: 0.25,
     correctAnswer: 'A',
-    explanation: `Phân tích chi tiết phương án chuẩn hóa sư phạm GDPT 2018 theo cấp độ ${level}.`,
+    explanation: `Phân tích chi tiết phương án chuẩn hóa sư phạm theo cấp độ ${level}.`,
   };
 }
 

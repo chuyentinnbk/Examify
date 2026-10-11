@@ -27,7 +27,7 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
 
     if (!res.ok) {
       return [
-        { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Khuyên dùng)', provider: 'gemini', isDefault: true },
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Khuyên dùng)', provider: 'gemini', isDefault: true },
         { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'gemini' },
         { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini' },
       ];
@@ -43,18 +43,18 @@ async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
           name: m.displayName || cleanId,
           provider: 'gemini' as const,
           description: m.description || '',
-          isDefault: cleanId === 'gemini-3.6-flash' || cleanId === 'gemini-3.7-flash',
+          isDefault: cleanId === 'gemini-3.8-flash' || cleanId === 'gemini-3.7-flash',
         };
       });
 
     return models.length > 0 ? models : [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'gemini', isDefault: true },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Khuyên dùng)', provider: 'gemini', isDefault: true },
       { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'gemini' },
       { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini' },
     ];
   } catch {
     return [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', provider: 'gemini', isDefault: true },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Khuyên dùng)', provider: 'gemini', isDefault: true },
       { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'gemini' },
       { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini' },
     ];

@@ -48,6 +48,18 @@ enum QuestionType {
   ESSAY
 }
 
+enum AcademicDocType {
+  EXAM
+  LESSON
+}
+
+enum ParseStatus {
+  PENDING
+  PARSING
+  PARSED
+  FAILED
+}
+
 // ------------------------------------------------------------------------------
 // Authentication & User Management
 // ------------------------------------------------------------------------------
@@ -64,8 +76,10 @@ model User {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  exams        Exam[]
-  auditLogs    AuditLog[]
+  exams             Exam[]
+  academicDocuments AcademicDocument[]
+  aiSkills          AiSkill[]
+  auditLogs         AuditLog[]
 
   @@index([role])
   @@index([email])
@@ -208,6 +222,9 @@ model Exam {
   // Teacher custom prompt passed after prompt guard sanitization
   customPrompt          String?        @map("custom_prompt") @db.Text
 
+  // AI Skills applied during generation (JSON array of skill IDs and titles)
+  appliedSkillIds       String?        @map("applied_skill_ids") @db.Text
+
   // AI execution details
   aiProvider            String         @map("ai_provider") // "openai" | "gemini" | "self-hosted"
   aiModel               String         @map("ai_model")
@@ -239,7 +256,7 @@ model AuditLog {
   entity    String   // e.g., SYSTEM, USER, EXAM, SECURITY
   entityId  String?  @map("entity_id")
   clientIp  String?  @map("client_ip")
-  country   String?  // Resolved via geoip-lite (e.g., "VN", "US", "JP")
+  country   String?  @default("VN") // Resolved via geoip-lite (e.g., "VN", "US", "JP")
   userAgent String?  @map("user_agent") @db.Text
   details   String?  @db.LongText // JSON payload for deep auditing
   createdAt DateTime @default(now()) @map("created_at")
@@ -249,4 +266,67 @@ model AuditLog {
   @@index([entity])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ------------------------------------------------------------------------------
+// Academic Data & Knowledge Base (Phần 1: Dữ liệu gốc & Phần 2: Dữ liệu tách)
+// ------------------------------------------------------------------------------
+
+model AcademicDocument {
+  id            String          @id @default(uuid())
+  title         String
+  docType       AcademicDocType @default(EXAM) @map("doc_type")
+  subject       String          // e.g., "Toán học", "Vật lí", "Hóa học"
+  grade         String          // e.g., "Lớp 12", "Lớp 10"
+  semester      String?         // e.g., "Học kỳ 1", "Học kỳ 2"
+  source        String?         // Nguồn tài liệu, trường, năm học
+  rawContent    String          @map("raw_content") @db.LongText
+  fileUrl       String?         @map("file_url")
+  teacherId     String          @map("teacher_id")
+  teacher       User            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // Phần 2: Dữ liệu tách (JSON cấu trúc bóc tách)
+  parseStatus   ParseStatus     @default(PENDING) @map("parse_status")
+  parsedData    String?         @map("parsed_data") @db.LongText
+  parsedAt      DateTime?       @map("parsed_at")
+  errorMessage  String?         @map("error_message") @db.Text
+
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  skills        AiSkill[]
+
+  @@index([teacherId])
+  @@index([docType])
+  @@index([subject, grade])
+  @@map("academic_documents")
+}
+
+// ------------------------------------------------------------------------------
+// AI Pedagogical Skills (Phần 3: Kỹ năng viết cho AI từ dữ liệu học thuật)
+// ------------------------------------------------------------------------------
+
+model AiSkill {
+  id                String            @id @default(uuid())
+  title             String            // Tên kĩ năng e.g. "Kỹ năng ra đề Đạo hàm & Tiệm cận phân hóa 4 mức độ"
+  description       String?           @db.Text
+  subject           String            // e.g., "Toán học"
+  grade             String            // e.g., "Lớp 12"
+  skillInstructions String            @map("skill_instructions") @db.LongText // Hướng dẫn chi tiết, ma trận, lưu ý sư phạm cho AI
+  fewShotExamples   String?           @map("few_shot_examples") @db.LongText // JSON array các câu hỏi mẫu bóc tách
+  isActive          Boolean           @default(true) @map("is_active")
+
+  teacherId         String            @map("teacher_id")
+  teacher           User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  documentId        String?           @map("document_id")
+  document          AcademicDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@index([teacherId])
+  @@index([subject, grade])
+  @@index([isActive])
+  @@map("ai_skills")
 }

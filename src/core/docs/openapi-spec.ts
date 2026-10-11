@@ -462,11 +462,11 @@ export const openApiSpec: OpenAPISpec = {
         "properties": {
           "id": {
             "type": "string",
-            "example": "gemini-2.0-flash"
+            "example": "gemini-3.8-flash"
           },
           "name": {
             "type": "string",
-            "example": "Gemini 2.0 Flash"
+            "example": "Gemini 3.8 Flash"
           },
           "provider": {
             "type": "string",
@@ -644,7 +644,7 @@ export const openApiSpec: OpenAPISpec = {
                       },
                       "geminiModel": {
                         "type": "string",
-                        "default": "gemini-2.0-flash"
+                        "default": "gemini-3.8-flash"
                       },
                       "openaiApiKey": {
                         "type": "string",
@@ -1794,7 +1794,7 @@ export const openApiSpec: OpenAPISpec = {
                   },
                   "aiModel": {
                     "type": "string",
-                    "example": "gemini-2.0-flash"
+                    "example": "gemini-3.8-flash"
                   },
                   "language": {
                     "type": "string",
@@ -2061,7 +2061,7 @@ export const openApiSpec: OpenAPISpec = {
                         },
                         "geminiModel": {
                           "type": "string",
-                          "example": "gemini-2.0-flash"
+                          "example": "gemini-3.8-flash"
                         },
                         "geminiKeysCount": {
                           "type": "integer",
@@ -2133,7 +2133,7 @@ export const openApiSpec: OpenAPISpec = {
                   },
                   "geminiModel": {
                     "type": "string",
-                    "example": "gemini-2.0-flash"
+                    "example": "gemini-3.8-flash"
                   },
                   "openaiApiKeys": {
                     "type": "string",

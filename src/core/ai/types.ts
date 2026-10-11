@@ -16,6 +16,13 @@ export interface CognitiveDistribution {
   highApplication: number;  // Percentage, e.g., 10%
 }
 
+export interface AppliedSkillContext {
+  id?: string;
+  title: string;
+  skillInstructions: string;
+  fewShotExamples?: any[];
+}
+
 export interface ExamGenerationPayload {
   curriculum: CurriculumContext;
   examType: ExamType;
@@ -24,6 +31,7 @@ export interface ExamGenerationPayload {
   totalQuestions: number;
   cognitiveMatrix?: CognitiveDistribution;
   customPrompt?: string;
+  appliedSkills?: AppliedSkillContext[];
   language?: string; // default "Vietnamese" or "English"
 }
 

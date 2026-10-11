@@ -31,6 +31,16 @@ export default function Sidebar() {
       badge: null,
     },
     {
+      route: '#academic-data',
+      icon: 'menu_book',
+      label: 'Dữ liệu học thuật',
+      badge: (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+          MỚI
+        </span>
+      ),
+    },
+    {
       route: '#profile',
       icon: 'manage_accounts',
       label: 'Tài khoản & 2FA',

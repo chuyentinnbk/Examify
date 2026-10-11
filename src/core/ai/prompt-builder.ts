@@ -78,8 +78,8 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 2. DIVERSE CURRICULUM COVERAGE: Broadly distribute questions across different topics, sub-skills, theories, and practical applications within the specified subject and grade.
 3. OUTPUT ONLY RAW VALID JSON: Never output markdown code fences (like \`\`\`json), markdown explanations, or conversational filler.
 4. STRICT JSON SCHEMA: The entire exam output must adhere strictly to the JSON schema.
-5. PRECISE & PEDAGOGICAL: Questions must be unambiguous, factually accurate according to Vietnam's GDPT 2018 standards, and mathematically verified.
-6. QUESTION TYPES ACCORDING TO VIETNAM GDPT 2018 STANDARDS:
+5. PRECISE & PEDAGOGICAL: Questions must be unambiguous, factually accurate, and mathematically verified.
+6. QUESTION TYPES & SPECIFICATIONS:
    - MULTIPLE_CHOICE: 4 distinct choices (A, B, C, D) in "options", exactly one correct option in "correctAnswer" ("A", "B", "C", or "D").
    - TRUE_FALSE (Đúng / Sai): 1 question statement with context, plus exactly 4 sub-items in "options" corresponding to a, b, c, d. "correctAnswer" formatted as "a: Đ, b: S, c: Đ, d: S" (or "a: Đúng, b: Sai, c: Đúng, d: Đúng").
    - SHORT_ANSWER (Trả lời ngắn): Problem statement asking for a concise value/number. "options" must be empty array []. "correctAnswer" is the concise value (e.g. "15", "-4.5", "2024").
@@ -151,6 +151,18 @@ ${matrixSpecs}
     // Safely append custom teacher directives if present
     if (safeCustomPrompt) {
       userPrompt += `\n\n### ADDITIONAL TEACHER INSTRUCTIONS (Within Exam Scope):\n"${safeCustomPrompt}"`;
+    }
+
+    // Apply Pedagogical AI Skills if selected
+    if (payload.appliedSkills && payload.appliedSkills.length > 0) {
+      userPrompt += `\n\n### SPECIALIZED PEDAGOGICAL & DOMAIN AI SKILLS (Enforce Strictly):`;
+      payload.appliedSkills.forEach((skill, idx) => {
+        userPrompt += `\n\n--- [KỸ NĂNG ${idx + 1}: ${skill.title}] ---`;
+        userPrompt += `\n${skill.skillInstructions}`;
+        if (skill.fewShotExamples && Array.isArray(skill.fewShotExamples) && skill.fewShotExamples.length > 0) {
+          userPrompt += `\n* Các câu hỏi mẫu tiêu biểu cần bám sát (Few-shot Examples):\n${JSON.stringify(skill.fewShotExamples, null, 2)}`;
+        }
+      });
     }
 
     return {

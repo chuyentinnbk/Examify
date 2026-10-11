@@ -109,7 +109,7 @@ export class AuditLogger {
           entityId: event.entityId || null,
           userId: event.userId || null,
           clientIp: event.clientIp || null,
-          country: event.country || null,
+          country: event.country || 'VN',
           userAgent: event.userAgent || null,
           details: event.details ? JSON.stringify(event.details) : null,
         },

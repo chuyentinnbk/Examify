@@ -311,6 +311,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       const req = !!(data.success && data.data?.setupRequired);
       setIsSetupRequired(req);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('examify_setup_required', String(req));
+      }
       if (req) {
         setCurrentRoute('#setup-wizard');
         return true;
@@ -400,21 +403,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Initial sync with browser hash
+    // Initial sync with browser hash & local storage
     if (typeof window !== 'undefined') {
       const storedToken = localStorage.getItem('examify_token');
+      const storedUser = localStorage.getItem('examify_user');
+      const cachedSetup = localStorage.getItem('examify_setup_required');
+
+      if (cachedSetup !== null) {
+        setIsSetupRequired(cachedSetup === 'true');
+      } else if (storedToken) {
+        setIsSetupRequired(false);
+      }
+
       const hash = window.location.hash || (storedToken ? '#dashboard' : '#login');
 
-      if (!storedToken) {
-        setCurrentRouteState('#login');
-        if (hash === '#setup-wizard') {
-          window.location.hash = '#login';
+      // Fast restore user profile immediately from local cache so UI renders in 0ms without waiting for network
+      if (storedToken) {
+        setToken(storedToken);
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch {
+            // ignore
+          }
         }
-      } else {
         const safeHash = hash === '#setup-wizard' ? '#dashboard' : hash;
         setCurrentRouteState(safeHash);
         if (hash === '#setup-wizard') {
           window.location.hash = '#dashboard';
+        }
+      } else {
+        setCurrentRouteState('#login');
+        if (hash === '#setup-wizard') {
+          window.location.hash = '#login';
         }
       }
 
@@ -436,14 +457,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       window.addEventListener('hashchange', handleHashChange);
 
-      // Perform setup and session auth check
+      // Perform background setup check and session validation (once on mount)
       checkSetupStatus();
 
       return () => {
         window.removeEventListener('hashchange', handleHashChange);
       };
     }
-  }, [isSetupRequired]);
+  }, []); // Run only ONCE on mount
 
   return (
     <AppContext.Provider

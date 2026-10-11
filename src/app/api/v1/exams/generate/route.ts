@@ -8,6 +8,7 @@ import { StorageManager } from '@/core/storage/storage-manager';
 import { AuditLogger } from '@/core/logger/audit-logger';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
+import { AcademicStorage } from '@/core/storage/academic-storage';
 
 const GenerateExamSchema = z.object({
   title: z.string().min(3, 'Exam title must be at least 3 characters'),
@@ -33,6 +34,7 @@ const GenerateExamSchema = z.object({
     })
     .optional(),
   customPrompt: z.string().max(1500).optional(),
+  skillIds: z.array(z.string()).optional(),
   aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
   aiModel: z.string().optional(),
   language: z.string().default('Vietnamese'),
@@ -102,6 +104,28 @@ export async function POST(req: NextRequest) {
       const selectedProvider = payload.aiProvider || (process.env.DEFAULT_AI_PROVIDER as SupportedAIProvider) || 'gemini';
       const initialProvider = AIFactory.getProvider(selectedProvider, { model: payload.aiModel });
 
+      // 3.5 Load Applied Pedagogical AI Skills if provided
+      const appliedSkills: Array<{ id: string; title: string; skillInstructions: string; fewShotExamples?: any[] }> = [];
+      if (payload.skillIds && payload.skillIds.length > 0) {
+        for (const sid of payload.skillIds) {
+          const sk = await AcademicStorage.getSkillById(sid);
+          if (sk && sk.isActive) {
+            let fewShot = [];
+            try {
+              if (sk.fewShotExamples) fewShot = JSON.parse(sk.fewShotExamples);
+            } catch {
+              // ignore
+            }
+            appliedSkills.push({
+              id: sk.id,
+              title: sk.title,
+              skillInstructions: sk.skillInstructions,
+              fewShotExamples: fewShot,
+            });
+          }
+        }
+      }
+
       // 4. Create initial DRAFT record in database
       const examRecord = await prisma.exam.create({
         data: {
@@ -116,6 +140,7 @@ export async function POST(req: NextRequest) {
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix ? JSON.stringify(payload.cognitiveMatrix) : null,
           customPrompt: safeCustomPrompt || null,
+          appliedSkillIds: payload.skillIds && payload.skillIds.length > 0 ? JSON.stringify(payload.skillIds) : null,
           aiProvider: initialProvider.providerName,
           aiModel: initialProvider.modelName,
         },
@@ -131,6 +156,7 @@ export async function POST(req: NextRequest) {
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix,
           customPrompt: safeCustomPrompt,
+          appliedSkills: appliedSkills.length > 0 ? appliedSkills : undefined,
           language: payload.language,
         },
         selectedProvider

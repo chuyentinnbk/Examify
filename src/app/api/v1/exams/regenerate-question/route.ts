@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({
-          model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.6-flash',
+          model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.8-flash',
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.6,
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 }`;
 
         if (type === 'true_false') {
-          typeInstruction = `Hãy tạo MỘT (1) câu hỏi trắc nghiệm ĐÚNG / SAI (gồm bối cảnh/nội dung chung và 4 ý khẳng định a, b, c, d độc lập) theo chuẩn GDPT 2018 cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+          typeInstruction = `Hãy tạo MỘT (1) câu hỏi trắc nghiệm ĐÚNG / SAI (gồm bối cảnh/nội dung chung và 4 ý khẳng định a, b, c, d độc lập) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
 Định dạng JSON trả về:
 {
   "content": "Bối cảnh hoặc đề bài toán...",
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   "explanation": "Giải thích chi tiết tính đúng/sai của từng ý a, b, c, d..."
 }`;
         } else if (type === 'short_answer') {
-          typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (thí sinh chỉ điền đáp số/kết quả cuối cùng, không có lựa chọn A,B,C,D) theo chuẩn GDPT 2018 cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+          typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (thí sinh chỉ điền đáp số/kết quả cuối cùng, không có lựa chọn A,B,C,D) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
 Định dạng JSON trả về:
 {
   "content": "Nội dung bài toán yêu cầu tìm đáp số...",
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 }`;
         }
 
-        const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi chuẩn GDPT 2018 tại Việt Nam.
+        const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi tại Việt Nam.
 ${typeInstruction}
 Chuyên đề/Chủ đề: ${currentTopic || subject}
 QUY TẮC BẮT BUỘC: Không được trùng lặp với bất kỳ câu hỏi nào đã có trong đề thi.

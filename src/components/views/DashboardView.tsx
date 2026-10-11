@@ -60,7 +60,7 @@ export default function DashboardView() {
           <div className="flex flex-col gap-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md w-fit text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-cyan-300 animate-ping" />
-              <span>Hệ Khảo Thí Chuẩn Hóa GDPT 2018</span>
+              <span>Hệ Khảo Thí &amp; Đánh Giá Năng Lực Thông Minh</span>
             </div>
 
             <div className="flex items-center gap-4 pt-1">
@@ -294,7 +294,7 @@ export default function DashboardView() {
           </p>
           <p className="text-xs text-slate-400 mt-1">
             {exams.length === 0
-              ? 'Bắt đầu bằng cách tạo ma trận chuẩn GDPT 2018 hoặc sinh tự động bằng AI.'
+              ? 'Bắt đầu bằng cách tạo ma trận kiến thức hoặc sinh đề tự động bằng AI.'
               : 'Thử thay đổi từ khóa tìm kiếm hoặc chuyển bộ lọc trạng thái.'}
           </p>
           {exams.length === 0 && (

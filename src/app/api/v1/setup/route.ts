@@ -132,6 +132,9 @@ function updateEnvFile(updates: Record<string, string>) {
   fs.writeFileSync(envPath, newLines.join('\n'), 'utf8');
 }
 
+// In-memory cache for initialization status to avoid slow remote DB roundtrips on every page refresh
+let cachedIsInitialized: boolean | null = null;
+
 /**
  * GET /api/v1/setup
  * Checks whether initial setup is required or already completed.
@@ -167,8 +170,17 @@ export async function GET() {
     },
   };
 
+  // If already verified as initialized in this server session, respond instantly
+  if (cachedIsInitialized === true) {
+    return apiSuccess({
+      isInitialized: true,
+      setupRequired: false,
+      currentConfig,
+    });
+  }
+
   try {
-    // Attempt database query with fail-safe 5s timeout
+    // Attempt database query with fail-safe timeout
     const queryDb = async () => {
       const adminCount = await prisma.user.count({ where: { role: Role.ADMIN } });
       const initSetting = await prisma.systemSetting.findUnique({ where: { key: 'is_initialized' } });
@@ -177,8 +189,12 @@ export async function GET() {
 
     const isInitialized = await Promise.race([
       queryDb().catch(() => false),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8000)),
     ]);
+
+    if (isInitialized) {
+      cachedIsInitialized = true;
+    }
 
     return apiSuccess({
       isInitialized,

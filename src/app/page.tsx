@@ -11,15 +11,21 @@ import CreateExamView from '@/components/views/CreateExamView';
 import EditorView from '@/components/views/EditorView';
 import ProfileView from '@/components/views/ProfileView';
 import AdminView from '@/components/views/AdminView';
+import AcademicDataView from '@/components/views/AcademicDataView';
 import LoginView from '@/components/views/LoginView';
 import RegisterView from '@/components/views/RegisterView';
 import SetupWizardView from '@/components/views/SetupWizardView';
 
 function AppContent() {
   const { currentRoute, isSetupRequired, token } = useAppStore();
+  const [mounted, setMounted] = React.useState(false);
 
-  // If setup status is still being determined, show the smooth centered loading screen
-  if (isSetupRequired === null) {
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // If setup status is still being determined or component not yet mounted on client, show loading screen
+  if (!mounted || isSetupRequired === null) {
     return (
       <main className="w-full min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center justify-center text-center max-w-sm w-full mx-auto">
@@ -95,6 +101,9 @@ function AppContent() {
         return <CreateExamView />;
       case '#editor':
         return <EditorView />;
+      case '#academic-data':
+      case '#data':
+        return <AcademicDataView />;
       case '#profile':
         return <ProfileView />;
       case '#admin':

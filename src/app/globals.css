@@ -249,7 +249,7 @@ body {
     outline: none !important;
   }
 
-  /* Bảng in câu hỏi trắc nghiệm Đúng / Sai chuẩn Bộ GD&ĐT (GDPT 2018 / 2025) */
+  /* Bảng in câu hỏi trắc nghiệm Đúng / Sai chuẩn Bộ GD&ĐT */
   table.tf-print-table,
   .tf-print-table {
     display: table !important;

@@ -96,7 +96,7 @@ export async function GET() {
         maskedKey: geminiKeys[0] ? maskApiKey(geminiKeys[0]) : '',
         maskedKeys: geminiKeys.map(maskApiKey),
         rawKeyCount: geminiKeys.length,
-        currentModel: (process.env.GEMINI_MODEL || 'gemini-3.6-flash').split(',')[0].trim(),
+        currentModel: (process.env.GEMINI_MODEL || 'gemini-3.8-flash').split(',')[0].trim(),
         endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
       },
       openai: {

@@ -111,6 +111,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/v1/auth/2fa') ||
     pathname.startsWith('/api/v1/exams') ||
     pathname.startsWith('/api/v1/curriculum') ||
+    pathname.startsWith('/api/v1/academic-data') ||
     pathname.startsWith('/api/v1/admin') ||
     pathname.startsWith('/api/v1/ai');
 

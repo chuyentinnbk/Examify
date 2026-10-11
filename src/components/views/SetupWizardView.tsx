@@ -60,7 +60,7 @@ export default function SetupWizardView() {
 
   // Live real-time models from official endpoints
   const [geminiLiveModels, setGeminiLiveModels] = useState<Array<{ id: string; name: string }>>([
-    { id: 'gemini-3.6-flash', name: 'gemini-3.6-flash (Thế hệ mới nhất)' },
+    { id: 'gemini-3.8-flash', name: 'gemini-3.8-flash (Thế hệ mới nhất)' },
     { id: 'gemini-3.7-flash', name: 'gemini-3.7-flash (Hiệu năng cao)' },
     { id: 'gemini-3.5-flash', name: 'gemini-3.5-flash (Tối ưu)' },
   ]);

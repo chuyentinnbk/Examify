@@ -3,6 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
+import PortalModal from '@/components/common/PortalModal';
+
+interface SkillOption {
+  id: string;
+  title: string;
+  description?: string | null;
+  subject: string;
+  grade: string;
+  skillInstructions: string;
+  fewShotExamples?: string | null;
+  isActive: boolean;
+}
 
 interface ModelOption {
   id: string;
@@ -38,11 +50,17 @@ export default function CreateExamView() {
   const [veryHard, setVeryHard] = useState(10);
 
   const [aiProvider, setAiProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [modelsList, setModelsList] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Pedagogical Skills
+  const [availableSkills, setAvailableSkills] = useState<SkillOption[]>([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+  const [previewingSkill, setPreviewingSkill] = useState<SkillOption | null>(null);
 
   // AI Provider Status from /api/v1/ai/settings
   const [providersStatus, setProvidersStatus] = useState<Record<string, ProviderInfo>>({
@@ -79,9 +97,33 @@ export default function CreateExamView() {
     }
   };
 
+  // Fetch available AI Pedagogical Skills from backend
+  const fetchAvailableSkills = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `/api/v1/academic-data/skills?subject=${encodeURIComponent(subject)}&grade=${encodeURIComponent(grade)}&isActive=true`,
+        { headers }
+      );
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data?.skills)) {
+        setAvailableSkills(data.data.skills);
+      }
+    } catch {
+      // Keep silent
+    }
+  };
+
   useEffect(() => {
     fetchProviderStatus();
   }, []);
+
+  useEffect(() => {
+    fetchAvailableSkills();
+  }, [subject, grade]);
 
   // Real-time Model Fetching from official APIs
   const fetchLiveModels = async (providerName: string) => {
@@ -113,11 +155,11 @@ export default function CreateExamView() {
       // Fallback defaults
       if (providerName === 'gemini') {
         setModelsList([
-          { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', isDefault: true },
+          { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', isDefault: true },
           { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
           { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
         ]);
-        setSelectedModel('gemini-3.6-flash');
+        setSelectedModel('gemini-3.8-flash');
       } else if (providerName === 'openai') {
         setModelsList([
           { id: 'gpt-4o-mini', name: 'GPT-4o Mini', isDefault: true },
@@ -180,6 +222,7 @@ export default function CreateExamView() {
           highApplication: veryHard,
         },
         customPrompt,
+        skillIds: selectedSkillIds.length > 0 ? selectedSkillIds : undefined,
         aiProvider,
         aiModel: selectedModel,
       };
@@ -379,7 +422,7 @@ export default function CreateExamView() {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-blue-600 text-lg">category</span>
               <h3 className="text-sm font-bold text-slate-800">
-                1. Phân cấp Chương trình Giáo dục (GDPT 2018)
+                1. Phân cấp Chương trình Giáo dục
               </h3>
             </div>
 
@@ -388,7 +431,14 @@ export default function CreateExamView() {
                 <label className="text-xs font-semibold text-slate-700">Cấp học *</label>
                 <select
                   value={level}
-                  onChange={(e) => setLevel(e.target.value)}
+                  onChange={(e) => {
+                    const newLevel = e.target.value;
+                    setLevel(newLevel);
+                    // Tự động chuyển lớp mặc định tương ứng với từng cấp
+                    if (newLevel === 'UPPER_SEC') setGrade('Lớp 12');
+                    else if (newLevel === 'LOWER_SEC') setGrade('Lớp 9');
+                    else if (newLevel === 'PRIMARY') setGrade('Lớp 5');
+                  }}
                   className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   <option value="UPPER_SEC">THPT (Cấp 3)</option>
@@ -404,10 +454,30 @@ export default function CreateExamView() {
                   onChange={(e) => setGrade(e.target.value)}
                   className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
                 >
-                  <option value="Lớp 12">Lớp 12</option>
-                  <option value="Lớp 11">Lớp 11</option>
-                  <option value="Lớp 10">Lớp 10</option>
-                  <option value="Lớp 9">Lớp 9</option>
+                  {level === 'UPPER_SEC' && (
+                    <>
+                      <option value="Lớp 12">Lớp 12</option>
+                      <option value="Lớp 11">Lớp 11</option>
+                      <option value="Lớp 10">Lớp 10</option>
+                    </>
+                  )}
+                  {level === 'LOWER_SEC' && (
+                    <>
+                      <option value="Lớp 9">Lớp 9</option>
+                      <option value="Lớp 8">Lớp 8</option>
+                      <option value="Lớp 7">Lớp 7</option>
+                      <option value="Lớp 6">Lớp 6</option>
+                    </>
+                  )}
+                  {level === 'PRIMARY' && (
+                    <>
+                      <option value="Lớp 5">Lớp 5</option>
+                      <option value="Lớp 4">Lớp 4</option>
+                      <option value="Lớp 3">Lớp 3</option>
+                      <option value="Lớp 2">Lớp 2</option>
+                      <option value="Lớp 1">Lớp 1</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -584,6 +654,102 @@ export default function CreateExamView() {
               rows={3}
               className="w-full p-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+          </div>
+
+          {/* 4. Kỹ Năng Sư Phạm AI Áp Dụng */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-600 text-lg">psychology</span>
+                <h3 className="text-sm font-bold text-slate-800">
+                  4. Kỹ Năng Sư Phạm AI Áp Dụng ({selectedSkillIds.length})
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentRoute('#academic-data')}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline px-2 py-1 rounded-lg hover:bg-blue-50 transition"
+                  title="Quản lý và tải thêm dữ liệu học thuật gốc / viết kỹ năng mới"
+                >
+                  <span className="material-symbols-outlined text-xs">folder_open</span>
+                  <span>Quản lý Dữ liệu</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSkillModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-base">add_task</span>
+                  Chọn Kỹ Năng AI
+                </button>
+              </div>
+            </div>
+
+            {selectedSkillIds.length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center">
+                <p className="text-xs text-slate-500 font-medium">
+                  Chưa chọn kỹ năng nào. AI sẽ sinh đề theo ma trận mặc định.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsSkillModalOpen(true)}
+                  className="mt-2 text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">smart_toy</span>
+                  Bấm vào đây để chọn kỹ năng ra đề chuyên sâu
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedSkillIds.map((sid) => {
+                  const skill = availableSkills.find((s) => s.id === sid);
+                  if (!skill) return null;
+                  return (
+                    <div
+                      key={sid}
+                      className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-emerald-600 text-base shrink-0">
+                          check_circle
+                        </span>
+                        <div className="truncate">
+                          <p className="text-xs font-bold text-emerald-950 truncate">
+                            {skill.title}
+                          </p>
+                          {skill.description && (
+                            <p className="text-[10px] text-slate-500 truncate">
+                              {skill.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewingSkill(skill)}
+                          title="Xem quy chuẩn kỹ năng"
+                          className="p-1 text-emerald-700 hover:bg-emerald-100 rounded-lg transition"
+                        >
+                          <span className="material-symbols-outlined text-base">visibility</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedSkillIds((prev) => prev.filter((id) => id !== sid))
+                          }
+                          title="Bỏ chọn kỹ năng"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        >
+                          <span className="material-symbols-outlined text-base">close</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -763,6 +929,163 @@ export default function CreateExamView() {
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL: CHỌN KỸ NĂNG SƯ PHẠM AI */}
+      {/* ========================================================================= */}
+      <PortalModal
+        isOpen={isSkillModalOpen}
+        onClose={() => setIsSkillModalOpen(false)}
+        title="Chọn Kỹ Năng Sư Phạm AI Áp Dụng Cho Đề Thi"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-slate-500 font-medium">
+            Chọn 1 hoặc nhiều kỹ năng ra đề chuyên sâu (được bóc tách từ tài liệu học thuật hoặc do giáo viên tự thiết lập) để AI bám sát ma trận và cài cắm dạng bài.
+          </p>
+
+          {availableSkills.length === 0 ? (
+            <div className="p-8 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center">
+              <span className="material-symbols-outlined text-3xl text-slate-400 mb-2">
+                psychology_alt
+              </span>
+              <p className="text-xs font-bold text-slate-700">
+                Chưa có kỹ năng nào cho môn {subject} ({grade})
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1 mb-3">
+                Bạn có thể vào trang &quot;Dữ liệu học thuật&quot; để nạp đề thi/bài học và cho AI tự động viết kỹ năng mới.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSkillModalOpen(false);
+                  setCurrentRoute('#academic-data');
+                }}
+                className="px-3.5 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition"
+              >
+                Đến Trang Dữ Liệu Học Thuật
+              </button>
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
+              {availableSkills.map((sk) => {
+                const isChecked = selectedSkillIds.includes(sk.id);
+                return (
+                  <div
+                    key={sk.id}
+                    onClick={() => {
+                      setSelectedSkillIds((prev) =>
+                        isChecked ? prev.filter((id) => id !== sk.id) : [...prev, sk.id]
+                      );
+                    }}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      isChecked
+                        ? 'bg-emerald-50/80 border-emerald-400 shadow-xs'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}}
+                      className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-xs font-bold text-slate-800 truncate">{sk.title}</h4>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewingSkill(sk);
+                          }}
+                          className="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5 shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-xs">visibility</span>
+                          Chi tiết
+                        </button>
+                      </div>
+                      {sk.description && (
+                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                          {sk.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 font-semibold">
+                        <span className="bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
+                          {sk.subject}
+                        </span>
+                        <span className="bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
+                          {sk.grade}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <span className="text-xs font-semibold text-slate-600">
+              Đã chọn: <strong className="text-emerald-700">{selectedSkillIds.length}</strong> kỹ năng
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsSkillModalOpen(false)}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-xs"
+            >
+              Áp Dụng ({selectedSkillIds.length})
+            </button>
+          </div>
+        </div>
+      </PortalModal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: XEM TRƯỚC CHI TIẾT KỸ NĂNG */}
+      {/* ========================================================================= */}
+      <PortalModal
+        isOpen={!!previewingSkill}
+        onClose={() => setPreviewingSkill(null)}
+        title={previewingSkill ? previewingSkill.title : 'Quy Chuẩn Kỹ Năng Sư Phạm'}
+      >
+        {previewingSkill && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                {previewingSkill.subject}
+              </span>
+              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                {previewingSkill.grade}
+              </span>
+            </div>
+
+            {previewingSkill.description && (
+              <p className="text-xs text-slate-600 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                {previewingSkill.description}
+              </p>
+            )}
+
+            <div>
+              <span className="block text-xs font-bold text-slate-700 mb-1">
+                Hướng dẫn quy chuẩn sư phạm cho AI:
+              </span>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono whitespace-pre-wrap text-slate-800 max-h-56 overflow-y-auto">
+                {previewingSkill.skillInstructions}
+              </div>
+            </div>
+
+            {previewingSkill.fewShotExamples && (
+              <div>
+                <span className="block text-xs font-bold text-slate-700 mb-1">
+                  Câu hỏi mẫu tham khảo (Few-shot Examples):
+                </span>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono whitespace-pre-wrap text-slate-700 max-h-40 overflow-y-auto">
+                  {previewingSkill.fewShotExamples}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </PortalModal>
     </div>
   );
 }

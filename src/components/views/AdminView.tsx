@@ -145,7 +145,7 @@ export const AdminView: React.FC = () => {
   const [geminiConfig, setGeminiConfig] = useState<ProviderMultiKeySetting>({
     keys: [''],
     maskedKeys: [],
-    model: 'gemini-3.6-flash',
+    model: 'gemini-3.8-flash',
     hasKey: false,
     rawMode: false,
     rawText: '',
@@ -247,7 +247,7 @@ export const AdminView: React.FC = () => {
             hasKey: d.providers.gemini.hasKey,
             maskedKeys: mKeys,
             keys: prev.keys.filter(Boolean).length > 0 ? prev.keys : mKeys.length > 0 ? mKeys.map(() => '') : [''],
-            model: d.providers.gemini.currentModel || 'gemini-3.6-flash',
+            model: d.providers.gemini.currentModel || 'gemini-3.8-flash',
           }));
         }
 
@@ -971,7 +971,7 @@ export const AdminView: React.FC = () => {
                       onChange={(e) => setGeminiConfig({ ...geminiConfig, model: e.target.value })}
                       className="h-8 px-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
                     >
-                      <option value="gemini-3.6-flash">gemini-3.6-flash (Mới & Tối ưu)</option>
+                      <option value="gemini-3.8-flash">gemini-3.8-flash (Mới & Tối ưu)</option>
                       <option value="gemini-3.7-flash">gemini-3.7-flash (Suy luận nâng cao)</option>
                       <option value="gemini-3.5-flash">gemini-3.5-flash</option>
                       <option value="gemini-1.5-pro">gemini-1.5-pro</option>

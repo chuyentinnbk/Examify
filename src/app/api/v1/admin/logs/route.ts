@@ -56,7 +56,7 @@ const FALLBACK_LOGS = [
         success: true,
         examId: 'ex-10-toan-hk1',
         questionsCount: 20,
-        modelUsed: 'gemini-3.6-flash',
+        modelUsed: 'gemini-3.8-flash',
         message: 'Sinh 20 câu hỏi trắc nghiệm kèm ma trận Bloom thành công.',
       },
       sentAt: new Date(Date.now() - 33580).toISOString(),
