@@ -65,6 +65,7 @@ services:
     volumes:
       - storage_exams:/app/storage/exams
       - storage_logs:/app/storage/logs
+      - storage_academic_data:/app/storage/academic-data
     networks:
       - examify_network
 
@@ -93,6 +94,8 @@ volumes:
   storage_exams:
     driver: local
   storage_logs:
+    driver: local
+  storage_academic_data:
     driver: local
 
 networks:
