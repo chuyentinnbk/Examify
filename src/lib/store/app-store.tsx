@@ -56,6 +56,7 @@ export interface ExamItem {
   department?: string;
   schoolName?: string;
   questions?: ExamQuestion[];
+  appliedSkills?: Array<{ id: string; title: string }>;
 }
 
 /**

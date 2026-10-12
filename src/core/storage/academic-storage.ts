@@ -129,6 +129,7 @@ export class AcademicStorage {
     grade?: string;
     search?: string;
   }): Promise<AcademicDocumentRecord[]> {
+    let dbDocs: AcademicDocumentRecord[] = [];
     try {
       const where: any = {};
       if (filter?.teacherId) where.teacherId = filter.teacherId;
@@ -142,24 +143,35 @@ export class AcademicStorage {
         ];
       }
 
-      const dbDocs = await prisma.academicDocument.findMany({
+      const res = await prisma.academicDocument.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
       });
-      return dbDocs as unknown as AcademicDocumentRecord[];
+      dbDocs = res as unknown as AcademicDocumentRecord[];
     } catch {
-      // Fallback to local file storage
-      let list = readLocalDocs();
-      if (filter?.teacherId) list = list.filter((d) => d.teacherId === filter.teacherId);
-      if (filter?.docType) list = list.filter((d) => d.docType === filter.docType);
-      if (filter?.subject) list = list.filter((d) => d.subject === filter.subject);
-      if (filter?.grade) list = list.filter((d) => d.grade === filter.grade);
-      if (filter?.search) {
-        const s = filter.search.toLowerCase();
-        list = list.filter((d) => d.title.toLowerCase().includes(s) || d.subject.toLowerCase().includes(s));
-      }
-      return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      // Fallback
     }
+
+    let local = readLocalDocs();
+    if (filter?.teacherId) local = local.filter((d) => d.teacherId === filter.teacherId);
+    if (filter?.docType) local = local.filter((d) => d.docType === filter.docType);
+    if (filter?.subject) local = local.filter((d) => d.subject === filter.subject);
+    if (filter?.grade) local = local.filter((d) => d.grade === filter.grade);
+    if (filter?.search) {
+      const s = filter.search.toLowerCase();
+      local = local.filter((d) => d.title.toLowerCase().includes(s) || d.subject.toLowerCase().includes(s));
+    }
+
+    // Merge and deduplicate by ID
+    const mergedMap = new Map<string, AcademicDocumentRecord>();
+    for (const d of dbDocs) mergedMap.set(d.id, d);
+    for (const d of local) {
+      if (!mergedMap.has(d.id)) mergedMap.set(d.id, d);
+    }
+
+    return Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
   }
 
   public static async getDocumentById(id: string): Promise<AcademicDocumentRecord | null> {
@@ -290,6 +302,7 @@ export class AcademicStorage {
     grade?: string;
     isActive?: boolean;
   }): Promise<AiSkillRecord[]> {
+    let dbSkills: AiSkillRecord[] = [];
     try {
       const where: any = {};
       if (filter?.teacherId) where.teacherId = filter.teacherId;
@@ -297,19 +310,30 @@ export class AcademicStorage {
       if (filter?.grade) where.grade = filter.grade;
       if (typeof filter?.isActive === 'boolean') where.isActive = filter.isActive;
 
-      const dbSkills = await prisma.aiSkill.findMany({
+      const res = await prisma.aiSkill.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
       });
-      return dbSkills as unknown as AiSkillRecord[];
+      dbSkills = res as unknown as AiSkillRecord[];
     } catch {
-      let list = readLocalSkills();
-      if (filter?.teacherId) list = list.filter((s) => s.teacherId === filter.teacherId);
-      if (filter?.subject) list = list.filter((s) => s.subject === filter.subject);
-      if (filter?.grade) list = list.filter((s) => s.grade === filter.grade);
-      if (typeof filter?.isActive === 'boolean') list = list.filter((s) => s.isActive === filter.isActive);
-      return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      // ignore
     }
+
+    let local = readLocalSkills();
+    if (filter?.teacherId) local = local.filter((s) => s.teacherId === filter.teacherId);
+    if (filter?.subject) local = local.filter((s) => s.subject === filter.subject);
+    if (filter?.grade) local = local.filter((s) => s.grade === filter.grade);
+    if (typeof filter?.isActive === 'boolean') local = local.filter((s) => s.isActive === filter.isActive);
+
+    const mergedMap = new Map<string, AiSkillRecord>();
+    for (const s of dbSkills) mergedMap.set(s.id, s);
+    for (const s of local) {
+      if (!mergedMap.has(s.id)) mergedMap.set(s.id, s);
+    }
+
+    return Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
   }
 
   public static async getSkillById(id: string): Promise<AiSkillRecord | null> {
@@ -363,10 +387,33 @@ export class AcademicStorage {
     writeLocalSkills(list);
 
     try {
+      // Verify foreign keys before prisma upsert
+      let validDocId = record.documentId;
+      if (validDocId) {
+        const docExists = await prisma.academicDocument.findUnique({ where: { id: validDocId } });
+        if (!docExists) validDocId = null;
+      }
+
+      let validTeacherId = record.teacherId;
+      const userExists = await prisma.user.findUnique({ where: { id: validTeacherId } });
+      if (!userExists) {
+        // Fallback to first available admin/teacher user
+        const firstUser = await prisma.user.findFirst();
+        if (firstUser) validTeacherId = firstUser.id;
+      }
+
       await prisma.aiSkill.upsert({
         where: { id },
-        create: record as any,
-        update: record as any,
+        create: {
+          ...record,
+          teacherId: validTeacherId,
+          documentId: validDocId,
+        } as any,
+        update: {
+          ...record,
+          teacherId: validTeacherId,
+          documentId: validDocId,
+        } as any,
       });
     } catch {
       // Local copy is safe

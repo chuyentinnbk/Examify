@@ -363,10 +363,39 @@ ${parsedContext}
       const rawText = await this.callLlmJson(prompt);
       const parsedJson = this.extractJson(rawText);
 
+      let instructionsText = parsedJson.skillInstructions;
+      if (Array.isArray(instructionsText)) {
+        instructionsText = instructionsText.join('\n');
+      } else if (typeof instructionsText === 'object' && instructionsText !== null) {
+        instructionsText = JSON.stringify(instructionsText, null, 2);
+      }
+
+      // Safeguard against proctor / student instructions polluting skill guidelines
+      const isProctorInstructions =
+        typeof instructionsText === 'string' &&
+        (instructionsText.includes('không được sử dụng tài liệu') ||
+          instructionsText.includes('Cán bộ coi thi') ||
+          instructionsText.length < 50);
+
+      if (!instructionsText || isProctorInstructions) {
+        instructionsText = `=== QUY CHUẨN SƯ PHẠM: ${doc.title} (${doc.subject} - ${doc.grade}) ===
+1. MA TRẬN & ĐỘ PHÂN HÓA:
+- Tuân thủ ma trận chuẩn: Nhận biết (40%), Thông hiểu (30%), Vận dụng (20%), Vận dụng cao (10%).
+- Đảm bảo câu hỏi có tính phân loại cao, không trùng lặp và không có lỗi sai logic.
+
+2. DẠNG BÀI & CẤU TRÚC ĐẶC TRƯNG:
+- Bám sát trọng tâm kiến thức và phong cách sư phạm của tài liệu "${doc.title}".
+- Với môn Toán/KHTN: Công thức, biến số và ký hiệu toán học phải viết chuẩn LaTeX ($...$).
+- Phương án sai (nhiễu) phải phản ánh các lỗi tư duy, hiểu lầm khái niệm điển hình của học sinh.
+
+3. HƯỚNG DẪN GIẢI & ĐÁP ÁN:
+- Lời giải chi tiết, rõ ràng từng bước, nêu rõ công thức áp dụng và kết luận đáp số chuẩn xác.`;
+      }
+
       return {
         title: parsedJson.title || `Kỹ năng ra đề ${doc.subject} ${doc.grade} - ${doc.title}`,
         description: parsedJson.description || `Được trích xuất và tổng hợp từ tài liệu học thuật "${doc.title}".`,
-        skillInstructions: parsedJson.skillInstructions || parsedJson.instructions || 'Tuân thủ chuẩn ma trận và phân hóa nhận thức.',
+        skillInstructions: instructionsText,
         fewShotExamples: parsedJson.fewShotExamples || sampleQuestions,
       };
     } catch {

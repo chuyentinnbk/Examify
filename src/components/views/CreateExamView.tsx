@@ -110,7 +110,13 @@ export default function CreateExamView() {
       );
       const data = await res.json();
       if (data.success && Array.isArray(data.data?.skills)) {
-        setAvailableSkills(data.data.skills);
+        const skills = data.data.skills;
+        setAvailableSkills(skills);
+        // Tự động kích hoạt toàn bộ kỹ năng sư phạm phù hợp cho môn & khối này
+        setSelectedSkillIds(skills.map((s: any) => s.id));
+      } else {
+        setAvailableSkills([]);
+        setSelectedSkillIds([]);
       }
     } catch {
       // Keep silent
@@ -349,6 +355,7 @@ export default function CreateExamView() {
         matrix: { easy, medium, hard, veryHard },
         isAiGenerated: true,
         questions,
+        appliedSkills: data.data?.appliedSkills || [],
       };
 
       await addExam(newExam);
@@ -664,6 +671,12 @@ export default function CreateExamView() {
                 <h3 className="text-sm font-bold text-slate-800">
                   4. Kỹ Năng Sư Phạm AI Áp Dụng ({selectedSkillIds.length})
                 </h3>
+                {selectedSkillIds.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    Đang kích hoạt
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -681,7 +694,7 @@ export default function CreateExamView() {
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition shadow-xs"
                 >
                   <span className="material-symbols-outlined text-base">add_task</span>
-                  Chọn Kỹ Năng AI
+                  Tùy chỉnh Kỹ Năng
                 </button>
               </div>
             </div>
@@ -689,16 +702,29 @@ export default function CreateExamView() {
             {selectedSkillIds.length === 0 ? (
               <div className="p-3.5 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center">
                 <p className="text-xs text-slate-500 font-medium">
-                  Chưa chọn kỹ năng nào. AI sẽ sinh đề theo ma trận mặc định.
+                  {availableSkills.length > 0
+                    ? `Có ${availableSkills.length} kỹ năng khả dụng nhưng chưa được chọn.`
+                    : `Chưa có kỹ năng sư phạm nào cho môn ${subject} (${grade}). AI sẽ sinh đề theo ma trận mặc định.`}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsSkillModalOpen(true)}
-                  className="mt-2 text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-sm">smart_toy</span>
-                  Bấm vào đây để chọn kỹ năng ra đề chuyên sâu
-                </button>
+                {availableSkills.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSkillIds(availableSkills.map((s) => s.id))}
+                    className="mt-2 text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    Bấm để kích hoạt toàn bộ ({availableSkills.length} kỹ năng)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentRoute('#academic-data')}
+                    className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">upload_file</span>
+                    Tải tài liệu vào Dữ liệu học thuật để AI tạo kỹ năng mới
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -922,7 +948,10 @@ export default function CreateExamView() {
               ) : (
                 <>
                   <span className="material-symbols-outlined text-base">auto_awesome</span>
-                  <span>Bắt đầu Sinh Đề Thi ({selectedModel})</span>
+                  <span>
+                    Bắt đầu Sinh Đề Thi ({selectedModel})
+                    {selectedSkillIds.length > 0 && ` • ${selectedSkillIds.length} Kỹ năng AI`}
+                  </span>
                 </>
               )}
             </button>

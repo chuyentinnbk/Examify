@@ -665,6 +665,15 @@ export default function EditorView() {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300">
                 {activeExam.subject} • {activeExam.grade}
               </span>
+              {activeExam.appliedSkills && activeExam.appliedSkills.length > 0 && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shadow-2xs"
+                  title={`Kỹ năng sư phạm đã áp dụng:\n${activeExam.appliedSkills.map((s) => `• ${s.title}`).join('\n')}`}
+                >
+                  <span className="material-symbols-outlined text-xs text-emerald-600">psychology</span>
+                  <span>{activeExam.appliedSkills.length} Kỹ năng AI</span>
+                </span>
+              )}
               <div className="flex items-center gap-1.5 pl-1 text-[11px] text-slate-500 font-medium">
                 <UserAvatar
                   name={activeExam.author || user.name}

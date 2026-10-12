@@ -104,15 +104,29 @@ export async function POST(req: NextRequest) {
       const selectedProvider = payload.aiProvider || (process.env.DEFAULT_AI_PROVIDER as SupportedAIProvider) || 'gemini';
       const initialProvider = AIFactory.getProvider(selectedProvider, { model: payload.aiModel });
 
-      // 3.5 Load Applied Pedagogical AI Skills if provided
+      // 3.5 Load Applied Pedagogical AI Skills
       const appliedSkills: Array<{ id: string; title: string; skillInstructions: string; fewShotExamples?: any[] }> = [];
-      if (payload.skillIds && payload.skillIds.length > 0) {
-        for (const sid of payload.skillIds) {
+      let targetSkillIds = payload.skillIds;
+
+      // Auto-detect active skills for the requested subject and grade if not specified
+      if (targetSkillIds === undefined) {
+        const autoSkills = await AcademicStorage.getSkills({
+          subject: payload.curriculum.subject,
+          grade: payload.curriculum.grade,
+          isActive: true,
+        });
+        targetSkillIds = autoSkills.map((s) => s.id);
+      }
+
+      if (targetSkillIds && targetSkillIds.length > 0) {
+        for (const sid of targetSkillIds) {
           const sk = await AcademicStorage.getSkillById(sid);
           if (sk && sk.isActive) {
             let fewShot = [];
             try {
-              if (sk.fewShotExamples) fewShot = JSON.parse(sk.fewShotExamples);
+              if (sk.fewShotExamples) {
+                fewShot = typeof sk.fewShotExamples === 'string' ? JSON.parse(sk.fewShotExamples) : sk.fewShotExamples;
+              }
             } catch {
               // ignore
             }
@@ -140,7 +154,7 @@ export async function POST(req: NextRequest) {
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix ? JSON.stringify(payload.cognitiveMatrix) : null,
           customPrompt: safeCustomPrompt || null,
-          appliedSkillIds: payload.skillIds && payload.skillIds.length > 0 ? JSON.stringify(payload.skillIds) : null,
+          appliedSkillIds: appliedSkills.length > 0 ? JSON.stringify(appliedSkills.map((s) => ({ id: s.id, title: s.title }))) : null,
           aiProvider: initialProvider.providerName,
           aiModel: initialProvider.modelName,
         },
@@ -199,27 +213,64 @@ export async function POST(req: NextRequest) {
               HIGH_APPLICATION: 'Vận dụng cao',
             };
             const levelStr = levelMap[q.cognitiveLevel] || 'Thông hiểu';
-            const fresh = getCurriculumQuestion(
-              payload.curriculum.subject,
-              payload.curriculum.grade,
-              levelStr,
-              i,
-              existingContents
-            );
 
-            const replacement = {
-              questionNumber: i + 1,
-              type: q.type || 'MULTIPLE_CHOICE',
-              cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
-              content: fresh.content,
-              options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
-              correctAnswer: fresh.correctAnswer,
-              explanation: fresh.explanation,
-              points: q.points || payload.totalPoints / payload.totalQuestions,
-            };
+            let replacement: any = null;
+            // 1. First priority: Check if appliedSkills have unused few-shot example questions
+            for (const askill of appliedSkills) {
+              if (Array.isArray(askill.fewShotExamples)) {
+                const sample = askill.fewShotExamples.find(
+                  (ex: any) =>
+                    ex.content &&
+                    !existingContents.some((ec) => ec.trim().toLowerCase() === ex.content.trim().toLowerCase())
+                );
+                if (sample) {
+                  replacement = {
+                    questionNumber: i + 1,
+                    type: sample.type || q.type || 'MULTIPLE_CHOICE',
+                    cognitiveLevel: sample.cognitiveLevel || q.cognitiveLevel || 'COMPREHENSION',
+                    content: sample.content,
+                    options: Array.isArray(sample.options)
+                      ? sample.options.map((opt: string) => opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim())
+                      : [],
+                    correctAnswer: sample.correctAnswer || 'A',
+                    explanation: sample.explanation || 'Áp dụng theo kỹ năng sư phạm chuẩn hóa.',
+                    points: q.points || payload.totalPoints / payload.totalQuestions,
+                  };
+                  break;
+                }
+              }
+            }
+
+            // 2. Second priority: Standard curriculum question fallback
+            if (!replacement) {
+              const fresh = getCurriculumQuestion(
+                payload.curriculum.subject,
+                payload.curriculum.grade,
+                levelStr,
+                i,
+                existingContents
+              );
+
+              replacement = {
+                questionNumber: i + 1,
+                type: q.type || 'MULTIPLE_CHOICE',
+                cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
+                content: fresh.content,
+                options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
+                correctAnswer: fresh.correctAnswer,
+                explanation: fresh.explanation,
+                points: q.points || payload.totalPoints / payload.totalQuestions,
+              };
+            }
+
             uniqueQuestions.push(replacement);
-            seenSignatures.add(fresh.content.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').slice(0, 80));
-            existingContents.push(fresh.content);
+            seenSignatures.add(
+              replacement.content
+                .toLowerCase()
+                .replace(/[^\p{L}\p{N}]+/gu, '')
+                .slice(0, 80)
+            );
+            existingContents.push(replacement.content);
           } else {
             seenSignatures.add(signature);
             existingContents.push(q.content);
@@ -297,6 +348,7 @@ export async function POST(req: NextRequest) {
           filePath: relativeFilePath,
           examData: generationResult.examData,
           usage: generationResult.usage,
+          appliedSkills: appliedSkills.map((s) => ({ id: s.id, title: s.title })),
         },
         'Exam generated successfully',
         {},

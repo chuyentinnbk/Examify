@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Dependencies installation
 FROM base AS deps
-COPY package.json ./
+COPY package.json package-lock.json* ./
 RUN npm install
 
 # Build application

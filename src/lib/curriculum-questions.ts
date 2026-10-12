@@ -647,6 +647,57 @@ function generateProceduralQuestion(
   const numB = (index * 5 + 4) % 11 + 3;
   const numC = numA * numB;
 
+  if (subject.includes('Toán') && (grade.includes('Lớp 1') || grade.includes('Lớp 2') || grade.includes('Tiểu học'))) {
+    const primaryQuestions = [
+      {
+        content: `Kết quả của phép tính $${numA} + ${numB}$ là:`,
+        options: [
+          { key: 'A', text: `${numA + numB}`, isCorrect: true },
+          { key: 'B', text: `${numA + numB - 1}`, isCorrect: false },
+          { key: 'C', text: `${numA + numB + 1}`, isCorrect: false },
+          { key: 'D', text: `${numA + numB + 2}`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Ta có $${numA} + ${numB} = ${numA + numB}$. Chọn đáp án A.`,
+      },
+      {
+        content: `Số liền sau của số $${numA + 5}$ là:`,
+        options: [
+          { key: 'A', text: `${numA + 6}`, isCorrect: true },
+          { key: 'B', text: `${numA + 4}`, isCorrect: false },
+          { key: 'C', text: `${numA + 5}`, isCorrect: false },
+          { key: 'D', text: `${numA + 7}`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Số liền sau của $${numA + 5}$ là $${numA + 5} + 1 = ${numA + 6}$.`,
+      },
+      {
+        content: `Điền dấu thích hợp ($>; <; =$) vào chỗ chấm: $${numA + 2} \\dots ${numB + 1}$`,
+        options: [
+          { key: 'A', text: numA + 2 > numB + 1 ? '>' : numA + 2 < numB + 1 ? '<' : '=', isCorrect: true },
+          { key: 'B', text: numA + 2 > numB + 1 ? '<' : '>', isCorrect: false },
+          { key: 'C', text: '=', isCorrect: numA + 2 === numB + 1 },
+          { key: 'D', text: 'Không so sánh được', isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `So sánh $${numA + 2}$ và $${numB + 1}$, ta có $${numA + 2} ${numA + 2 > numB + 1 ? '>' : numA + 2 < numB + 1 ? '<' : '='} ${numB + 1}$.`,
+      },
+    ];
+    const pick = primaryQuestions[index % primaryQuestions.length];
+    return {
+      id: Date.now() + index + Math.floor(Math.random() * 10000),
+      order: `Câu ${String(index + 1).padStart(2, '0')}`,
+      level,
+      levelClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      topic: `${subject} - ${grade}`,
+      content: pick.content,
+      options: pick.options,
+      points: 0.25,
+      correctAnswer: pick.correctAnswer,
+      explanation: pick.explanation,
+    };
+  }
+
   if (subject.includes('Toán')) {
     const questions = [
       {
@@ -769,6 +820,10 @@ export function getCurriculumQuestion(
   seedIndex: number = 0,
   existingContents: string[] = []
 ): ExamQuestion {
+  if (grade.includes('Lớp 1') || grade.includes('Lớp 2') || grade.includes('Tiểu học')) {
+    return generateProceduralQuestion(subject, grade, level, seedIndex);
+  }
+
   const match = CURRICULUM_QUESTION_BANK.filter(
     (q) => q.subject.toLowerCase() === subject.toLowerCase()
   );

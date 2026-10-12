@@ -70,7 +70,7 @@ export class ExamPromptBuilder {
     }
 
     // 2. Build the System Directive
-    const systemPrompt = `You are an elite educational assessment and pedagogical examination engine ("Examify AI").
+    let systemPrompt = `You are an elite educational assessment and pedagogical examination engine ("Examify AI").
 Your sole objective is to author high-quality, academically rigorous, and curriculum-aligned exam questions formatted strictly as a single valid JSON object.
 
 ### CRITICAL ANTI-DUPLICATION & QUALITY RULES:
@@ -86,6 +86,13 @@ Your sole objective is to author high-quality, academically rigorous, and curric
    - ESSAY (Tự luận): Multi-step analytical problem. "options" must be empty array []. "correctAnswer": "Xem hướng dẫn chấm". "explanation" must provide step-by-step scoring rubric with partial points.
 7. DETAILED EXPLANATIONS: Provide step-by-step pedagogical explanations and clear scoring rubrics for all questions.
 8. LANGUAGE: All content, options, and explanations must be in: ${language}.`;
+
+    if (payload.appliedSkills && payload.appliedSkills.length > 0) {
+      systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS:
+You have been provided with specialized pedagogical skills extracted from official academic materials. You MUST prioritize and strictly apply the question styles, difficulty tiers, trick/trap mechanisms, and few-shot examples defined in these skills.
+- The generated questions MUST visibly match the depth, terminology, mathematical rigor, and pedagogical nuances specified in the skills.
+- Treat the provided few-shot examples as gold-standard structural templates: author fresh questions of matching sophistication and format while varying data, numbers, and context.`;
+    }
 
     // 3. Assemble Curriculum Hierarchy Details
     const curriculumHierarchy = `
@@ -155,14 +162,23 @@ ${matrixSpecs}
 
     // Apply Pedagogical AI Skills if selected
     if (payload.appliedSkills && payload.appliedSkills.length > 0) {
-      userPrompt += `\n\n### SPECIALIZED PEDAGOGICAL & DOMAIN AI SKILLS (Enforce Strictly):`;
+      userPrompt += `\n\n======================================================================`;
+      userPrompt += `\n### BỘ QUY CHUẨN KỸ NĂNG SƯ PHẠM ĐỘC QUYỀN (BẮT BUỘC ÁP DỤNG TRIỆT ĐỂ):`;
+      userPrompt += `\nCác câu hỏi tạo ra PHẢI TUÂN THỦ NGHIÊM NGẶT các quy tắc sư phạm, ma trận, dạng bài và câu hỏi mẫu sau đây:`;
       payload.appliedSkills.forEach((skill, idx) => {
+        const instStr = Array.isArray(skill.skillInstructions)
+          ? skill.skillInstructions.join('\n')
+          : typeof skill.skillInstructions === 'string'
+          ? skill.skillInstructions
+          : JSON.stringify(skill.skillInstructions, null, 2);
+
         userPrompt += `\n\n--- [KỸ NĂNG ${idx + 1}: ${skill.title}] ---`;
-        userPrompt += `\n${skill.skillInstructions}`;
+        userPrompt += `\n${instStr}`;
         if (skill.fewShotExamples && Array.isArray(skill.fewShotExamples) && skill.fewShotExamples.length > 0) {
-          userPrompt += `\n* Các câu hỏi mẫu tiêu biểu cần bám sát (Few-shot Examples):\n${JSON.stringify(skill.fewShotExamples, null, 2)}`;
+          userPrompt += `\n\n* CÂU HỎI MẪU TIÊU BIỂU CẦN BÁM SÁT (FEW-SHOT EXAMPLES):\n(Hãy sáng tạo các câu hỏi mới có cấu trúc, độ khó, phương án nhiễu và văn phong tương đương các câu mẫu sau):\n${JSON.stringify(skill.fewShotExamples, null, 2)}`;
         }
       });
+      userPrompt += `\n======================================================================`;
     }
 
     return {
