@@ -82,7 +82,12 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 6. QUESTION TYPES & SPECIFICATIONS:
    - MULTIPLE_CHOICE: 4 distinct choices (A, B, C, D) in "options", exactly one correct option in "correctAnswer" ("A", "B", "C", or "D").
    - TRUE_FALSE (Đúng / Sai): 1 question statement with context, plus exactly 4 sub-items in "options" corresponding to a, b, c, d. "correctAnswer" formatted as "a: Đ, b: S, c: Đ, d: S" (or "a: Đúng, b: Sai, c: Đúng, d: Đúng").
-   - SHORT_ANSWER (Trả lời ngắn): Problem statement asking for a concise value/number. "options" must be empty array []. "correctAnswer" is the concise value (e.g. "15", "-4.5", "2024").
+   - SHORT_ANSWER (Trả lời ngắn):
+     * Yêu cầu bài toán dẫn đến một đáp số cụ thể. "options" bắt buộc là mảng rỗng [].
+     * BẮT BUỘC GIẢI CHI TIẾT TRƯỚC: Bạn PHẢI tính toán cẩn thận từng bước trong "explanation" trước khi kết luận đáp số.
+     * "correctAnswer" PHẢI LÀ KẾT QUẢ SỐ HỌC HOẶC BIỂU THỨC RÚT GỌN CHÍNH XÁC (ví dụ: "15", "-4.5", "2/3", "\\sqrt{2}").
+     * TUYỆT ĐỐI KHÔNG điền chữ cái A, B, C, D vào correctAnswer của SHORT_ANSWER.
+     * TUYỆT ĐỐI KHÔNG dùng số mặc định hay đoán mò. Mọi đáp số phải khớp 100% với lời giải trong explanation.
    - ESSAY (Tự luận): Multi-step analytical problem. "options" must be empty array []. "correctAnswer": "Xem hướng dẫn chấm". "explanation" must provide step-by-step scoring rubric with partial points.
 7. DETAILED EXPLANATIONS: Provide step-by-step pedagogical explanations and clear scoring rubrics for all questions.
 8. LANGUAGE: All content, options, and explanations must be in: ${language}.`;
@@ -149,8 +154,8 @@ ${matrixSpecs}
       "options": [
         "First option content (WITHOUT leading A. prefix for MULTIPLE_CHOICE, or sub-item a for TRUE_FALSE, or empty array for SHORT_ANSWER and ESSAY)"
       ],
-      "correctAnswer": "A | B | C | D (for MULTIPLE_CHOICE) or 'a: Đ, b: S, c: Đ, d: S' (for TRUE_FALSE) or 'concise_value' (for SHORT_ANSWER) or 'Xem hướng dẫn chấm' (for ESSAY)",
-      "explanation": "string (Step-by-step pedagogical explanation with LaTeX math if needed)",
+      "explanation": "string (Step-by-step pedagogical explanation and calculations FIRST before writing final answer)",
+      "correctAnswer": "A | B | C | D (for MULTIPLE_CHOICE) or 'a: Đ, b: S, c: Đ, d: S' (for TRUE_FALSE) or 'exact_concise_numerical_value' (for SHORT_ANSWER) or 'Xem hướng dẫn chấm' (for ESSAY)",
       "points": 0.5
     }
   ]

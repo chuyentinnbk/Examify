@@ -876,15 +876,82 @@ function generateProceduralQuestion(
 }
 
 /**
+ * Extracts a clean, mathematically accurate concise value for Short Answer (Trả lời ngắn).
+ * Strips option prefixes ("A. "), equation variables ("x = ", "m = "), and outer LaTeX delimiters.
+ * Falls back to extracting exact numerical conclusions from the explanation.
+ */
+export function extractCleanShortAnswerValue(
+  optionText?: string | null,
+  explanation?: string | null,
+  rawAnswer?: string | null
+): string {
+  // 1. If rawAnswer is already a valid concise answer and NOT just a single letter A-D or True/False label
+  if (rawAnswer && typeof rawAnswer === 'string') {
+    const trimmed = rawAnswer.trim();
+    if (!/^[A-Da-d]$/.test(trimmed) && !trimmed.includes(':') && !trimmed.toLowerCase().includes('xem')) {
+      let clean = trimmed.replace(/^\$+|\$+$/g, '').trim();
+      clean = clean.replace(/^[a-zA-Z_]\s*[:=]\s*/, '');
+      clean = clean.replace(/^(?:đáp số|kết quả|giá trị)\s*[:=]?\s*/i, '');
+      if (clean && !/^[A-Da-d]$/.test(clean)) {
+        return clean;
+      }
+    }
+  }
+
+  // 2. If optionText from the correct option is provided
+  if (optionText && typeof optionText === 'string') {
+    let clean = optionText.trim();
+    // Strip leading "A. ", "B. ", "(A) ", "a) "
+    clean = clean.replace(/^(\(?[A-Da-d]\)[\.\:\-\s]+|[A-Da-d][\.\:\)]\s+)/i, '').trim();
+    // Strip outer $...$
+    clean = clean.replace(/^\$+|\$+$/g, '').trim();
+    // Strip variable prefix like "x = 5", "m = -2", "y = 3", "f(x) = 0", "S = "
+    clean = clean.replace(/^[a-zA-Z_](?:\([a-zA-Z0-9_]+\))?\s*[:=]\s*/, '');
+    // Strip leading phrases like "Đáp án là", "Kết quả là"
+    clean = clean.replace(/^(?:đáp án|đáp số|kết quả|giá trị)\s*(?:là|bằng|=|:)?\s*/i, '');
+
+    if (clean && !/^[A-Da-d]$/.test(clean)) {
+      return clean;
+    }
+  }
+
+  // 3. Search explanation for mathematical conclusion
+  if (explanation && typeof explanation === 'string') {
+    // Pattern 1: Explicit answer statement like "Đáp số: 15" or "Kết quả: -4"
+    const p1 = explanation.match(/(?:đáp số|kết quả|đáp án)\s*[:=]\s*\$?([+-]?\d+(?:[\.,/]\d+)?|\{[^\}]+\}|\([^\)]+\))\$?/i);
+    if (p1 && p1[1]) return p1[1].trim();
+
+    // Pattern 2: "Vậy... bằng/là X" or "Do đó... bằng/là X"
+    const p2 = explanation.match(/(?:vậy|do đó|suy ra|kết luận)\s+[^,\.\n]*?\s+(?:là|bằng|=|đạt giá trị)\s*\$?([+-]?\d+(?:[\.,/]\d+)?|\{[^\}]+\}|\([^\)]+\))\$?/i);
+    if (p2 && p2[1]) return p2[1].trim();
+
+    // Pattern 3: Last formula equality like "= 15" or "bằng 15" at end of explanation
+    const matches = [...explanation.matchAll(/(?:=|bằng|là)\s*\$?([+-]?\d+(?:[\.,/]\d+)?)\$?(?:\s*[\.\,\n]|$)/gi)];
+    if (matches.length > 0) {
+      return matches[matches.length - 1][1].trim();
+    }
+  }
+
+  // 4. Fallback if optionText had non-empty text
+  if (optionText && !/^[A-Da-d]$/.test(optionText.trim())) {
+    return optionText.trim().replace(/^\$+|\$+$/g, '');
+  }
+
+  return rawAnswer && !/^[A-Da-d]$/.test(rawAnswer.trim()) ? rawAnswer.trim() : '';
+}
+
+/**
  * Returns a high-quality, strictly unique curriculum question based on subject, grade, and level.
  * Avoids any question in the existingQuestionContents list.
+ * Adapts to targetType (e.g. short_answer, true_false, essay).
  */
 export function getCurriculumQuestion(
   subject: string,
   grade: string,
   level: string,
   seedIndex: number = 0,
-  existingContents: string[] = []
+  existingContents: string[] = [],
+  targetType?: string
 ): ExamQuestion {
   if (grade.includes('Lớp 1') || grade.includes('Lớp 2') || grade.includes('Tiểu học')) {
     return generateProceduralQuestion(subject, grade, level, seedIndex);
@@ -920,16 +987,57 @@ export function getCurriculumQuestion(
         ? 'bg-amber-50 text-amber-700 border-amber-200'
         : 'bg-rose-50 text-rose-700 border-rose-200';
 
+    const rawType = String(targetType || 'multiple_choice').toLowerCase();
+    const isSA = rawType.includes('short') || rawType.includes('ngan');
+    const isTF = rawType.includes('true') || rawType.includes('dung');
+    const isEs = rawType.includes('essay') || rawType.includes('luan');
+
+    let content = template.content;
+    let options = template.options.map((o) => ({ ...o }));
+    let correctAnswer = template.correctAnswer;
+    let points = 0.25;
+
+    if (isSA) {
+      options = [];
+      points = 0.5;
+      const corrOpt = template.options.find(
+        (o) => o.key.toUpperCase() === template.correctAnswer.toUpperCase() || o.isCorrect
+      );
+      correctAnswer = extractCleanShortAnswerValue(corrOpt?.text, template.explanation, template.correctAnswer);
+      content = content.replace(/\s*Trong các phương án sau[,:]?/gi, '')
+                       .replace(/\s*Chọn khẳng định đúng[:\.]?/gi, '');
+    } else if (isTF) {
+      points = 1.0;
+      const subKeys = ['a', 'b', 'c', 'd'];
+      options = subKeys.map((k, i) => {
+        const opt = template.options[i];
+        return {
+          key: k,
+          text: opt ? opt.text.replace(/^[A-D][\.\:\)]\s+/i, '') : `Mệnh đề khẳng định ý ${k}`,
+          isCorrect: opt ? opt.key.toUpperCase() === template.correctAnswer.toUpperCase() : i % 2 === 0,
+        };
+      });
+      correctAnswer = options.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
+    } else if (isEs) {
+      points = 1.5;
+      options = [];
+      const corrOpt = template.options.find(
+        (o) => o.key.toUpperCase() === template.correctAnswer.toUpperCase() || o.isCorrect
+      );
+      correctAnswer = `Đáp số: ${extractCleanShortAnswerValue(corrOpt?.text, template.explanation, template.correctAnswer)}`;
+    }
+
     return {
       id: Date.now() + seedIndex + Math.floor(Math.random() * 1000),
       order: `Câu ${String(seedIndex + 1).padStart(2, '0')}`,
+      type: isSA ? 'short_answer' : isTF ? 'true_false' : isEs ? 'essay' : 'multiple_choice',
       level: template.level,
       levelClass,
       topic: `${template.subject} - ${template.topic || grade}`,
-      content: template.content,
-      options: template.options.map((o) => ({ ...o })),
-      points: 0.25,
-      correctAnswer: template.correctAnswer,
+      content,
+      options,
+      points,
+      correctAnswer,
       explanation: template.explanation,
     };
   }

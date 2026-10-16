@@ -3,6 +3,7 @@ import { z } from 'zod';
 import prisma from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
+import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 
 export async function GET(req: NextRequest) {
   const userId = req.headers.get('x-user-id');
@@ -117,7 +118,9 @@ export async function GET(req: NextRequest) {
               content: q.content || '',
               options: formattedOptions,
               points: q.points || (normType === 'essay' ? 1.5 : normType === 'true_false' ? 1.0 : normType === 'short_answer' ? 0.5 : 0.25),
-              correctAnswer: q.correctAnswer || (normType === 'essay' ? 'Xem hướng dẫn chấm' : normType === 'short_answer' ? '12' : normType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A'),
+              correctAnswer: normType === 'short_answer'
+                ? extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer)
+                : (q.correctAnswer || (normType === 'essay' ? 'Xem hướng dẫn chấm' : normType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A')),
               explanation: q.explanation || 'Lời giải chi tiết biên soạn theo chuẩn chương trình.',
             };
           });

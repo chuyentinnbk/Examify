@@ -21,6 +21,7 @@ import {
   exportExamToZipAll,
   getOptionsLayout,
 } from '@/lib/export-exam';
+import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 
 export default function EditorView() {
   const { activeExam, updateExam, showToast, setCurrentRoute, user } = useAppStore();
@@ -421,30 +422,27 @@ export default function EditorView() {
         newOptions = []; // Clear options for display in short answer
 
         if (oldType === 'multiple_choice') {
-          // CRITICAL: Extract the ACTUAL TEXT of the correct option!
+          // CRITICAL: Extract the ACTUAL TEXT/VALUE of the correct option!
           const currentOpts = (q.options && q.options.length > 0) ? q.options : backupOptions;
           const correctKey = q.correctAnswer?.trim().toUpperCase();
           const correctOpt = currentOpts.find(
             (o) => o.key.toUpperCase() === correctKey || o.isCorrect
           );
-          if (correctOpt && correctOpt.text) {
-            newAns = cleanOptionText(correctOpt.text);
-          } else if (q.correctAnswer && !/^[A-D]$/i.test(q.correctAnswer.trim())) {
-            newAns = q.correctAnswer.trim();
-          } else {
-            const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
-            newAns = match ? match[1] : (q.correctAnswer || '12');
-          }
+          newAns = extractCleanShortAnswerValue(correctOpt?.text, q.explanation, q.correctAnswer);
         } else if (oldType === 'true_false') {
-          const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
-          newAns = match ? match[1] : (backupAnswer && !backupAnswer.includes(':') ? backupAnswer : '12');
+          newAns = extractCleanShortAnswerValue(null, q.explanation, backupAnswer && !backupAnswer.includes(':') ? backupAnswer : '');
         } else if (oldType === 'essay') {
-          if (q.correctAnswer && !q.correctAnswer.includes('Xem hướng dẫn')) {
-            newAns = q.correctAnswer.replace(/^Đáp số:\s*/i, '').trim();
-          } else {
-            const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
-            newAns = match ? match[1] : '12';
-          }
+          const rawEssayAns = q.correctAnswer && !q.correctAnswer.includes('Xem hướng dẫn')
+            ? q.correctAnswer.replace(/^Đáp số:\s*/i, '').trim()
+            : '';
+          newAns = extractCleanShortAnswerValue(null, q.explanation, rawEssayAns);
+        } else {
+          newAns = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+        }
+
+        // If still empty (e.g. question had no explanation and no options), try finding any number in content or backup
+        if (!newAns) {
+          newAns = extractCleanShortAnswerValue(null, q.content, q._backupAnswer);
         }
 
         points = 0.5;
@@ -519,9 +517,9 @@ export default function EditorView() {
       defaultContent = 'Cho hàm số $y = f(x)$ xác định và liên tục trên $\\mathbb{R}$. Các mệnh đề sau đúng hay sai?';
     } else if (normType === 'short_answer') {
       options = [];
-      correctAnswer = '12';
+      correctAnswer = '4';
       points = 0.5;
-      defaultContent = 'Tìm giá trị của tham số $m$ để đồ thị hàm số có đúng 3 điểm cực trị.';
+      defaultContent = 'Cho hàm số $y = x^3 - 3x^2 + 4$. Điểm cực đại của đồ thị hàm số có tung độ bằng bao nhiêu?';
     } else if (normType === 'essay') {
       options = [];
       correctAnswer = 'Xem hướng dẫn chấm và barem điểm';
@@ -541,7 +539,9 @@ export default function EditorView() {
       options,
       points,
       correctAnswer,
-      explanation: 'Giải thích chi tiết đáp án đúng / barem điểm...',
+      explanation: normType === 'short_answer'
+        ? 'Ta có $y\' = 3x^2 - 6x = 0 \\Leftrightarrow x = 0$ hoặc $x = 2$. Với $x = 0$ thì $y = 4$ là giá trị cực đại của đồ thị hàm số. Vậy đáp số là 4.'
+        : 'Giải thích chi tiết đáp án đúng / barem điểm...',
     };
 
     const sorted = sortQuestionsBySection([...questions, newQ]);
@@ -2066,7 +2066,11 @@ export default function EditorView() {
                       }`}
                       title={q.correctAnswer}
                     >
-                      {q.correctAnswer}
+                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) ? (
+                        <MathText content={q.correctAnswer} inline />
+                      ) : (
+                        q.correctAnswer || '---'
+                      )}
                     </span>
                   </div>
                 );
@@ -2085,7 +2089,11 @@ export default function EditorView() {
                   <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                     <span>Câu {idx + 1}:</span>
                     <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900 font-mono">
-                      {q.correctAnswer}
+                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) ? (
+                        <MathText content={q.correctAnswer} inline />
+                      ) : (
+                        q.correctAnswer || '---'
+                      )}
                     </span>
                     <span className="text-[10px] text-slate-400 font-normal">
                       ({getTypeLabel(q.type)} • {q.level})

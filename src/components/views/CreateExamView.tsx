@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import PortalModal from '@/components/common/PortalModal';
-import { isQuestionDuplicate, getCurriculumQuestion } from '@/lib/curriculum-questions';
+import { isQuestionDuplicate, getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { normalizeQuestionType } from '@/lib/exam-sections';
 
 interface SkillOption {
@@ -284,7 +284,7 @@ export default function CreateExamView() {
 
           // If duplicate, replace with fresh procedural question so total count is preserved
           if (isQuestionDuplicate(questionContent, existingList)) {
-            const fresh = getCurriculumQuestion(subject, grade, levelStr, idx, existingList);
+            const fresh = getCurriculumQuestion(subject, grade, levelStr, idx, existingList, qType);
             questionContent = fresh.content;
             optionsToUse = fresh.options;
             answerToUse = fresh.correctAnswer;
@@ -320,6 +320,21 @@ export default function CreateExamView() {
             });
           }
 
+          let finalAnswer = answerToUse || '';
+          if (qType === 'short_answer') {
+            // Guarantee short answer is NEVER a multiple-choice letter (A/B/C/D) or a True/False string
+            const firstOptText = (optionsToUse && optionsToUse.length > 0)
+              ? (typeof optionsToUse[0] === 'object' ? optionsToUse[0]?.text : String(optionsToUse[0]))
+              : null;
+            finalAnswer = extractCleanShortAnswerValue(firstOptText, explanationToUse, answerToUse);
+          } else if (qType === 'essay') {
+            finalAnswer = answerToUse && !answerToUse.includes('Xem') ? answerToUse : 'Xem hướng dẫn chấm';
+          } else if (qType === 'true_false') {
+            finalAnswer = answerToUse || 'a: Đ, b: S, c: Đ, d: S';
+          } else {
+            finalAnswer = answerToUse || 'A';
+          }
+
           uniqueFormatted.push({
             id: idx + 1,
             order: `Câu ${String(uniqueFormatted.length + 1).padStart(2, '0')}`,
@@ -338,7 +353,7 @@ export default function CreateExamView() {
             content: questionContent,
             options: formattedOptions,
             points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
-            correctAnswer: answerToUse || (qType === 'essay' ? 'Xem hướng dẫn chấm' : qType === 'short_answer' ? '12' : qType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A'),
+            correctAnswer: finalAnswer,
             explanation: explanationToUse || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
           });
         });

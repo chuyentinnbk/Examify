@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
 
       // 5.5 Deduplicate and ensure 100% uniqueness of all questions
       if (generationResult.examData?.questions && Array.isArray(generationResult.examData.questions)) {
-        const { getCurriculumQuestion, isQuestionDuplicate } = await import('@/lib/curriculum-questions');
+        const { getCurriculumQuestion, isQuestionDuplicate, extractCleanShortAnswerValue } = await import('@/lib/curriculum-questions');
         const uniqueQuestions: any[] = [];
         const existingContents: string[] = [];
 
@@ -210,22 +210,26 @@ export async function POST(req: NextRequest) {
             };
             const levelStr = levelMap[q.cognitiveLevel] || 'Thông hiểu';
 
-            // Generate fresh unique curriculum question without repeating few-shot samples
+            // Generate fresh unique curriculum question adapted to question type
             const fresh = getCurriculumQuestion(
               payload.curriculum.subject,
               payload.curriculum.grade,
               levelStr,
               i,
-              existingContents
+              existingContents,
+              q.type
             );
 
+            const isShortAnswer = String(q.type).toUpperCase().includes('SHORT');
             const replacement = {
               questionNumber: i + 1,
               type: q.type || 'MULTIPLE_CHOICE',
               cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
               content: fresh.content,
-              options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
-              correctAnswer: fresh.correctAnswer,
+              options: isShortAnswer ? [] : fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
+              correctAnswer: isShortAnswer
+                ? extractCleanShortAnswerValue(fresh.options[0]?.text, fresh.explanation, fresh.correctAnswer)
+                : fresh.correctAnswer,
               explanation: fresh.explanation,
               points: q.points || payload.totalPoints / payload.totalQuestions,
             };
@@ -235,7 +239,12 @@ export async function POST(req: NextRequest) {
           } else {
             existingContents.push(q.content);
             q.questionNumber = i + 1;
-            if (Array.isArray(q.options)) {
+            const isSA = String(q.type).toUpperCase().includes('SHORT');
+            if (isSA) {
+              q.options = [];
+              // Ensure clean numeric answer without multiple-choice letters
+              q.correctAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+            } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
                 typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt
               );

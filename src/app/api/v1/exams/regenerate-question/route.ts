@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AIFactory, SupportedAIProvider } from '@/core/ai/ai-factory';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess } from '@/lib/utils';
-import { getCurriculumQuestion } from '@/lib/curriculum-questions';
+import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 
 const RegenerateQuestionSchema = z.object({
   subject: z.string().default('Toán học'),
@@ -70,12 +70,13 @@ export async function POST(req: NextRequest) {
 }`;
         } else if (type === 'short_answer') {
           typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (thí sinh chỉ điền đáp số/kết quả cuối cùng, không có lựa chọn A,B,C,D) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+YÊU CẦU ĐẶC BIỆT: Bạn phải tính toán chi tiết trong "explanation" để tìm ra đáp số chuẩn xác, sau đó ghi kết quả số học chính xác đó vào "correctAnswer" (ví dụ: "25", "-3", "4/3"). TUYỆT ĐỐI KHÔNG điền chữ cái A,B,C,D hay số mặc định.
 Định dạng JSON trả về:
 {
   "content": "Nội dung bài toán yêu cầu tìm đáp số...",
   "options": [],
-  "correctAnswer": "12",
-  "explanation": "Các bước tính toán chi tiết dẫn tới kết quả 12..."
+  "explanation": "Các bước tính toán chi tiết từng bước dẫn tới kết quả...",
+  "correctAnswer": "kết_quả_số_học_chính_xác"
 }`;
         } else if (type === 'essay') {
           typeInstruction = `Hãy tạo MỘT (1) bài tập TỰ LUẬN tự luận toàn diện kèm barem điểm chi tiết cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
@@ -147,7 +148,9 @@ ${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề (TUYỆT 
             content: parsed.content,
             options: formattedOptions,
             points: type === 'essay' ? 1.5 : type === 'true_false' ? 1.0 : type === 'short_answer' ? 0.5 : 0.25,
-            correctAnswer: parsed.correctAnswer || (type === 'essay' ? 'Xem hướng dẫn chấm' : 'A'),
+            correctAnswer: type === 'short_answer'
+              ? extractCleanShortAnswerValue(null, parsed.explanation, parsed.correctAnswer)
+              : (parsed.correctAnswer || (type === 'essay' ? 'Xem hướng dẫn chấm' : 'A')),
             explanation: parsed.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
           };
 
@@ -167,7 +170,8 @@ ${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề (TUYỆT 
       grade,
       level,
       Math.floor(Math.random() * 100),
-      existingQuestions
+      existingQuestions,
+      type
     );
     return apiSuccess(
       { question: fallbackQ, source: 'curriculum-bank' },
