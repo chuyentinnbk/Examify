@@ -38,6 +38,7 @@ export default function EditorView() {
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isEditorMode, setIsEditorMode] = useState(false);
 
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const addDropdownRef = useRef<HTMLDivElement>(null);
@@ -195,12 +196,14 @@ export default function EditorView() {
   };
 
   const handleUpdateQuestion = (qId: number | string, field: keyof ExamQuestion, value: any) => {
+    if (!isEditorMode) return;
     setQuestions((prev) =>
       prev.map((q) => (q.id === qId ? { ...q, [field]: value } : q))
     );
   };
 
   const handleUpdateOption = (qId: number | string, optKey: string, text: string) => {
+    if (!isEditorMode) return;
     const cleaned = cleanOptionText(text);
     setQuestions((prev) =>
       prev.map((q) => {
@@ -216,6 +219,10 @@ export default function EditorView() {
   };
 
   const handleSetCorrectAnswer = (qId: number | string, correctKey: string) => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi đáp án', 'warning');
+      return;
+    }
     const normKey = correctKey.trim().toUpperCase();
     setQuestions((prev) =>
       prev.map((q) => {
@@ -233,6 +240,10 @@ export default function EditorView() {
   };
 
   const handleToggleTrueFalse = (qId: number | string, optKey: string, isCorrect: boolean) => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi đáp án Đúng/Sai', 'warning');
+      return;
+    }
     const targetKey = optKey.trim().toLowerCase();
     setQuestions((prev) =>
       prev.map((q) => {
@@ -284,6 +295,10 @@ export default function EditorView() {
   };
 
   const handleChangeQuestionType = (qId: number | string, newType: QuestionType) => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi dạng câu hỏi', 'warning');
+      return;
+    }
     const normNewType = normalizeQuestionType(newType) as QuestionType;
 
     const updatedQuestions = questions.map((q) => {
@@ -487,6 +502,10 @@ export default function EditorView() {
   };
 
   const handleDeleteQuestion = (qId: number | string) => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để xóa câu hỏi', 'warning');
+      return;
+    }
     const remaining = questions.filter((q) => q.id !== qId);
     const sorted = sortQuestionsBySection(remaining);
     setQuestions(sorted);
@@ -494,6 +513,10 @@ export default function EditorView() {
   };
 
   const handleAddQuestion = (type: QuestionType = 'multiple_choice') => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để thêm câu hỏi mới', 'warning');
+      return;
+    }
     const normType = normalizeQuestionType(type) as QuestionType;
     let options = [
       { key: 'A', text: 'Lựa chọn A ($x > 0$)', isCorrect: true },
@@ -551,6 +574,10 @@ export default function EditorView() {
 
   // Single Question AI Regeneration
   const handleRegenerateQuestion = async (q: ExamQuestion) => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để tạo lại câu hỏi bằng AI', 'warning');
+      return;
+    }
     setRegeneratingQId(q.id);
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -607,6 +634,10 @@ export default function EditorView() {
 
   // Entire Exam AI Regeneration
   const handleRegenerateEntireExam = async () => {
+    if (!isEditorMode) {
+      showToast('Vui lòng bật Chế độ chỉnh sửa để tạo lại toàn bộ đề thi', 'warning');
+      return;
+    }
     if (!window.confirm('Bạn có chắc chắn muốn AI tạo lại TOÀN BỘ câu hỏi cho đề thi này?')) {
       return;
     }
@@ -878,105 +909,143 @@ export default function EditorView() {
             <input
               type="text"
               value={title}
+              disabled={!isEditorMode}
+              readOnly={!isEditorMode}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-base font-extrabold text-slate-900 dark:text-slate-100 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:outline-none mt-1 w-full max-w-lg"
+              className={`text-base font-extrabold text-slate-900 dark:text-slate-100 bg-transparent ${
+                isEditorMode
+                  ? 'border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:outline-none'
+                  : 'border-b border-transparent cursor-default'
+              } mt-1 w-full max-w-lg`}
+              title={isEditorMode ? 'Nhấp để sửa tiêu đề đề thi' : 'Tiêu đề đề thi (Bật Chế độ chỉnh sửa để thay đổi)'}
             />
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end">
-          {/* Regenerate Entire Exam Button */}
+          {/* Editor Mode Toggle Button */}
           <button
             type="button"
-            onClick={handleRegenerateEntireExam}
-            disabled={isRegeneratingExam}
-            className={`px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs ${
-              isRegeneratingExam ? 'opacity-50 cursor-not-allowed' : ''
+            onClick={() => {
+              const nextState = !isEditorMode;
+              setIsEditorMode(nextState);
+              if (!nextState) {
+                setEditingQId(null);
+                showToast('Đã chuyển về Chế độ xem trước (Chỉ đọc)', 'info');
+              } else {
+                showToast('Đã bật Chế độ chỉnh sửa đề thi. Bạn có thể sửa câu hỏi, đáp án và cấu trúc.', 'success');
+              }
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-xs ${
+              isEditorMode
+                ? 'bg-amber-500 hover:bg-amber-600 text-white border border-amber-600 ring-2 ring-amber-300 dark:ring-amber-800'
+                : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
             }`}
-            title="Sử dụng AI để tạo lại toàn bộ đề thi"
+            title={isEditorMode ? 'Đang ở Chế độ chỉnh sửa. Nhấp để chuyển về Chế độ xem trước (Chỉ đọc)' : 'Bật Chế độ chỉnh sửa để sửa câu hỏi, đáp án'}
           >
-            <span className={`material-symbols-outlined text-sm text-indigo-600 ${isRegeneratingExam ? 'animate-spin' : ''}`}>
-              {isRegeneratingExam ? 'progress_activity' : 'auto_awesome'}
+            <span className={`material-symbols-outlined text-base ${isEditorMode ? 'text-white' : 'text-slate-400'}`}>
+              {isEditorMode ? 'edit' : 'edit_off'}
             </span>
-            <span>{isRegeneratingExam ? 'Đang tạo lại...' : 'Tạo lại đề (AI)'}</span>
+            <span>{isEditorMode ? 'Chế độ: Đang sửa' : 'Chế độ: Chỉ đọc'}</span>
+            <span className={`w-2 h-2 rounded-full ${isEditorMode ? 'bg-white animate-ping' : 'bg-slate-400'}`}></span>
           </button>
 
-          {/* Add Question Dropdown */}
-          <div className="relative" ref={addDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsAddOpen(!isAddOpen)}
-              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm text-blue-600">add_circle</span>
-              <span>Thêm câu</span>
-              <span className="material-symbols-outlined text-xs">expand_more</span>
-            </button>
+          {isEditorMode && (
+            <>
+              {/* Regenerate Entire Exam Button */}
+              <button
+                type="button"
+                onClick={handleRegenerateEntireExam}
+                disabled={isRegeneratingExam}
+                className={`px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs ${
+                  isRegeneratingExam ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                title="Sử dụng AI để tạo lại toàn bộ đề thi"
+              >
+                <span className={`material-symbols-outlined text-sm text-indigo-600 ${isRegeneratingExam ? 'animate-spin' : ''}`}>
+                  {isRegeneratingExam ? 'progress_activity' : 'auto_awesome'}
+                </span>
+                <span>{isRegeneratingExam ? 'Đang tạo lại...' : 'Tạo lại đề (AI)'}</span>
+              </button>
 
-            {isAddOpen && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-40 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Chọn dạng câu hỏi
-                </div>
+              {/* Add Question Dropdown */}
+              <div className="relative" ref={addDropdownRef}>
                 <button
                   type="button"
-                  onClick={() => {
-                    handleAddQuestion('multiple_choice');
-                    setIsAddOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
+                  onClick={() => setIsAddOpen(!isAddOpen)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-blue-600 text-base">check_box</span>
-                  <div>
-                    <div>Trắc nghiệm (4 lựa chọn)</div>
-                    <div className="text-[10px] text-slate-400 font-normal">A, B, C, D • 1 đáp án đúng</div>
-                  </div>
+                  <span className="material-symbols-outlined text-sm text-blue-600">add_circle</span>
+                  <span>Thêm câu</span>
+                  <span className="material-symbols-outlined text-xs">expand_more</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddQuestion('true_false');
-                    setIsAddOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-amber-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-amber-600 text-base">rule</span>
-                  <div>
-                    <div>Đúng / Sai (4 ý a, b, c, d)</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Định dạng trắc nghiệm 4 ý</div>
+
+                {isAddOpen && (
+                  <div className="absolute right-0 mt-1.5 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-1.5 z-40 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Chọn dạng câu hỏi
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddQuestion('multiple_choice');
+                        setIsAddOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-blue-600 text-base">check_box</span>
+                      <div>
+                        <div>Trắc nghiệm (4 lựa chọn)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">A, B, C, D • 1 đáp án đúng</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddQuestion('true_false');
+                        setIsAddOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-amber-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-amber-600 text-base">rule</span>
+                      <div>
+                        <div>Đúng / Sai (4 ý a, b, c, d)</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Định dạng trắc nghiệm 4 ý</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddQuestion('short_answer');
+                        setIsAddOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-purple-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-purple-600 text-base">edit_note</span>
+                      <div>
+                        <div>Trả lời ngắn</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Điền số hoặc đáp số ngắn gọn</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAddQuestion('essay');
+                        setIsAddOpen(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-rose-600 text-base">menu_book</span>
+                      <div>
+                        <div>Tự luận</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Kèm barem chấm điểm chi tiết</div>
+                      </div>
+                    </button>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddQuestion('short_answer');
-                    setIsAddOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-purple-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-purple-600 text-base">edit_note</span>
-                  <div>
-                    <div>Trả lời ngắn</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Điền số hoặc đáp số ngắn gọn</div>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddQuestion('essay');
-                    setIsAddOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-rose-600 text-base">menu_book</span>
-                  <div>
-                    <div>Tự luận</div>
-                    <div className="text-[10px] text-slate-400 font-normal">Kèm barem chấm điểm chi tiết</div>
-                  </div>
-                </button>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Download / Export Dropdown */}
           <div className="relative" ref={exportDropdownRef}>
@@ -1108,19 +1177,21 @@ export default function EditorView() {
           </div>
 
           {/* Auto Sort Button */}
-          <button
-            type="button"
-            onClick={() => {
-              const sorted = sortQuestionsBySection(questions);
-              setQuestions(sorted);
-              showToast('Đã sắp xếp lại toàn bộ câu hỏi theo chuẩn Phần I, II, III, IV Bộ GD&ĐT!', 'success');
-            }}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
-            title="Sắp xếp câu hỏi theo đúng chuẩn: Phần I (Trắc nghiệm), Phần II (Đúng/Sai), Phần III (Trả lời ngắn), Phần IV (Tự luận)"
-          >
-            <span className="material-symbols-outlined text-sm text-indigo-600 dark:text-indigo-400">sort</span>
-            <span>Sắp xếp chuẩn Bộ</span>
-          </button>
+          {isEditorMode && (
+            <button
+              type="button"
+              onClick={() => {
+                const sorted = sortQuestionsBySection(questions);
+                setQuestions(sorted);
+                showToast('Đã sắp xếp lại toàn bộ câu hỏi theo chuẩn Phần I, II, III, IV Bộ GD&ĐT!', 'success');
+              }}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+              title="Sắp xếp câu hỏi theo đúng chuẩn: Phần I (Trắc nghiệm), Phần II (Đúng/Sai), Phần III (Trả lời ngắn), Phần IV (Tự luận)"
+            >
+              <span className="material-symbols-outlined text-sm text-indigo-600 dark:text-indigo-400">sort</span>
+              <span>Sắp xếp chuẩn Bộ</span>
+            </button>
+          )}
 
           {/* Save Button */}
           <button
@@ -1134,33 +1205,77 @@ export default function EditorView() {
         </div>
       </div>
 
+      {/* Informative Mode Banner */}
+      {!isEditorMode ? (
+        <div className="no-print flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-slate-100/90 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-slate-400 text-base">visibility</span>
+            <span>Đang ở <strong>Chế độ xem trước (Chỉ đọc)</strong>. Mọi chỉnh sửa nội dung, đáp án và cấu trúc đề thi đã được khóa an toàn.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditorMode(true);
+              showToast('Đã bật Chế độ chỉnh sửa đề thi.', 'success');
+            }}
+            className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span className="material-symbols-outlined text-xs">edit</span>
+            <span>Bật chỉnh sửa</span>
+          </button>
+        </div>
+      ) : (
+        <div className="no-print flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-200 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-600 text-base animate-pulse">edit</span>
+            <span><strong>Chế độ chỉnh sửa đang BẬT:</strong> Bạn có thể đổi dạng câu hỏi, sửa nội dung, chọn đáp án đúng và thêm/xóa câu.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditorMode(false);
+              setEditingQId(null);
+              showToast('Đã chuyển về Chế độ xem trước (Chỉ đọc).', 'info');
+            }}
+            className="text-xs font-bold text-amber-900 dark:text-amber-100 hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span className="material-symbols-outlined text-xs">lock</span>
+            <span>Khóa / Xong</span>
+          </button>
+        </div>
+      )}
+
       {/* Official Vietnamese Exam Header (Chuẩn Bộ GD&ĐT) */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-3 border-b border-slate-100 dark:border-slate-800 text-xs">
           {/* Left Side: Sở / Trường & Khung Đề chính thức */}
           <div className="flex flex-col items-center justify-center text-center space-y-1">
             {/* Quick Action: Button Chọn Sở Giáo Dục */}
-            <div className="no-print mb-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomDeptInput(department);
-                  setIsDeptModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[11px] font-bold border border-blue-200/90 dark:border-blue-800 transition-all shadow-2xs group"
-                title="Chọn Sở Giáo dục từ 34 tỉnh/thành hoặc tự nhập custom"
-              >
-                <span className="material-symbols-outlined text-sm text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">account_balance</span>
-                <span>Chọn Sở Giáo Dục</span>
-                <span className="material-symbols-outlined text-xs opacity-70">expand_more</span>
-              </button>
-            </div>
+            {isEditorMode && (
+              <div className="no-print mb-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomDeptInput(department);
+                    setIsDeptModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[11px] font-bold border border-blue-200/90 dark:border-blue-800 transition-all shadow-2xs group"
+                  title="Chọn Sở Giáo dục từ 34 tỉnh/thành hoặc tự nhập custom"
+                >
+                  <span className="material-symbols-outlined text-sm text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">account_balance</span>
+                  <span>Chọn Sở Giáo Dục</span>
+                  <span className="material-symbols-outlined text-xs opacity-70">expand_more</span>
+                </button>
+              </div>
+            )}
 
             {/* Dòng Tên Sở Giáo Dục / Cơ quan quản lý (Gốc trên cùng bên trái - Cho phép sửa trực tiếp tại chỗ) */}
             <div className="w-full max-w-[340px]">
               <input
                 type="text"
                 value={department}
+                readOnly={!isEditorMode}
+                disabled={!isEditorMode}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -1177,8 +1292,10 @@ export default function EditorView() {
                   }
                 }}
                 placeholder="SỞ GIÁO DỤC VÀ ĐÀO TẠO THÀNH PHỐ HẢI PHÒNG"
-                className="w-full text-center font-bold text-slate-800 dark:text-slate-200 text-xs tracking-wide bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0 print:text-black"
-                title="Gốc trên cùng bên trái đề: Nhấp để sửa trực tiếp Sở Giáo dục hoặc Cơ quan xuất xứ đề"
+                className={`w-full text-center font-bold text-slate-800 dark:text-slate-200 text-xs tracking-wide bg-transparent border border-transparent ${
+                  isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                } rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0 print:text-black`}
+                title={isEditorMode ? "Gốc trên cùng bên trái đề: Nhấp để sửa trực tiếp Sở Giáo dục hoặc Cơ quan xuất xứ đề" : "Cơ quan xuất xứ đề"}
               />
             </div>
 
@@ -1187,6 +1304,8 @@ export default function EditorView() {
               <input
                 type="text"
                 value={schoolName}
+                readOnly={!isEditorMode}
+                disabled={!isEditorMode}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -1200,8 +1319,10 @@ export default function EditorView() {
                   }
                 }}
                 placeholder="TRƯỜNG THPT CHUYÊN TRẦN PHÚ"
-                className="w-full text-center font-bold text-slate-900 dark:text-slate-100 text-sm bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0"
-                title="Nhấp để sửa tên Trường / Đơn vị"
+                className={`w-full text-center font-bold text-slate-900 dark:text-slate-100 text-sm bg-transparent border border-transparent ${
+                  isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-700 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                } rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0`}
+                title={isEditorMode ? "Nhấp để sửa tên Trường / Đơn vị" : "Đơn vị đào tạo"}
               />
             </div>
 
@@ -1213,27 +1334,31 @@ export default function EditorView() {
           {/* Right Side: Kỳ thi, Môn, Thời gian */}
           <div className="flex flex-col items-center justify-center text-center space-y-1">
             {/* Quick Action: Button Đặt Tên Bài Kiểm Tra */}
-            <div className="no-print mb-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomSessionInput(sessionTitle);
-                  setIsSessionModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold border border-indigo-200/90 dark:border-indigo-800 transition-all shadow-2xs group"
-                title="Đổi tên Bài kiểm tra / Kỳ thi hoặc chọn mẫu"
-              >
-                <span className="material-symbols-outlined text-sm text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">assignment</span>
-                <span>Đặt Tên Bài Kiểm Tra</span>
-                <span className="material-symbols-outlined text-xs opacity-70">expand_more</span>
-              </button>
-            </div>
+            {isEditorMode && (
+              <div className="no-print mb-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomSessionInput(sessionTitle);
+                    setIsSessionModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold border border-indigo-200/90 dark:border-indigo-800 transition-all shadow-2xs group"
+                  title="Đổi tên Bài kiểm tra / Kỳ thi hoặc chọn mẫu"
+                >
+                  <span className="material-symbols-outlined text-sm text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">assignment</span>
+                  <span>Đặt Tên Bài Kiểm Tra</span>
+                  <span className="material-symbols-outlined text-xs opacity-70">expand_more</span>
+                </button>
+              </div>
+            )}
 
             {/* Dòng Tên Kỳ Thi / Bài Kiểm Tra (Cho phép sửa trực tiếp tại chỗ) */}
             <div className="w-full max-w-[340px]">
               <input
                 type="text"
                 value={sessionTitle}
+                readOnly={!isEditorMode}
+                disabled={!isEditorMode}
                 onChange={(e) => {
                   setSessionTitle(e.target.value);
                   setCustomSessionInput(e.target.value);
@@ -1245,8 +1370,10 @@ export default function EditorView() {
                   }
                 }}
                 placeholder="KIỂM TRA ĐỊNH KỲ HỌC KỲ I..."
-                className="w-full text-center font-bold text-slate-900 dark:text-slate-100 text-xs md:text-sm bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0"
-                title="Nhấp để sửa trực tiếp tên Bài kiểm tra / Kỳ thi"
+                className={`w-full text-center font-bold text-slate-900 dark:text-slate-100 text-xs md:text-sm bg-transparent border border-transparent ${
+                  isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                } rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0`}
+                title={isEditorMode ? "Nhấp để sửa trực tiếp tên Bài kiểm tra / Kỳ thi" : "Tên bài kiểm tra / Kỳ thi"}
               />
             </div>
 
@@ -1255,6 +1382,8 @@ export default function EditorView() {
               <input
                 type="text"
                 value={academicYear}
+                readOnly={!isEditorMode}
+                disabled={!isEditorMode}
                 onChange={(e) => setAcademicYear(e.target.value)}
                 onBlur={(e) => {
                   const val = e.target.value.trim();
@@ -1263,8 +1392,10 @@ export default function EditorView() {
                   }
                 }}
                 placeholder="NĂM HỌC 2024 – 2025"
-                className="w-full text-center font-bold text-slate-900 dark:text-slate-100 text-xs bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0"
-                title="Nhấp để sửa Năm học"
+                className={`w-full text-center font-bold text-slate-900 dark:text-slate-100 text-xs bg-transparent border border-transparent ${
+                  isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                } rounded px-1.5 py-0.5 outline-none transition-all print:border-none print:p-0`}
+                title={isEditorMode ? "Nhấp để sửa Năm học" : "Năm học"}
               />
             </div>
 
@@ -1291,12 +1422,16 @@ export default function EditorView() {
               <input
                 type="text"
                 value={examCode}
+                readOnly={!isEditorMode}
+                disabled={!isEditorMode}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9A-Za-z]/g, '').slice(0, 4);
                   setExamCode(val);
                 }}
-                className="w-12 text-center font-extrabold text-sm font-mono text-slate-900 dark:text-slate-100 bg-transparent border-b border-dashed border-slate-400 focus:border-blue-600 focus:outline-none"
-                title="Nhấp để sửa mã đề (chuẩn 3 chữ số: 101, 102, 134...)"
+                className={`w-12 text-center font-extrabold text-sm font-mono text-slate-900 dark:text-slate-100 bg-transparent ${
+                  isEditorMode ? 'border-b border-dashed border-slate-400 focus:border-blue-600 focus:outline-none' : 'border-b-transparent cursor-default'
+                }`}
+                title={isEditorMode ? "Nhấp để sửa mã đề (chuẩn 3 chữ số: 101, 102, 134...)" : "Mã đề thi"}
                 placeholder="101"
               />
             </span>
@@ -1352,30 +1487,40 @@ export default function EditorView() {
                       <input
                         type="text"
                         value={currentSectionTitle}
+                        readOnly={!isEditorMode}
+                        disabled={!isEditorMode}
                         onChange={(e) => {
                           const val = e.target.value;
                           setSectionTitles((prev) => ({ ...prev, [sectionKey]: val }));
                         }}
                         placeholder="NHẬP TÊN PHẦN BÀI THI (VD: PHẦN I. CÂU HỎI TRẮC NGHIỆM)..."
-                        className="w-full font-extrabold text-xs md:text-sm text-slate-900 dark:text-slate-100 uppercase tracking-wide bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 rounded px-1 py-0.5 outline-none transition-all print:border-none print:p-0"
-                        title="Nhấp để đặt lại tên cho phần bài kiểm tra này"
+                        className={`w-full font-extrabold text-xs md:text-sm text-slate-900 dark:text-slate-100 uppercase tracking-wide bg-transparent border-b border-transparent ${
+                          isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                        } rounded px-1 py-0.5 outline-none transition-all print:border-none print:p-0`}
+                        title={isEditorMode ? "Nhấp để đặt lại tên cho phần bài kiểm tra này" : "Tên phần bài thi"}
                       />
                     </div>
-                    <span className="no-print text-[10px] text-blue-600 dark:text-blue-400 font-bold px-2.5 py-0.5 rounded-full bg-blue-100/70 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-900 shrink-0">
-                      ✏️ Đổi tên phần
-                    </span>
+                    {isEditorMode && (
+                      <span className="no-print text-[10px] text-blue-600 dark:text-blue-400 font-bold px-2.5 py-0.5 rounded-full bg-blue-100/70 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-900 shrink-0">
+                        ✏️ Đổi tên phần
+                      </span>
+                    )}
                   </div>
                   <div>
                     <input
                       type="text"
                       value={currentSectionDesc}
+                      readOnly={!isEditorMode}
+                      disabled={!isEditorMode}
                       onChange={(e) => {
                         const val = e.target.value;
                         setSectionDescriptions((prev) => ({ ...prev, [sectionKey]: val }));
                       }}
                       placeholder="Nhập ghi chú / hướng dẫn làm bài cho phần này..."
-                      className="w-full text-[11px] text-slate-600 dark:text-slate-400 italic bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800 rounded px-1 py-0.5 outline-none transition-all print:border-none print:p-0"
-                      title="Nhấp để sửa hướng dẫn làm bài phần này"
+                      className={`w-full text-[11px] text-slate-600 dark:text-slate-400 italic bg-transparent border-b border-transparent ${
+                        isEditorMode ? 'hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-400 focus:bg-white dark:focus:bg-slate-800' : 'cursor-default'
+                      } rounded px-1 py-0.5 outline-none transition-all print:border-none print:p-0`}
+                      title={isEditorMode ? "Nhấp để sửa hướng dẫn làm bài phần này" : "Hướng dẫn làm bài phần này"}
                     />
                   </div>
                 </div>
@@ -1397,94 +1542,112 @@ export default function EditorView() {
                     Câu {qIndex + 1}
                   </span>
 
-                  {/* Question Type Selector */}
-                  <select
-                    value={normalizeQuestionType(q.type)}
-                    onChange={(e) => handleChangeQuestionType(q.id, e.target.value as QuestionType)}
-                    className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="multiple_choice">Trắc nghiệm (4 lựa chọn)</option>
-                    <option value="true_false">Đúng / Sai (4 ý a,b,c,d)</option>
-                    <option value="short_answer">Trả lời ngắn</option>
-                    <option value="essay">Tự luận</option>
-                  </select>
+                  {isEditorMode ? (
+                    <>
+                      {/* Question Type Selector */}
+                      <select
+                        value={normalizeQuestionType(q.type)}
+                        onChange={(e) => handleChangeQuestionType(q.id, e.target.value as QuestionType)}
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="multiple_choice">Trắc nghiệm (4 lựa chọn)</option>
+                        <option value="true_false">Đúng / Sai (4 ý a,b,c,d)</option>
+                        <option value="short_answer">Trả lời ngắn</option>
+                        <option value="essay">Tự luận</option>
+                      </select>
 
-                  {/* Cognitive Level Selector */}
-                  <select
-                    value={q.level}
-                    onChange={(e) => handleUpdateQuestion(q.id, 'level', e.target.value)}
-                    className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
-                  >
-                    <option value="Nhận biết">Nhận biết</option>
-                    <option value="Thông hiểu">Thông hiểu</option>
-                    <option value="Vận dụng">Vận dụng</option>
-                    <option value="Vận dụng cao">Vận dụng cao</option>
-                  </select>
+                      {/* Cognitive Level Selector */}
+                      <select
+                        value={q.level}
+                        onChange={(e) => handleUpdateQuestion(q.id, 'level', e.target.value)}
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
+                      >
+                        <option value="Nhận biết">Nhận biết</option>
+                        <option value="Thông hiểu">Thông hiểu</option>
+                        <option value="Vận dụng">Vận dụng</option>
+                        <option value="Vận dụng cao">Vận dụng cao</option>
+                      </select>
 
-                  {/* Points Input */}
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0"
-                      max="10"
-                      value={q.points !== undefined ? q.points : 0.25}
-                      onChange={(e) => handleUpdateQuestion(q.id, 'points', parseFloat(e.target.value) || 0)}
-                      className="w-14 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-transparent text-center font-bold text-slate-700 dark:text-slate-300 text-xs"
-                      title="Điểm số câu hỏi"
-                    />
-                    <span>điểm</span>
+                      {/* Points Input */}
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                        <input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="10"
+                          value={q.points !== undefined ? q.points : 0.25}
+                          onChange={(e) => handleUpdateQuestion(q.id, 'points', parseFloat(e.target.value) || 0)}
+                          className="w-14 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-transparent text-center font-bold text-slate-700 dark:text-slate-300 text-xs"
+                          title="Điểm số câu hỏi"
+                        />
+                        <span>điểm</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {getTypeLabel(q.type)}
+                      </span>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {q.level || 'Thông hiểu'}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        {q.points !== undefined ? q.points : 0.25} điểm
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {isEditorMode && (
+                  <div className="no-print flex items-center gap-1.5">
+                    {/* AI Regenerate Single Question */}
+                    <button
+                      type="button"
+                      onClick={() => handleRegenerateQuestion(q)}
+                      disabled={isRegenThis}
+                      className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                        isRegenThis ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      title="Tạo lại câu hỏi này bằng AI"
+                    >
+                      <span className={`material-symbols-outlined text-xs text-indigo-600 ${isRegenThis ? 'animate-spin' : ''}`}>
+                        {isRegenThis ? 'progress_activity' : 'auto_awesome'}
+                      </span>
+                      <span>{isRegenThis ? 'Đang tạo...' : 'Tạo lại (AI)'}</span>
+                    </button>
+
+                    {/* Inline Edit Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setEditingQId(isEditing ? null : q.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                        isEditing
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                      title={isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa nội dung câu hỏi'}
+                    >
+                      <span className="material-symbols-outlined text-xs">
+                        {isEditing ? 'check' : 'edit'}
+                      </span>
+                      <span>{isEditing ? 'Xong' : 'Sửa'}</span>
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteQuestion(q.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                      title="Xóa câu hỏi này"
+                    >
+                      <span className="material-symbols-outlined text-base">delete</span>
+                    </button>
                   </div>
-                </div>
-
-                <div className="no-print flex items-center gap-1.5">
-                  {/* AI Regenerate Single Question */}
-                  <button
-                    type="button"
-                    onClick={() => handleRegenerateQuestion(q)}
-                    disabled={isRegenThis}
-                    className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors ${
-                      isRegenThis ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                    title="Tạo lại câu hỏi này bằng AI"
-                  >
-                    <span className={`material-symbols-outlined text-xs text-indigo-600 ${isRegenThis ? 'animate-spin' : ''}`}>
-                      {isRegenThis ? 'progress_activity' : 'auto_awesome'}
-                    </span>
-                    <span>{isRegenThis ? 'Đang tạo...' : 'Tạo lại (AI)'}</span>
-                  </button>
-
-                  {/* Inline Edit Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setEditingQId(isEditing ? null : q.id)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors ${
-                      isEditing
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                    title={isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa nội dung câu hỏi'}
-                  >
-                    <span className="material-symbols-outlined text-xs">
-                      {isEditing ? 'check' : 'edit'}
-                    </span>
-                    <span>{isEditing ? 'Xong' : 'Sửa'}</span>
-                  </button>
-
-                  {/* Delete Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteQuestion(q.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                    title="Xóa câu hỏi này"
-                  >
-                    <span className="material-symbols-outlined text-base">delete</span>
-                  </button>
-                </div>
+                )}
               </div>
 
               {/* INLINE EDIT MODE */}
-              {isEditing ? (
+              {isEditing && isEditorMode ? (
                 <div className="no-print space-y-4 pt-1 bg-slate-50/60 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
@@ -1766,8 +1929,16 @@ export default function EditorView() {
                         {safeOptions.map((opt) => (
                           <div
                             key={opt.key}
-                            onClick={() => handleSetCorrectAnswer(q.id, opt.key)}
-                            className={`exam-opt-item ${printColClass} px-3 py-2 rounded-xl border flex items-baseline gap-2 transition-all cursor-pointer ${
+                            onClick={() => {
+                              if (!isEditorMode) {
+                                showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi đáp án đúng', 'warning');
+                                return;
+                              }
+                              handleSetCorrectAnswer(q.id, opt.key);
+                            }}
+                            className={`exam-opt-item ${printColClass} px-3 py-2 rounded-xl border flex items-baseline gap-2 transition-all ${
+                              isEditorMode ? 'cursor-pointer hover:border-blue-400' : 'cursor-default'
+                            } ${
                               opt.isCorrect
                                 ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-400'
                                 : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1841,9 +2012,17 @@ export default function EditorView() {
                                   </td>
                                   {/* Cột Đúng (Ô trống in giấy, có X nếu kèm đáp án) */}
                                   <td
-                                    onClick={() => handleToggleTrueFalse(q.id, subKey, true)}
-                                    className="border border-black dark:border-slate-400 py-2 px-1 text-center align-middle w-12 md:w-14 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors select-none"
-                                    title="Nhấp để đánh dấu Đúng"
+                                    onClick={() => {
+                                      if (!isEditorMode) {
+                                        showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi đáp án Đúng/Sai', 'warning');
+                                        return;
+                                      }
+                                      handleToggleTrueFalse(q.id, subKey, true);
+                                    }}
+                                    className={`border border-black dark:border-slate-400 py-2 px-1 text-center align-middle w-12 md:w-14 select-none ${
+                                      isEditorMode ? 'cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors' : 'cursor-default'
+                                    }`}
+                                    title={isEditorMode ? "Nhấp để đánh dấu Đúng" : "Mệnh đề Đúng"}
                                   >
                                     <span className="font-bold text-sm text-black dark:text-white">
                                       {includeAnswers && opt.isCorrect ? 'X' : ''}
@@ -1851,9 +2030,17 @@ export default function EditorView() {
                                   </td>
                                   {/* Cột Sai (Ô trống in giấy, có X nếu kèm đáp án) */}
                                   <td
-                                    onClick={() => handleToggleTrueFalse(q.id, subKey, false)}
-                                    className="border border-black dark:border-slate-400 py-2 px-1 text-center align-middle w-12 md:w-14 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors select-none"
-                                    title="Nhấp để đánh dấu Sai"
+                                    onClick={() => {
+                                      if (!isEditorMode) {
+                                        showToast('Vui lòng bật Chế độ chỉnh sửa để thay đổi đáp án Đúng/Sai', 'warning');
+                                        return;
+                                      }
+                                      handleToggleTrueFalse(q.id, subKey, false);
+                                    }}
+                                    className={`border border-black dark:border-slate-400 py-2 px-1 text-center align-middle w-12 md:w-14 select-none ${
+                                      isEditorMode ? 'cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors' : 'cursor-default'
+                                    }`}
+                                    title={isEditorMode ? "Nhấp để đánh dấu Sai" : "Mệnh đề Sai"}
                                   >
                                     <span className="font-bold text-sm text-black dark:text-white">
                                       {includeAnswers && !opt.isCorrect ? 'X' : ''}
@@ -1882,9 +2069,13 @@ export default function EditorView() {
                         <input
                           type="text"
                           value={q.correctAnswer || ''}
+                          readOnly={!isEditorMode}
+                          disabled={!isEditorMode}
                           onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                          placeholder="Ví dụ: 12, -3.5, hoặc 4/3..."
-                          className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                          placeholder={isEditorMode ? "Ví dụ: 12, -3.5, hoặc 4/3..." : "Chưa có đáp số"}
+                          className={`w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 ${
+                            isEditorMode ? 'focus:ring-2 focus:ring-purple-500 focus:outline-none' : 'cursor-default opacity-90'
+                          }`}
                         />
                         {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) && (
                           <div className="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-md border border-purple-200/80 dark:border-purple-900/40 text-xs flex items-center gap-2">
@@ -1910,20 +2101,22 @@ export default function EditorView() {
                             <span className="material-symbols-outlined text-sm text-rose-600">menu_book</span>
                             <span>Barem điểm &amp; Hướng dẫn chấm tự luận:</span>
                           </label>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium hidden sm:inline">
-                              Trình bày các bước chấm
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setEditingQId(q.id)}
-                              className="text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-rose-100 bg-rose-100/80 dark:bg-rose-900/50 hover:bg-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors"
-                              title="Chỉnh sửa barem chấm điểm"
-                            >
-                              <span className="material-symbols-outlined text-xs">edit</span>
-                              <span>Sửa barem</span>
-                            </button>
-                          </div>
+                          {isEditorMode && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium hidden sm:inline">
+                                Trình bày các bước chấm
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingQId(q.id)}
+                                className="text-[11px] font-bold text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-rose-100 bg-rose-100/80 dark:bg-rose-900/50 hover:bg-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors"
+                                title="Chỉnh sửa barem chấm điểm"
+                              >
+                                <span className="material-symbols-outlined text-xs">edit</span>
+                                <span>Sửa barem</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {q.explanation ? (
@@ -1932,10 +2125,14 @@ export default function EditorView() {
                           </div>
                         ) : (
                           <div
-                            onClick={() => setEditingQId(q.id)}
-                            className="text-xs text-rose-500/80 dark:text-rose-400/80 italic p-3 border border-dashed border-rose-300 dark:border-rose-800 rounded-lg cursor-pointer hover:bg-rose-100/30 transition-colors"
+                            onClick={() => {
+                              if (isEditorMode) setEditingQId(q.id);
+                            }}
+                            className={`text-xs text-rose-500/80 dark:text-rose-400/80 italic p-3 border border-dashed border-rose-300 dark:border-rose-800 rounded-lg ${
+                              isEditorMode ? 'cursor-pointer hover:bg-rose-100/30 transition-colors' : 'cursor-default'
+                            }`}
                           >
-                            Chưa có barem chấm điểm. Bấm vào đây hoặc nút "Sửa barem" để thêm hướng dẫn chấm và barem chi tiết.
+                            Chưa có barem chấm điểm.{isEditorMode ? ' Bấm vào đây hoặc nút "Sửa barem" để thêm hướng dẫn chấm và barem chi tiết.' : ''}
                           </div>
                         )}
                       </div>
@@ -1968,46 +2165,48 @@ export default function EditorView() {
       })}
 
         {/* Quick Add Question Bar at the bottom */}
-        <div className="no-print p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <span className="material-symbols-outlined text-blue-600 text-lg">add_circle</span>
-            <span>Thêm câu hỏi mới vào đề:</span>
+        {isEditorMode && (
+          <div className="no-print p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <span className="material-symbols-outlined text-blue-600 text-lg">add_circle</span>
+              <span>Thêm câu hỏi mới vào đề:</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleAddQuestion('multiple_choice')}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-xs">check_box</span>
+                <span>+ Trắc nghiệm (4 lựa chọn)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddQuestion('true_false')}
+                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-xs">rule</span>
+                <span>+ Đúng / Sai (a,b,c,d)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddQuestion('short_answer')}
+                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-xs">edit_note</span>
+                <span>+ Trả lời ngắn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddQuestion('essay')}
+                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-xs">menu_book</span>
+                <span>+ Tự luận</span>
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleAddQuestion('multiple_choice')}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-xs">check_box</span>
-              <span>+ Trắc nghiệm (4 lựa chọn)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddQuestion('true_false')}
-              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-xs">rule</span>
-              <span>+ Đúng / Sai (a,b,c,d)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddQuestion('short_answer')}
-              className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-xs">edit_note</span>
-              <span>+ Trả lời ngắn</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAddQuestion('essay')}
-              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-xs">menu_book</span>
-              <span>+ Tự luận</span>
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Official Exam Footer */}
