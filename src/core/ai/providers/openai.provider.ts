@@ -72,7 +72,7 @@ export class OpenAIProvider implements IAIProvider {
             { role: 'user', content: userPrompt },
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.3,
+          temperature: 0.7,
         });
 
         const rawContent = completion.choices[0]?.message?.content || '';

@@ -69,7 +69,7 @@ export class GeminiProvider implements IAIProvider {
           systemInstruction: systemPrompt,
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.3,
+            temperature: 0.7,
           },
         });
 

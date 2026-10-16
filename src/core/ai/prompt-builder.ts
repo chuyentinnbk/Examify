@@ -88,10 +88,11 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 8. LANGUAGE: All content, options, and explanations must be in: ${language}.`;
 
     if (payload.appliedSkills && payload.appliedSkills.length > 0) {
-      systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS:
-You have been provided with specialized pedagogical skills extracted from official academic materials. You MUST prioritize and strictly apply the question styles, difficulty tiers, trick/trap mechanisms, and few-shot examples defined in these skills.
-- The generated questions MUST visibly match the depth, terminology, mathematical rigor, and pedagogical nuances specified in the skills.
-- Treat the provided few-shot examples as gold-standard structural templates: author fresh questions of matching sophistication and format while varying data, numbers, and context.`;
+      systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS & STRICT ZERO-DUPLICATION:
+You have been provided with specialized pedagogical skills extracted from official academic materials. You MUST apply the question styles, difficulty tiers, and pedagogical rigor defined in these skills:
+- TUYỆT ĐỐI KHÔNG COPY NGUYÊN VĂN CÂU MẪU: Treat few-shot examples solely as structural templates. Author 100% fresh, novel questions with completely different parameters, numbers, context, and functions.
+- KHÔNG LẶP LẠI DẠNG TOÁN HAY PHƯƠNG TRÌNH: Every single question in the exam MUST test a different sub-topic, formula, or concept. Never create multiple questions that solve the same equation pattern with trivial variable changes.
+- TOÀN DIỆN CHƯƠNG TRÌNH: Đảm bảo phủ đều các chủ đề, chuyên đề và bài học của môn học trong học kỳ, không dồn vào một dạng bài duy nhất.`;
     }
 
     // 3. Assemble Curriculum Hierarchy Details
@@ -175,7 +176,7 @@ ${matrixSpecs}
         userPrompt += `\n\n--- [KỸ NĂNG ${idx + 1}: ${skill.title}] ---`;
         userPrompt += `\n${instStr}`;
         if (skill.fewShotExamples && Array.isArray(skill.fewShotExamples) && skill.fewShotExamples.length > 0) {
-          userPrompt += `\n\n* CÂU HỎI MẪU TIÊU BIỂU CẦN BÁM SÁT (FEW-SHOT EXAMPLES):\n(Hãy sáng tạo các câu hỏi mới có cấu trúc, độ khó, phương án nhiễu và văn phong tương đương các câu mẫu sau):\n${JSON.stringify(skill.fewShotExamples, null, 2)}`;
+          userPrompt += `\n\n* CÂU HỎI MẪU TIÊU BIỂU (FEW-SHOT TEMPLATES - CHỈ DÙNG THAM KHẢO PHONG CÁCH SƯ PHẠM, TUYỆT ĐỐI KHÔNG COPY NGUYÊN VĂN HAY LẶP LẠI CÂU MẪU):\n${JSON.stringify(skill.fewShotExamples, null, 2)}`;
         }
       });
       userPrompt += `\n======================================================================`;

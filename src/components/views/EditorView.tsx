@@ -215,14 +215,16 @@ export default function EditorView() {
   };
 
   const handleSetCorrectAnswer = (qId: number | string, correctKey: string) => {
+    const normKey = correctKey.trim().toUpperCase();
     setQuestions((prev) =>
       prev.map((q) => {
         if (q.id === qId) {
           const newOpts = (q.options || []).map((opt) => ({
             ...opt,
-            isCorrect: opt.key === correctKey,
+            key: opt.key.toUpperCase(),
+            isCorrect: opt.key.toUpperCase() === normKey,
           }));
-          return { ...q, correctAnswer: correctKey, options: newOpts };
+          return { ...q, correctAnswer: normKey, options: newOpts };
         }
         return q;
       })
@@ -230,16 +232,21 @@ export default function EditorView() {
   };
 
   const handleToggleTrueFalse = (qId: number | string, optKey: string, isCorrect: boolean) => {
+    const targetKey = optKey.trim().toLowerCase();
     setQuestions((prev) =>
       prev.map((q) => {
         if (q.id === qId) {
           const subKeys = ['a', 'b', 'c', 'd'];
-          const currentOpts = q.options && q.options.length > 0 ? q.options : subKeys.map(k => ({ key: k, text: `Mệnh đề ${k}`, isCorrect: true }));
+          const currentOpts =
+            q.options && q.options.length > 0
+              ? q.options
+              : subKeys.map((k) => ({ key: k, text: `Mệnh đề ${k}`, isCorrect: true }));
+
           const newOpts = currentOpts.map((opt) =>
-            opt.key.toLowerCase() === optKey.toLowerCase() ? { ...opt, isCorrect } : opt
+            opt.key.toLowerCase() === targetKey ? { ...opt, key: opt.key.toLowerCase(), isCorrect } : opt
           );
           const answerStr = newOpts
-            .map((opt) => `${opt.key}: ${opt.isCorrect ? 'Đ' : 'S'}`)
+            .map((opt) => `${opt.key.toLowerCase()}: ${opt.isCorrect ? 'Đ' : 'S'}`)
             .join(', ');
           return { ...q, options: newOpts, correctAnswer: answerStr };
         }
@@ -248,68 +255,248 @@ export default function EditorView() {
     );
   };
 
+  const QUESTION_TYPE_ORDER: Record<string, number> = {
+    multiple_choice: 1,
+    true_false: 2,
+    short_answer: 3,
+    essay: 4,
+  };
+
+  const sortQuestionsBySection = (qList: ExamQuestion[]): ExamQuestion[] => {
+    const sorted = [...qList].sort((a, b) => {
+      const typeA = normalizeQuestionType(a.type);
+      const typeB = normalizeQuestionType(b.type);
+      const orderA = QUESTION_TYPE_ORDER[typeA] || 99;
+      const orderB = QUESTION_TYPE_ORDER[typeB] || 99;
+      return orderA - orderB;
+    });
+
+    return sorted.map((q, idx) => {
+      const normType = normalizeQuestionType(q.type);
+      return {
+        ...q,
+        type: normType,
+        section: normType,
+        order: `Câu ${String(idx + 1).padStart(2, '0')}`,
+      };
+    });
+  };
+
   const handleChangeQuestionType = (qId: number | string, newType: QuestionType) => {
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id === qId) {
-          let newOptions = q.options || [];
-          let newAns = q.correctAnswer;
-          let points = q.points;
+    const normNewType = normalizeQuestionType(newType) as QuestionType;
 
-          if (newType === 'true_false') {
-            const subKeys = ['a', 'b', 'c', 'd'];
-            newOptions = subKeys.map((k, i) => {
-              const existing = (q.options || [])[i];
-              return {
-                key: k,
-                text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
-                isCorrect: existing ? !!existing.isCorrect : i % 2 === 0,
-              };
-            });
-            newAns = newOptions.map(o => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
-            points = 1.0;
-          } else if (newType === 'multiple_choice') {
-            const optKeys = ['A', 'B', 'C', 'D'];
-            newOptions = optKeys.map((k, i) => {
-              const existing = (q.options || [])[i];
-              return {
-                key: k,
-                text: existing ? cleanOptionText(existing.text) : `Lựa chọn phương án ${k}`,
-                isCorrect: k === 'A',
-              };
-            });
-            newAns = 'A';
-            points = 0.25;
-          } else if (newType === 'short_answer') {
-            newOptions = [];
-            newAns = newAns && !newAns.includes(':') && newAns.length <= 20 ? newAns : '12';
-            points = 0.5;
-          } else if (newType === 'essay') {
-            newOptions = [];
-            newAns = 'Xem hướng dẫn chấm và barem điểm';
-            points = 1.5;
+    const updatedQuestions = questions.map((q) => {
+      if (q.id !== qId) return q;
+
+      const oldType = normalizeQuestionType(q.type);
+      if (oldType === normNewType) return q;
+
+      let newOptions: QuestionOption[] = [];
+      let newAns = q.correctAnswer || '';
+      let points = q.points;
+      const backupOptions = (q.options && q.options.length > 0) ? q.options : (q._backupOptions || []);
+      const backupAnswer = q.correctAnswer || q._backupAnswer || '';
+
+      // --- 1. CONVERT TO TRUE_FALSE (ĐÚNG / SAI 4 Ý a, b, c, d) ---
+      if (normNewType === 'true_false') {
+        const subKeys = ['a', 'b', 'c', 'd'];
+
+        if (oldType === 'multiple_choice') {
+          // Map existing 4 options to a, b, c, d without losing their texts
+          const existingOpts = (q.options && q.options.length >= 4) ? q.options : backupOptions;
+          newOptions = subKeys.map((k, i) => {
+            const existing = existingOpts[i];
+            const isTargetCorrect = (q.correctAnswer && existing)
+              ? existing.key.toUpperCase() === q.correctAnswer.trim().toUpperCase()
+              : (existing ? !!existing.isCorrect : false);
+            return {
+              key: k,
+              text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
+              isCorrect: isTargetCorrect,
+            };
+          });
+        } else if (oldType === 'short_answer' || oldType === 'essay') {
+          // Check if previously had true_false options in backup
+          const previousTfOpts = backupOptions.filter((o) => ['a', 'b', 'c', 'd'].includes(o.key.toLowerCase()));
+          if (previousTfOpts.length === 4) {
+            newOptions = previousTfOpts.map((o) => ({ ...o, key: o.key.toLowerCase() }));
+          } else {
+            const ansText = cleanOptionText(q.correctAnswer || backupAnswer);
+            newOptions = [
+              { key: 'a', text: ansText && !ansText.includes('Xem') ? `Kết quả của bài toán là $${ansText}$` : 'Mệnh đề khẳng định ý a', isCorrect: true },
+              { key: 'b', text: 'Mệnh đề phủ định của ý a', isCorrect: false },
+              { key: 'c', text: 'Tập xác định của hàm số thỏa mãn yêu cầu bài toán', isCorrect: true },
+              { key: 'd', text: 'Tập nghiệm của phương trình là tập hợp rỗng', isCorrect: false },
+            ];
           }
-
-          return {
-            ...q,
-            type: newType,
-            options: newOptions,
-            correctAnswer: newAns,
-            points,
-          };
+        } else {
+          newOptions = subKeys.map((k, i) => {
+            const existing = (q.options || [])[i] || backupOptions[i];
+            return {
+              key: k,
+              text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
+              isCorrect: existing ? !!existing.isCorrect : i % 2 === 0,
+            };
+          });
         }
-        return q;
-      })
-    );
+
+        // Formulate correct answer string: "a: Đ, b: S, c: Đ, d: S"
+        newAns = newOptions.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
+        points = 1.0;
+      }
+
+      // --- 2. CONVERT TO MULTIPLE_CHOICE (TRẮC NGHIỆM 4 LỰA CHỌN A, B, C, D) ---
+      else if (normNewType === 'multiple_choice') {
+        const optKeys = ['A', 'B', 'C', 'D'];
+
+        if (oldType === 'true_false') {
+          // Convert from true_false: preserve text of all 4 propositions!
+          const existingOpts = (q.options && q.options.length >= 4) ? q.options : backupOptions;
+
+          // Find which options were marked true
+          const trueIndices = existingOpts
+            .map((o, idx) => (o.isCorrect ? idx : -1))
+            .filter((idx) => idx !== -1);
+
+          // Pick the first true option as the single correct MC answer (or 'A' if none)
+          const targetCorrectKey = optKeys[trueIndices.length > 0 ? trueIndices[0] : 0] || 'A';
+
+          newOptions = optKeys.map((k, i) => {
+            const existing = existingOpts[i];
+            return {
+              key: k,
+              text: existing ? cleanOptionText(existing.text) : `Lựa chọn phương án ${k}`,
+              isCorrect: k === targetCorrectKey,
+            };
+          });
+          newAns = targetCorrectKey;
+        } else if (oldType === 'short_answer' || oldType === 'essay') {
+          // Check if backup has multiple_choice options
+          const previousMcOpts = backupOptions.filter((o) => ['A', 'B', 'C', 'D'].includes(o.key.toUpperCase()));
+          if (previousMcOpts.length === 4) {
+            const savedAns = backupAnswer.trim().toUpperCase();
+            const validKey = ['A', 'B', 'C', 'D'].includes(savedAns) ? savedAns : 'A';
+            newOptions = previousMcOpts.map((o) => ({
+              ...o,
+              key: o.key.toUpperCase(),
+              isCorrect: o.key.toUpperCase() === validKey,
+            }));
+            newAns = validKey;
+          } else {
+            // Keep the actual mathematical answer as Option A
+            const ansText = cleanOptionText(q.correctAnswer || backupAnswer);
+            newOptions = [
+              { key: 'A', text: ansText && !ansText.includes('Xem') ? ansText : 'Lựa chọn phương án A (đáp án đúng)', isCorrect: true },
+              { key: 'B', text: 'Lựa chọn phương án B', isCorrect: false },
+              { key: 'C', text: 'Lựa chọn phương án C', isCorrect: false },
+              { key: 'D', text: 'Lựa chọn phương án D', isCorrect: false },
+            ];
+            newAns = 'A';
+          }
+        } else {
+          const existingOpts = (q.options && q.options.length > 0) ? q.options : backupOptions;
+          let foundCorrect = false;
+          newOptions = optKeys.map((k, i) => {
+            const existing = existingOpts[i];
+            const isMatchAns = q.correctAnswer && q.correctAnswer.trim().toUpperCase() === k;
+            const isCorr = existing ? (isMatchAns || (!!existing.isCorrect && !foundCorrect)) : (k === 'A');
+            if (isCorr) foundCorrect = true;
+            return {
+              key: k,
+              text: existing ? cleanOptionText(existing.text) : `Lựa chọn phương án ${k}`,
+              isCorrect: isCorr,
+            };
+          });
+          if (!newOptions.some((o) => o.isCorrect)) {
+            newOptions[0].isCorrect = true;
+          }
+          newAns = newOptions.find((o) => o.isCorrect)?.key || 'A';
+        }
+
+        points = 0.25;
+      }
+
+      // --- 3. CONVERT TO SHORT_ANSWER (TRẢ LỜI NGẮN) ---
+      else if (normNewType === 'short_answer') {
+        newOptions = []; // Clear options for display in short answer
+
+        if (oldType === 'multiple_choice') {
+          // CRITICAL: Extract the ACTUAL TEXT of the correct option!
+          const currentOpts = (q.options && q.options.length > 0) ? q.options : backupOptions;
+          const correctKey = q.correctAnswer?.trim().toUpperCase();
+          const correctOpt = currentOpts.find(
+            (o) => o.key.toUpperCase() === correctKey || o.isCorrect
+          );
+          if (correctOpt && correctOpt.text) {
+            newAns = cleanOptionText(correctOpt.text);
+          } else if (q.correctAnswer && !/^[A-D]$/i.test(q.correctAnswer.trim())) {
+            newAns = q.correctAnswer.trim();
+          } else {
+            const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
+            newAns = match ? match[1] : (q.correctAnswer || '12');
+          }
+        } else if (oldType === 'true_false') {
+          const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
+          newAns = match ? match[1] : (backupAnswer && !backupAnswer.includes(':') ? backupAnswer : '12');
+        } else if (oldType === 'essay') {
+          if (q.correctAnswer && !q.correctAnswer.includes('Xem hướng dẫn')) {
+            newAns = q.correctAnswer.replace(/^Đáp số:\s*/i, '').trim();
+          } else {
+            const match = q.explanation?.match(/(?:kết quả|đáp số|bằng|là)\s*[:=]?\s*([0-9\+\-\/\.,a-z]+)/i);
+            newAns = match ? match[1] : '12';
+          }
+        }
+
+        points = 0.5;
+      }
+
+      // --- 4. CONVERT TO ESSAY (TỰ LUẬN) ---
+      else if (normNewType === 'essay') {
+        newOptions = [];
+
+        if (oldType === 'multiple_choice') {
+          const currentOpts = (q.options && q.options.length > 0) ? q.options : backupOptions;
+          const correctOpt = currentOpts.find(
+            (o) => o.key.toUpperCase() === q.correctAnswer?.trim().toUpperCase() || o.isCorrect
+          );
+          const answerText = correctOpt ? `${correctOpt.key}. ${cleanOptionText(correctOpt.text)}` : q.correctAnswer;
+          newAns = `Đáp số: ${answerText}`;
+        } else if (oldType === 'true_false') {
+          newAns = q.correctAnswer ? `Đáp án Đúng/Sai: ${q.correctAnswer}` : 'Xem hướng dẫn chấm';
+        } else if (oldType === 'short_answer') {
+          newAns = q.correctAnswer ? `Đáp số: ${q.correctAnswer}` : 'Xem hướng dẫn chấm';
+        }
+
+        points = 1.5;
+      }
+
+      return {
+        ...q,
+        type: normNewType,
+        section: normNewType,
+        options: newOptions,
+        correctAnswer: newAns,
+        points,
+        _backupOptions: backupOptions.length > 0 ? backupOptions : q.options,
+        _backupAnswer: backupAnswer || q.correctAnswer,
+      };
+    });
+
+    // Auto-sort into official Ministry of Education sections (Phần I -> Phần II -> Phần III -> Phần IV)
+    const sorted = sortQuestionsBySection(updatedQuestions);
+    setQuestions(sorted);
+    showToast(`Đã chuyển câu hỏi sang dạng "${getTypeLabel(normNewType)}" và tự động sắp xếp chuẩn Bộ!`, 'success');
   };
 
   const handleDeleteQuestion = (qId: number | string) => {
-    setQuestions((prev) => prev.filter((q) => q.id !== qId));
-    showToast('Đã xóa câu hỏi khỏi bộ đề', 'info');
+    const remaining = questions.filter((q) => q.id !== qId);
+    const sorted = sortQuestionsBySection(remaining);
+    setQuestions(sorted);
+    showToast('Đã xóa câu hỏi và cập nhật lại thứ tự đề thi', 'info');
   };
 
   const handleAddQuestion = (type: QuestionType = 'multiple_choice') => {
-    const nextNum = questions.length + 1;
+    const normType = normalizeQuestionType(type) as QuestionType;
     let options = [
       { key: 'A', text: 'Lựa chọn A ($x > 0$)', isCorrect: true },
       { key: 'B', text: 'Lựa chọn B ($x < 0$)', isCorrect: false },
@@ -320,7 +507,7 @@ export default function EditorView() {
     let points = 0.25;
     let defaultContent = 'Nội dung câu hỏi mới biên soạn (hỗ trợ $công_thức_toán$)...';
 
-    if (type === 'true_false') {
+    if (normType === 'true_false') {
       options = [
         { key: 'a', text: 'Khẳng định ý a', isCorrect: true },
         { key: 'b', text: 'Khẳng định ý b', isCorrect: false },
@@ -330,12 +517,12 @@ export default function EditorView() {
       correctAnswer = 'a: Đ, b: S, c: Đ, d: S';
       points = 1.0;
       defaultContent = 'Cho hàm số $y = f(x)$ xác định và liên tục trên $\\mathbb{R}$. Các mệnh đề sau đúng hay sai?';
-    } else if (type === 'short_answer') {
+    } else if (normType === 'short_answer') {
       options = [];
       correctAnswer = '12';
       points = 0.5;
       defaultContent = 'Tìm giá trị của tham số $m$ để đồ thị hàm số có đúng 3 điểm cực trị.';
-    } else if (type === 'essay') {
+    } else if (normType === 'essay') {
       options = [];
       correctAnswer = 'Xem hướng dẫn chấm và barem điểm';
       points = 1.5;
@@ -344,8 +531,9 @@ export default function EditorView() {
 
     const newQ: ExamQuestion = {
       id: Date.now(),
-      order: `Câu ${String(nextNum).padStart(2, '0')}`,
-      type,
+      order: `Câu mới`,
+      type: normType,
+      section: normType,
       level: 'Thông hiểu',
       levelClass: 'bg-blue-50 text-blue-700 border-blue-200',
       topic: activeExam.subject,
@@ -355,8 +543,10 @@ export default function EditorView() {
       correctAnswer,
       explanation: 'Giải thích chi tiết đáp án đúng / barem điểm...',
     };
-    setQuestions((prev) => [...prev, newQ]);
-    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(type)})`, 'success');
+
+    const sorted = sortQuestionsBySection([...questions, newQ]);
+    setQuestions(sorted);
+    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(normType)}) và tự động sắp xếp vào phần tương ứng`, 'success');
   };
 
   // Single Question AI Regeneration
@@ -917,6 +1107,21 @@ export default function EditorView() {
             )}
           </div>
 
+          {/* Auto Sort Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const sorted = sortQuestionsBySection(questions);
+              setQuestions(sorted);
+              showToast('Đã sắp xếp lại toàn bộ câu hỏi theo chuẩn Phần I, II, III, IV Bộ GD&ĐT!', 'success');
+            }}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+            title="Sắp xếp câu hỏi theo đúng chuẩn: Phần I (Trắc nghiệm), Phần II (Đúng/Sai), Phần III (Trả lời ngắn), Phần IV (Tự luận)"
+          >
+            <span className="material-symbols-outlined text-sm text-indigo-600 dark:text-indigo-400">sort</span>
+            <span>Sắp xếp chuẩn Bộ</span>
+          </button>
+
           {/* Save Button */}
           <button
             type="button"
@@ -1194,7 +1399,7 @@ export default function EditorView() {
 
                   {/* Question Type Selector */}
                   <select
-                    value={q.type || 'multiple_choice'}
+                    value={normalizeQuestionType(q.type)}
                     onChange={(e) => handleChangeQuestionType(q.id, e.target.value as QuestionType)}
                     className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
@@ -1363,10 +1568,14 @@ export default function EditorView() {
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                             {['a', 'b', 'c', 'd'].map((subKey) => {
-                              const opt = (q.options || []).find((o) => o.key.toLowerCase() === subKey) || {
+                              const rawOpt = (q.options || []).find((o) => o.key.toLowerCase() === subKey);
+                              const isTruth = rawOpt?.isCorrect !== undefined
+                                ? !!rawOpt.isCorrect
+                                : (q.correctAnswer ? new RegExp(`${subKey}\\s*:\\s*(?:Đ|Đúng|True|1)`, 'i').test(q.correctAnswer) : true);
+                              const opt = {
                                 key: subKey,
-                                text: '',
-                                isCorrect: true,
+                                text: rawOpt ? rawOpt.text : '',
+                                isCorrect: isTruth,
                               };
                               return (
                                 <tr key={subKey} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -1521,10 +1730,20 @@ export default function EditorView() {
 
                   {/* 1. TRẮC NGHIỆM 4 LỰA CHỌN */}
                   {isMC && (() => {
-                    const optA = q.options.find((o) => o.key === 'A')?.text || '';
-                    const optB = q.options.find((o) => o.key === 'B')?.text || '';
-                    const optC = q.options.find((o) => o.key === 'C')?.text || '';
-                    const optD = q.options.find((o) => o.key === 'D')?.text || '';
+                    const safeOptions = ['A', 'B', 'C', 'D'].map((k) => {
+                      const found = (q.options || []).find((o) => o.key.toUpperCase() === k);
+                      const isTarget = (found && found.isCorrect) || (q.correctAnswer && q.correctAnswer.trim().toUpperCase() === k);
+                      return {
+                        key: k,
+                        text: found ? found.text : '',
+                        isCorrect: !!isTarget,
+                      };
+                    });
+
+                    const optA = safeOptions[0].text;
+                    const optB = safeOptions[1].text;
+                    const optC = safeOptions[2].text;
+                    const optD = safeOptions[3].text;
                     const layout = getOptionsLayout([
                       { text: optA },
                       { text: optB },
@@ -1544,7 +1763,7 @@ export default function EditorView() {
 
                     return (
                       <div className={`pt-1 ${gridClass} exam-options-grid`}>
-                        {q.options.map((opt) => (
+                        {safeOptions.map((opt) => (
                           <div
                             key={opt.key}
                             onClick={() => handleSetCorrectAnswer(q.id, opt.key)}
@@ -1598,10 +1817,14 @@ export default function EditorView() {
                           </thead>
                           <tbody>
                             {['a', 'b', 'c', 'd'].map((subKey) => {
-                              const opt = (q.options || []).find((o) => o.key.toLowerCase() === subKey) || {
+                              const rawOpt = (q.options || []).find((o) => o.key.toLowerCase() === subKey);
+                              const isTruth = rawOpt?.isCorrect !== undefined
+                                ? !!rawOpt.isCorrect
+                                : (q.correctAnswer ? new RegExp(`${subKey}\\s*:\\s*(?:Đ|Đúng|True|1)`, 'i').test(q.correctAnswer) : true);
+                              const opt = {
                                 key: subKey,
-                                text: `Mệnh đề khẳng định ý ${subKey}`,
-                                isCorrect: true,
+                                text: rawOpt ? rawOpt.text : `Mệnh đề khẳng định ý ${subKey}`,
+                                isCorrect: isTruth,
                               };
                               return (
                                 <tr

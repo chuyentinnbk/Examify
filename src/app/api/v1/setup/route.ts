@@ -170,8 +170,10 @@ export async function GET() {
     },
   };
 
-  // If already verified as initialized in this server session, respond instantly
-  if (cachedIsInitialized === true) {
+  // If already verified as initialized in this server session or marker file exists, respond instantly
+  const markerPath = path.join(process.cwd(), 'storage', '.setup_completed');
+  if (cachedIsInitialized === true || fs.existsSync(markerPath)) {
+    cachedIsInitialized = true;
     return apiSuccess({
       isInitialized: true,
       setupRequired: false,
@@ -180,7 +182,7 @@ export async function GET() {
   }
 
   try {
-    // Attempt database query with fail-safe timeout
+    // Attempt database query with fail-safe timeout of 3s
     const queryDb = async () => {
       const adminCount = await prisma.user.count({ where: { role: Role.ADMIN } });
       const initSetting = await prisma.systemSetting.findUnique({ where: { key: 'is_initialized' } });
@@ -189,11 +191,16 @@ export async function GET() {
 
     const isInitialized = await Promise.race([
       queryDb().catch(() => false),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8000)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
     ]);
 
     if (isInitialized) {
       cachedIsInitialized = true;
+      try {
+        fs.writeFileSync(markerPath, 'setup_completed=true\n', 'utf8');
+      } catch {
+        // ignore
+      }
     }
 
     return apiSuccess({

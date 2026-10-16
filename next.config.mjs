@@ -11,6 +11,7 @@ const nextConfig = {
     'bcryptjs',
     '@prisma/client',
   ],
+  transpilePackages: ['docx'],
   experimental: {
     serverActions: {
       bodySizeLimit: '1024mb',

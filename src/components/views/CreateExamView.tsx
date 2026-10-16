@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import PortalModal from '@/components/common/PortalModal';
+import { isQuestionDuplicate, getCurriculumQuestion } from '@/lib/curriculum-questions';
+import { normalizeQuestionType } from '@/lib/exam-sections';
 
 interface SkillOption {
   id: string;
@@ -253,15 +255,11 @@ export default function CreateExamView() {
       if (data.success && data.data?.examData) {
         const d = data.data.examData;
         examTitle = d.title || examTitle;
-        const seenSignatures = new Set<string>();
+        const rawQuestionsList = d.questions || [];
         const uniqueFormatted: ExamQuestion[] = [];
-
-        (d.questions || []).forEach((q: any, idx: number) => {
-          const sig = (q.content || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').slice(0, 60);
-          if (sig && seenSignatures.has(sig)) {
-            return; // Skip duplicate question
-          }
-          if (sig) seenSignatures.add(sig);
+        rawQuestionsList.forEach((q: any, idx: number) => {
+          let questionContent = q.content || '';
+          const existingList = uniqueFormatted.map((item) => item.content);
 
           const rawType = String(q.type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
           const qType: QuestionType = rawType.includes('true') || rawType.includes('dung')
@@ -272,29 +270,52 @@ export default function CreateExamView() {
             ? 'essay'
             : 'multiple_choice';
 
+          const levelMap: Record<string, string> = {
+            KNOWLEDGE: 'Nhận biết',
+            COMPREHENSION: 'Thông hiểu',
+            APPLICATION: 'Vận dụng',
+            HIGH_APPLICATION: 'Vận dụng cao',
+          };
+          const levelStr = q.level || levelMap[q.cognitiveLevel] || 'Thông hiểu';
+
+          let optionsToUse = q.options;
+          let answerToUse = q.correctAnswer;
+          let explanationToUse = q.explanation;
+
+          // If duplicate, replace with fresh procedural question so total count is preserved
+          if (isQuestionDuplicate(questionContent, existingList)) {
+            const fresh = getCurriculumQuestion(subject, grade, levelStr, idx, existingList);
+            questionContent = fresh.content;
+            optionsToUse = fresh.options;
+            answerToUse = fresh.correctAnswer;
+            explanationToUse = fresh.explanation;
+          }
+
           let formattedOptions: any[] = [];
           if (qType === 'true_false') {
             const subKeys = ['a', 'b', 'c', 'd'];
-            formattedOptions = (q.options && q.options.length > 0 ? q.options : ['Ý mệnh đề a', 'Ý mệnh đề b', 'Ý mệnh đề c', 'Ý mệnh đề d']).map((opt: string, optIdx: number) => {
+            formattedOptions = (optionsToUse && optionsToUse.length > 0 ? optionsToUse : ['Ý mệnh đề a', 'Ý mệnh đề b', 'Ý mệnh đề c', 'Ý mệnh đề d']).map((opt: any, optIdx: number) => {
               const key = subKeys[optIdx] || String(optIdx);
-              const cleanText = String(opt || '').replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
-              const isCorrect = q.correctAnswer
-                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const isCorrect = answerToUse
+                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(answerToUse)
                 : optIdx % 2 === 0;
               return {
                 key,
-                text: cleanText || String(opt || ''),
+                text: cleanText || textVal,
                 isCorrect,
               };
             });
           } else if (qType === 'multiple_choice') {
-            formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: string, optIdx: number) => {
+            formattedOptions = (optionsToUse || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
               const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
-              const cleanText = String(opt || '').replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
               return {
                 key,
-                text: cleanText || String(opt || ''),
-                isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
+                text: cleanText || textVal,
+                isCorrect: (answerToUse || 'A').toUpperCase() === key,
               };
             });
           }
@@ -303,30 +324,41 @@ export default function CreateExamView() {
             id: idx + 1,
             order: `Câu ${String(uniqueFormatted.length + 1).padStart(2, '0')}`,
             type: qType,
-            level:
-              q.cognitiveLevel === 'KNOWLEDGE'
-                ? 'Nhận biết'
-                : q.cognitiveLevel === 'COMPREHENSION'
-                ? 'Thông hiểu'
-                : q.cognitiveLevel === 'APPLICATION'
-                ? 'Vận dụng'
-                : 'Vận dụng cao',
+            section: qType,
+            level: levelStr,
             levelClass:
-              q.cognitiveLevel === 'KNOWLEDGE'
+              levelStr === 'Nhận biết'
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : q.cognitiveLevel === 'COMPREHENSION'
+                : levelStr === 'Thông hiểu'
                 ? 'bg-blue-50 text-blue-700 border-blue-200'
-                : q.cognitiveLevel === 'APPLICATION'
+                : levelStr === 'Vận dụng'
                 ? 'bg-amber-50 text-amber-700 border-amber-200'
                 : 'bg-rose-50 text-rose-700 border-rose-200',
             topic: subject,
-            content: q.content,
+            content: questionContent,
             options: formattedOptions,
             points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
-            correctAnswer: q.correctAnswer || (qType === 'essay' ? 'Xem hướng dẫn chấm' : 'A'),
-            explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+            correctAnswer: answerToUse || (qType === 'essay' ? 'Xem hướng dẫn chấm' : qType === 'short_answer' ? '12' : qType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A'),
+            explanation: explanationToUse || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
           });
         });
+
+        // Auto-sort into official exam sections: Phần I (Trắc nghiệm) -> Phần II (Đúng/Sai) -> Phần III (Trả lời ngắn) -> Phần IV (Tự luận)
+        const TYPE_ORDER: Record<string, number> = {
+          multiple_choice: 1,
+          true_false: 2,
+          short_answer: 3,
+          essay: 4,
+        };
+        uniqueFormatted.sort((a, b) => {
+          const tA = normalizeQuestionType(a.type);
+          const tB = normalizeQuestionType(b.type);
+          return (TYPE_ORDER[tA] || 99) - (TYPE_ORDER[tB] || 99);
+        });
+        uniqueFormatted.forEach((q, i) => {
+          q.order = `Câu ${String(i + 1).padStart(2, '0')}`;
+        });
+
         questions = uniqueFormatted;
       } else {
         // High-quality curriculum question generator with zero duplicate guarantee

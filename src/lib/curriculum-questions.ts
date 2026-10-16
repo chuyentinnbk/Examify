@@ -701,48 +701,114 @@ function generateProceduralQuestion(
   if (subject.includes('Toán')) {
     const questions = [
       {
-        content: `Cho hàm số bậc ba y = x³ - ${3 * numA}x² + ${numB}. Tìm toạ độ điểm cực trị của đồ thị hàm số có hoành độ dương:`,
+        content: `Cho hàm số bậc ba $y = x^3 - ${3 * numA}x^2 + ${numB}$. Tìm toạ độ điểm cực trị của đồ thị hàm số có hoành độ dương:`,
         options: [
-          { key: 'A', text: `x = ${2 * numA}`, isCorrect: true },
-          { key: 'B', text: `x = ${numA}`, isCorrect: false },
-          { key: 'C', text: `x = -${numA}`, isCorrect: false },
-          { key: 'D', text: `x = 0`, isCorrect: false },
+          { key: 'A', text: `$x = ${2 * numA}$`, isCorrect: true },
+          { key: 'B', text: `$x = ${numA}$`, isCorrect: false },
+          { key: 'C', text: `$x = -${numA}$`, isCorrect: false },
+          { key: 'D', text: `$x = 0$`, isCorrect: false },
         ],
         correctAnswer: 'A',
-        explanation: `y' = 3x² - ${6 * numA}x = 3x(x - ${2 * numA}). Đồ thị có điểm cực trị tại x = 0 và x = ${2 * numA}. Hoành độ dương là x = ${2 * numA}.`,
+        explanation: `Ta có $y' = 3x^2 - ${6 * numA}x = 3x(x - ${2 * numA})$. Đồ thị hàm số có điểm cực trị tại $x = 0$ và $x = ${2 * numA}$. Hoành độ dương là $x = ${2 * numA}$.`,
       },
       {
-        content: `Tính tích phân I = ∫(${numA}x + ${numB})dx lấy cận từ 0 đến 2:`,
+        content: `Tính tích phân $I = \\int_0^2 (${numA}x + ${numB})\\,dx$:`,
         options: [
-          { key: 'A', text: `I = ${2 * numA + 2 * numB}`, isCorrect: true },
-          { key: 'B', text: `I = ${numA + numB}`, isCorrect: false },
-          { key: 'C', text: `I = ${4 * numA + numB}`, isCorrect: false },
-          { key: 'D', text: `I = ${2 * numA + 4 * numB}`, isCorrect: false },
+          { key: 'A', text: `$I = ${2 * numA + 2 * numB}$`, isCorrect: true },
+          { key: 'B', text: `$I = ${numA + numB}$`, isCorrect: false },
+          { key: 'C', text: `$I = ${4 * numA + numB}$`, isCorrect: false },
+          { key: 'D', text: `$I = ${2 * numA + 4 * numB}$`, isCorrect: false },
         ],
         correctAnswer: 'A',
-        explanation: `I = [(${numA}/2)x² + ${numB}x] từ 0 đến 2 = (${numA}/2)*4 + ${numB}*2 = ${2 * numA + 2 * numB}.`,
+        explanation: `Ta có $I = [\\frac{${numA}}{2}x^2 + ${numB}x]_0^2 = \\frac{${numA}}{2}\\cdot 4 + ${numB}\\cdot 2 = ${2 * numA + 2 * numB}$.`,
       },
       {
-        content: `Trong không gian Oxyz, cho mặt phẳng (P): ${numA}x + ${numB}y - z + ${numC} = 0. Vectơ nào sau đây là một vectơ pháp tuyến của (P)?`,
+        content: `Trong không gian $Oxyz$, cho mặt phẳng $(P): ${numA}x + ${numB}y - z + ${numC} = 0$. Vectơ nào sau đây là một vectơ pháp tuyến của $(P)$?`,
         options: [
-          { key: 'A', text: `n = (${numA}; ${numB}; -1)`, isCorrect: true },
-          { key: 'B', text: `n = (${numA}; ${numB}; 1)`, isCorrect: false },
-          { key: 'C', text: `n = (${numA}; -${numB}; -1)`, isCorrect: false },
-          { key: 'D', text: `n = (-${numA}; ${numB}; 1)`, isCorrect: false },
+          { key: 'A', text: `$\\vec{n} = (${numA}; ${numB}; -1)$`, isCorrect: true },
+          { key: 'B', text: `$\\vec{n} = (${numA}; ${numB}; 1)$`, isCorrect: false },
+          { key: 'C', text: `$\\vec{n} = (${numA}; -${numB}; -1)$`, isCorrect: false },
+          { key: 'D', text: `$\\vec{n} = (-${numA}; ${numB}; 1)$`, isCorrect: false },
         ],
         correctAnswer: 'A',
-        explanation: `Mặt phẳng Ax + By + Cz + D = 0 có VTPT n = (A; B; C) = (${numA}; ${numB}; -1).`,
+        explanation: `Mặt phẳng $Ax + By + Cz + D = 0$ có VTPT $\\vec{n} = (A; B; C) = (${numA}; ${numB}; -1)$.`,
       },
       {
-        content: `Tập xác định D của hàm số y = log_${numA}(x - ${numB}) là:`,
+        content: `Tập xác định $D$ của hàm số $y = \\log_{${numA + 1}}(x - ${numB})$ là:`,
         options: [
-          { key: 'A', text: `D = (${numB}; +∞)`, isCorrect: true },
-          { key: 'B', text: `D = [${numB}; +∞)`, isCorrect: false },
-          { key: 'C', text: `D = (-∞; ${numB})`, isCorrect: false },
-          { key: 'D', text: `D = R \\ {${numB}}`, isCorrect: false },
+          { key: 'A', text: `$D = (${numB}; +\\infty)$`, isCorrect: true },
+          { key: 'B', text: `$D = [${numB}; +\\infty)$`, isCorrect: false },
+          { key: 'C', text: `$D = (-\\infty; ${numB})$`, isCorrect: false },
+          { key: 'D', text: `$D = \\mathbb{R} \\setminus \\{${numB}\\}$`, isCorrect: false },
         ],
         correctAnswer: 'A',
-        explanation: `Điều kiện xác định: x - ${numB} > 0 <=> x > ${numB} => D = (${numB}; +∞).`,
+        explanation: `Điều kiện xác định: $x - ${numB} > 0 \\Leftrightarrow x > ${numB} \\Rightarrow D = (${numB}; +\\infty)$.`,
+      },
+      {
+        content: `Cho hàm số $y = \\frac{${numA}x + ${numB}}{x - ${numA + 1}}$. Đường tiệm cận đứng của đồ thị hàm số có phương trình là:`,
+        options: [
+          { key: 'A', text: `$x = ${numA + 1}$`, isCorrect: true },
+          { key: 'B', text: `$x = -${numA + 1}$`, isCorrect: false },
+          { key: 'C', text: `$y = ${numA}$`, isCorrect: false },
+          { key: 'D', text: `$y = ${numA + 1}$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Mẫu số triệt tiêu tại $x = ${numA + 1}$ và tử số khác 0, do đó tiệm cận đứng là $x = ${numA + 1}$.`,
+      },
+      {
+        content: `Trong không gian $Oxyz$, mặt cầu tâm $I(${numA}; -${numB}; 1)$ bán kính $R = ${numA + 2}$ có phương trình là:`,
+        options: [
+          { key: 'A', text: `$(x - ${numA})^2 + (y + ${numB})^2 + (z - 1)^2 = ${(numA + 2) ** 2}$`, isCorrect: true },
+          { key: 'B', text: `$(x + ${numA})^2 + (y - ${numB})^2 + (z + 1)^2 = ${(numA + 2) ** 2}$`, isCorrect: false },
+          { key: 'C', text: `$(x - ${numA})^2 + (y + ${numB})^2 + (z - 1)^2 = ${numA + 2}$`, isCorrect: false },
+          { key: 'D', text: `$(x + ${numA})^2 + (y + ${numB})^2 + (z + 1)^2 = ${(numA + 2) ** 2}$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Phương trình mặt cầu tâm $I(a; b; c)$ bán kính $R$ là $(x - a)^2 + (y - b)^2 + (z - c)^2 = R^2$.`,
+      },
+      {
+        content: `Cho số phức $z = ${numA} - ${numB}i$. Mô-đun của số phức $z$ bằng:`,
+        options: [
+          { key: 'A', text: `$\\sqrt{${numA ** 2 + numB ** 2}}$`, isCorrect: true },
+          { key: 'B', text: `$${numA + numB}$`, isCorrect: false },
+          { key: 'C', text: `$\\sqrt{${numA ** 2 - numB ** 2 > 0 ? numA ** 2 - numB ** 2 : 1}}$`, isCorrect: false },
+          { key: 'D', text: `$${numA ** 2 + numB ** 2}$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Mô-đun của $z = a + bi$ là $|z| = \\sqrt{a^2 + b^2} = \\sqrt{${numA}^2 + (-${numB})^2} = \\sqrt{${numA ** 2 + numB ** 2}}$.`,
+      },
+      {
+        content: `Nghiệm của phương trình $2^{x + ${numA}} = ${2 ** (numA + 3)}$ là:`,
+        options: [
+          { key: 'A', text: `$x = 3$`, isCorrect: true },
+          { key: 'B', text: `$x = ${numA}$`, isCorrect: false },
+          { key: 'C', text: `$x = ${numA + 3}$`, isCorrect: false },
+          { key: 'D', text: `$x = 2$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Ta có $2^{x + ${numA}} = 2^{${numA + 3}} \\Leftrightarrow x + ${numA} = ${numA + 3} \\Leftrightarrow x = 3$.`,
+      },
+      {
+        content: `Cho khối chóp có diện tích đáy $B = ${3 * numA}\\,\\text{cm}^2$ và chiều cao $h = ${numB}\\,\\text{cm}$. Thể tích khối chóp đã cho bằng:`,
+        options: [
+          { key: 'A', text: `$${numA * numB}\\,\\text{cm}^3$`, isCorrect: true },
+          { key: 'B', text: `$${3 * numA * numB}\\,\\text{cm}^3$`, isCorrect: false },
+          { key: 'C', text: `$${2 * numA * numB}\\,\\text{cm}^3$`, isCorrect: false },
+          { key: 'D', text: `$${(numA * numB) / 2}\\,\\text{cm}^3$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Thể tích khối chóp là $V = \\frac{1}{3}Bh = \\frac{1}{3}\\cdot ${3 * numA}\\cdot ${numB} = ${numA * numB}\\,\\text{cm}^3$.`,
+      },
+      {
+        content: `Cho cấp số cộng $(u_n)$ có số hạng đầu $u_1 = ${numA}$ và công sai $d = ${numB}$. Số hạng $u_4$ bằng:`,
+        options: [
+          { key: 'A', text: `$${numA + 3 * numB}$`, isCorrect: true },
+          { key: 'B', text: `$${numA + 4 * numB}$`, isCorrect: false },
+          { key: 'C', text: `$${numA * numB}$`, isCorrect: false },
+          { key: 'D', text: `$${numA + 2 * numB}$`, isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: `Số hạng tổng quát $u_n = u_1 + (n - 1)d \\Rightarrow u_4 = u_1 + 3d = ${numA} + 3\\cdot ${numB} = ${numA + 3 * numB}$.`,
       },
     ];
     const pick = questions[index % questions.length];
@@ -907,3 +973,51 @@ export function generateUniqueExamQuestions(
 
   return questions;
 }
+
+/**
+ * Intelligent question similarity and duplicate checker using normalized alphanumeric matching
+ * and token Jaccard overlap to prevent repetitive exam questions.
+ */
+export function isQuestionDuplicate(newContent: string, existingList: string[]): boolean {
+  if (!newContent || !newContent.trim()) return true;
+  const cleanNew = newContent.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  if (cleanNew.length < 8) return true;
+
+  for (const exist of existingList) {
+    if (!exist) continue;
+    const cleanExist = exist.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    if (cleanExist === cleanNew) return true;
+
+    // Strip common generic Vietnamese math preambles
+    const stripPre = (s: string) =>
+      s.replace(
+        /^(chohàmsố|trongkhônggianoxyz|trongkhônggian|tínhtíchphân|nguyênhàmcủa|tậpxácđịnh|phươngtrình|bấtphươngtrình|chohìnhchóp|chohìnhlăngtrụ|biết|tính|tìm)/gi,
+        ''
+      );
+
+    const strippedNew = stripPre(cleanNew);
+    const strippedExist = stripPre(cleanExist);
+
+    if (strippedNew.length >= 15 && strippedExist.length >= 15) {
+      if (strippedNew.slice(0, 50) === strippedExist.slice(0, 50)) {
+        return true;
+      }
+    }
+
+    // Token Jaccard similarity check
+    const wordsA = new Set(newContent.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+    const wordsB = new Set(exist.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+    if (wordsA.size >= 5 && wordsB.size >= 5) {
+      let common = 0;
+      for (const w of wordsA) {
+        if (wordsB.has(w)) common++;
+      }
+      const unionSize = new Set([...wordsA, ...wordsB]).size;
+      if (common / unionSize >= 0.75) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+

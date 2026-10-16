@@ -63,26 +63,38 @@ export async function GET(req: NextRequest) {
           structuredMeta = structured;
           const rawQ = structured.questions || [];
           questions = rawQ.map((q: any, idx: number) => {
-            const rawOptions = q.options || ['A', 'B', 'C', 'D'];
-            const formattedOptions = rawOptions.map((opt: any, optIdx: number) => {
-              if (typeof opt === 'object' && opt !== null) {
+            const rawType = String(q.type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
+            const isTF = rawType.includes('true') || rawType.includes('dung');
+            const isSA = rawType.includes('short') || rawType.includes('ngan');
+            const isEs = rawType.includes('essay') || rawType.includes('luan');
+            const normType = isTF ? 'true_false' : isSA ? 'short_answer' : isEs ? 'essay' : 'multiple_choice';
+
+            let formattedOptions: any[] = [];
+            if (!isSA && !isEs) {
+              const defaultKeys = isTF ? ['a', 'b', 'c', 'd'] : ['A', 'B', 'C', 'D'];
+              const rawOptions = Array.isArray(q.options) && q.options.length > 0 ? q.options : defaultKeys;
+              formattedOptions = rawOptions.map((opt: any, optIdx: number) => {
+                const defaultKey = defaultKeys[optIdx] || String(optIdx);
+                if (typeof opt === 'object' && opt !== null) {
+                  return {
+                    key: opt.key || defaultKey,
+                    text: opt.text || '',
+                    isCorrect: opt.isCorrect ?? (isTF ? optIdx % 2 === 0 : q.correctAnswer === opt.key),
+                  };
+                }
                 return {
-                  key: opt.key || ['A', 'B', 'C', 'D'][optIdx] || String(optIdx),
-                  text: opt.text || '',
-                  isCorrect: opt.isCorrect ?? (q.correctAnswer === opt.key),
+                  key: defaultKey,
+                  text: String(opt),
+                  isCorrect: isTF ? optIdx % 2 === 0 : q.correctAnswer === defaultKey,
                 };
-              }
-              const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
-              return {
-                key,
-                text: String(opt),
-                isCorrect: q.correctAnswer === key,
-              };
-            });
+              });
+            }
 
             return {
               id: q.id ?? idx + 1,
               order: q.order ?? `Câu ${String(idx + 1).padStart(2, '0')}`,
+              type: normType,
+              section: q.section || normType,
               level:
                 q.level ||
                 (q.cognitiveLevel === 'KNOWLEDGE'
@@ -104,8 +116,8 @@ export async function GET(req: NextRequest) {
               topic: q.topic || curriculum.subject || 'Tổng hợp',
               content: q.content || '',
               options: formattedOptions,
-              points: q.points || 0.25,
-              correctAnswer: q.correctAnswer || 'A',
+              points: q.points || (normType === 'essay' ? 1.5 : normType === 'true_false' ? 1.0 : normType === 'short_answer' ? 0.5 : 0.25),
+              correctAnswer: q.correctAnswer || (normType === 'essay' ? 'Xem hướng dẫn chấm' : normType === 'short_answer' ? '12' : normType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A'),
               explanation: q.explanation || 'Lời giải chi tiết biên soạn theo chuẩn chương trình.',
             };
           });
@@ -163,12 +175,19 @@ export async function GET(req: NextRequest) {
 
 const CreateManualExamSchema = z.object({
   id: z.string().optional(),
+  code: z.string().optional(),
   title: z.string().min(3),
   subject: z.string().default('Toán học'),
   grade: z.string().default('Lớp 12'),
   term: z.string().default('Học kỳ 1'),
   duration: z.number().default(45),
   status: z.enum(['approved', 'review', 'draft']).default('approved'),
+  department: z.string().optional(),
+  schoolName: z.string().optional(),
+  sessionTitle: z.string().optional(),
+  academicYear: z.string().optional(),
+  sectionTitles: z.record(z.string()).optional(),
+  sectionDescriptions: z.record(z.string()).optional(),
   matrix: z
     .object({
       easy: z.number().default(40),
@@ -214,6 +233,13 @@ export async function POST(req: NextRequest) {
 
     const structuredJson = JSON.stringify({
       title: data.title,
+      code: data.code,
+      department: data.department,
+      schoolName: data.schoolName,
+      sessionTitle: data.sessionTitle,
+      academicYear: data.academicYear,
+      sectionTitles: data.sectionTitles,
+      sectionDescriptions: data.sectionDescriptions,
       questions: data.questions,
     });
 

@@ -31,6 +31,8 @@ export interface ExamQuestion {
   points: number;
   correctAnswer: string;
   explanation: string;
+  _backupOptions?: QuestionOption[];
+  _backupAnswer?: string;
 }
 
 export interface ExamItem {
@@ -137,7 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [exams, setExams] = useState<ExamItem[]>([]);
   const [activeExam, setActiveExam] = useState<ExamItem | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [isSetupRequired, setIsSetupRequired] = useState<boolean | null>(null);
+  const [isSetupRequired, setIsSetupRequired] = useState<boolean | null>(false);
 
   const setCurrentRoute = (route: string) => {
     const currentToken = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
@@ -148,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       targetRoute = currentToken ? '#dashboard' : '#login';
     }
 
-    if (!currentToken && targetRoute !== '#setup-wizard' && targetRoute !== '#login') {
+    if (!currentToken && targetRoute !== '#setup-wizard' && targetRoute !== '#login' && targetRoute !== '#register') {
       setCurrentRouteState('#login');
       if (typeof window !== 'undefined') {
         window.location.hash = '#login';
@@ -307,100 +309,105 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const checkSetupStatus = async (): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/v1/setup');
-      const data = await res.json();
-      const req = !!(data.success && data.data?.setupRequired);
-      setIsSetupRequired(req);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('examify_setup_required', String(req));
-      }
-      if (req) {
-        setCurrentRoute('#setup-wizard');
-        return true;
-      }
+    if (typeof window === 'undefined') return false;
 
-      // If setup is completed, enforce authentication guard
-      if (typeof window !== 'undefined') {
-        const storedToken = localStorage.getItem('examify_token');
-        const storedUser = localStorage.getItem('examify_user');
+    const storedToken = localStorage.getItem('examify_token');
+    const storedUser = localStorage.getItem('examify_user');
+    const currentHash = window.location.hash;
 
-        if (!storedToken) {
-          // Unauthenticated incognito or first-time visit -> Force #login
-          setToken(null);
-          setCurrentRoute('#login');
-          return false;
-        }
-
-        // Fast restore local cache
-        if (storedUser) {
-          try {
-            const parsed = JSON.parse(storedUser);
-            setUser(parsed);
-            setToken(storedToken);
-          } catch {
-            // ignore
-          }
-        }
-
-        // Verify with server /api/v1/auth/me
+    // Fast path: If unauthenticated, immediately display login or register without waiting for setup API
+    if (!storedToken) {
+      setToken(null);
+      if (currentHash === '#setup-wizard') {
         try {
-          const meRes = await fetch('/api/v1/auth/me', {
-            headers: {
-              Authorization: `Bearer ${storedToken}`,
-            },
-          });
-          if (meRes.ok) {
-            const meData = await meRes.json();
-            if (meData.success && meData.data?.user) {
-              const u = meData.data.user;
-              const activeProfile: UserProfile = {
-                id: u.id,
-                name: u.fullName || u.email.split('@')[0],
-                email: u.email,
-                role: u.role === 'ADMIN' ? 'Quản trị viên Khảo thí' : 'Giáo viên bộ môn',
-                school: u.institutionName || 'Hệ thống Khảo thí Examify',
-                avatarStyle: u.avatarStyle || 'identicon',
-              };
-              setToken(storedToken);
-              setUser(activeProfile);
-              localStorage.setItem('examify_user', JSON.stringify(activeProfile));
-
-              // Load all exams from database for this authenticated user
-              fetchExams(storedToken);
-
-              const hash = window.location.hash;
-              if (!hash || hash === '#login' || hash === '#setup-wizard') {
-                setCurrentRoute('#dashboard');
-              } else {
-                setCurrentRoute(hash);
-              }
-              return false;
-            }
+          const res = await fetch('/api/v1/setup');
+          const data = await res.json();
+          const req = !!(data.success && data.data?.setupRequired);
+          setIsSetupRequired(req);
+          if (req) {
+            setCurrentRoute('#setup-wizard');
+            return true;
           }
-
-          // Token expired or invalid
-          localStorage.removeItem('examify_token');
-          localStorage.removeItem('examify_user');
-          setToken(null);
-          setCurrentRoute('#login');
         } catch {
-          // If offline but token was present, maintain session and load cache
-          fetchExams(storedToken);
+          // ignore
         }
-      }
-
-      return false;
-    } catch {
-      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
-      if (storedToken) {
-        setIsSetupRequired(false);
-        return false;
       }
       setIsSetupRequired(false);
-      setCurrentRouteState('#login');
+      if (currentHash === '#register') {
+        setCurrentRoute('#register');
+      } else {
+        setCurrentRoute('#login');
+      }
       return false;
     }
+
+    // Fast restore local user cache so dashboard is visible immediately (0ms)
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+        setToken(storedToken);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Verify session in background with 4s timeout
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const meRes = await fetch('/api/v1/auth/me', {
+        headers: {
+          Authorization: `Bearer ${storedToken}`,
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        if (meData.success && meData.data?.user) {
+          const u = meData.data.user;
+          const activeProfile: UserProfile = {
+            id: u.id,
+            name: u.fullName || u.email.split('@')[0],
+            email: u.email,
+            role: u.role === 'ADMIN' ? 'Quản trị viên Khảo thí' : 'Giáo viên bộ môn',
+            school: u.institutionName || 'Hệ thống Khảo thí Examify',
+            avatarStyle: u.avatarStyle || 'identicon',
+          };
+          setToken(storedToken);
+          setUser(activeProfile);
+          localStorage.setItem('examify_user', JSON.stringify(activeProfile));
+
+          // Load all exams in background
+          fetchExams(storedToken);
+
+          if (!currentHash || currentHash === '#login' || currentHash === '#setup-wizard') {
+            setCurrentRoute('#dashboard');
+          } else {
+            setCurrentRoute(currentHash);
+          }
+          return false;
+        }
+      }
+
+      // If token expired or unauthorized
+      if (meRes.status === 401 || meRes.status === 403) {
+        localStorage.removeItem('examify_token');
+        localStorage.removeItem('examify_user');
+        setToken(null);
+        setCurrentRoute('#login');
+      } else {
+        fetchExams(storedToken);
+      }
+    } catch {
+      // If network timeout or offline, keep local session and attempt exams fetch
+      fetchExams(storedToken);
+    }
+
+    return false;
   };
 
   useEffect(() => {
@@ -434,7 +441,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           window.location.hash = '#dashboard';
         }
       } else {
-        setCurrentRouteState('#login');
+        const safeHash = hash === '#register' ? '#register' : '#login';
+        setCurrentRouteState(safeHash);
         if (hash === '#setup-wizard') {
           window.location.hash = '#login';
         }
@@ -449,7 +457,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           window.location.hash = currentHash;
         }
 
-        if (!currentToken && currentHash !== '#setup-wizard' && currentHash !== '#login') {
+        if (!currentToken && currentHash !== '#setup-wizard' && currentHash !== '#login' && currentHash !== '#register') {
           setCurrentRouteState('#login');
           window.location.hash = '#login';
           return;

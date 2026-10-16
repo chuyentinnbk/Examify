@@ -1,20 +1,61 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { AppProvider, useAppStore } from '@/lib/store/app-store';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import ToastContainer from '@/components/layout/Toast';
 
-import DashboardView from '@/components/views/DashboardView';
-import CreateExamView from '@/components/views/CreateExamView';
-import EditorView from '@/components/views/EditorView';
-import ProfileView from '@/components/views/ProfileView';
-import AdminView from '@/components/views/AdminView';
-import AcademicDataView from '@/components/views/AcademicDataView';
+// Lightweight auth views loaded eagerly for instantaneous 0ms display
 import LoginView from '@/components/views/LoginView';
 import RegisterView from '@/components/views/RegisterView';
-import SetupWizardView from '@/components/views/SetupWizardView';
+
+// Generic Loading Skeleton for dynamic workspace views
+function ViewLoadingSkeleton({ title }: { title: string }) {
+  return (
+    <div className="w-full flex-1 flex flex-col gap-6 animate-pulse p-4">
+      <div className="flex items-center gap-3">
+        <div className="h-7 w-48 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+      </div>
+      <div className="h-32 w-full bg-slate-200/80 dark:bg-slate-800/80 rounded-2xl" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="h-28 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+        <div className="h-28 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+        <div className="h-28 bg-slate-200/60 dark:bg-slate-800/60 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+// Heavy workspace views loaded dynamically on demand to optimize initial page bundle
+const DashboardView = dynamic(() => import('@/components/views/DashboardView'), {
+  loading: () => <ViewLoadingSkeleton title="Bảng điều khiển" />,
+});
+
+const CreateExamView = dynamic(() => import('@/components/views/CreateExamView'), {
+  loading: () => <ViewLoadingSkeleton title="Tạo đề thi mới" />,
+});
+
+const EditorView = dynamic(() => import('@/components/views/EditorView'), {
+  loading: () => <ViewLoadingSkeleton title="Trình soạn thảo đề thi" />,
+});
+
+const ProfileView = dynamic(() => import('@/components/views/ProfileView'), {
+  loading: () => <ViewLoadingSkeleton title="Hồ sơ cá nhân" />,
+});
+
+const AdminView = dynamic(() => import('@/components/views/AdminView'), {
+  loading: () => <ViewLoadingSkeleton title="Quản trị hệ thống" />,
+});
+
+const AcademicDataView = dynamic(() => import('@/components/views/AcademicDataView'), {
+  loading: () => <ViewLoadingSkeleton title="Dữ liệu học thuật" />,
+});
+
+const SetupWizardView = dynamic(() => import('@/components/views/SetupWizardView'), {
+  loading: () => <ViewLoadingSkeleton title="Cài đặt hệ thống" />,
+});
 
 function AppContent() {
   const { currentRoute, isSetupRequired, token } = useAppStore();
@@ -24,46 +65,24 @@ function AppContent() {
     setMounted(true);
   }, []);
 
-  // If setup status is still being determined or component not yet mounted on client, show loading screen
-  if (!mounted || isSetupRequired === null) {
+  // Only show setup loading screen if explicitly navigating to setup wizard while checking status
+  if (mounted && currentRoute === '#setup-wizard' && isSetupRequired === null) {
     return (
       <main className="w-full min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center justify-center text-center max-w-sm w-full mx-auto">
-          {/* Logo with Glow Effect */}
-          <div className="relative w-20 h-20 mb-5 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-2xl bg-blue-500/20 blur-xl animate-pulse" />
-            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white">
-              <span className="material-symbols-outlined text-3xl">school</span>
-            </div>
+          <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 text-white mb-4">
+            <span className="material-symbols-outlined text-3xl">school</span>
           </div>
-
-          {/* System Title */}
-          <div className="flex items-center justify-center gap-1.5 mb-1.5">
-            <span className="text-xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Examify</span>
-            <span className="text-xl font-extrabold text-blue-600">AI</span>
-            <span className="text-[10px] font-extrabold uppercase bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 ml-1">
-              Beta
-            </span>
+          <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative mb-3">
+            <div className="absolute top-0 bottom-0 bg-blue-600 rounded-full animate-indeterminate" />
           </div>
-
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6">
-            Hệ Thống Khảo Thí &amp; Tạo Đề Thi Thông Minh
-          </p>
-
-          {/* Indeterminate Progress Track */}
-          <div className="w-52 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative mb-3">
-            <div className="absolute top-0 bottom-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full animate-indeterminate" />
-          </div>
-
-          <p className="text-[11px] text-slate-400 font-medium">
-            Đang tải dữ liệu cấu hình hệ thống...
-          </p>
+          <p className="text-xs text-slate-400 font-medium">Đang kiểm tra cấu hình hệ thống...</p>
         </div>
       </main>
     );
   }
 
-  // Full-screen setup view - Only show if setup is strictly required and not yet configured
+  // Full-screen setup view - Only show if setup is strictly required and user navigated to #setup-wizard
   if (currentRoute === '#setup-wizard' && isSetupRequired === true) {
     return (
       <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -83,7 +102,7 @@ function AppContent() {
     );
   }
 
-  // Authentication Guard: If no valid token or route is #login, enforce LoginView
+  // Authentication Guard: If no valid token or route is #login, enforce LoginView immediately
   if (!token || currentRoute === '#login') {
     return (
       <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">

@@ -193,19 +193,15 @@ export async function POST(req: NextRequest) {
 
       // 5.5 Deduplicate and ensure 100% uniqueness of all questions
       if (generationResult.examData?.questions && Array.isArray(generationResult.examData.questions)) {
-        const { getCurriculumQuestion } = await import('@/lib/curriculum-questions');
-        const seenSignatures = new Set<string>();
+        const { getCurriculumQuestion, isQuestionDuplicate } = await import('@/lib/curriculum-questions');
         const uniqueQuestions: any[] = [];
         const existingContents: string[] = [];
 
         for (let i = 0; i < generationResult.examData.questions.length; i++) {
           const q = generationResult.examData.questions[i];
-          const signature = (q.content || '')
-            .toLowerCase()
-            .replace(/[^\p{L}\p{N}]+/gu, '')
-            .slice(0, 80);
+          const isDup = isQuestionDuplicate(q.content, existingContents);
 
-          if (!signature || seenSignatures.has(signature)) {
+          if (isDup) {
             const levelMap: Record<string, string> = {
               KNOWLEDGE: 'Nhận biết',
               COMPREHENSION: 'Thông hiểu',
@@ -214,65 +210,29 @@ export async function POST(req: NextRequest) {
             };
             const levelStr = levelMap[q.cognitiveLevel] || 'Thông hiểu';
 
-            let replacement: any = null;
-            // 1. First priority: Check if appliedSkills have unused few-shot example questions
-            for (const askill of appliedSkills) {
-              if (Array.isArray(askill.fewShotExamples)) {
-                const sample = askill.fewShotExamples.find(
-                  (ex: any) =>
-                    ex.content &&
-                    !existingContents.some((ec) => ec.trim().toLowerCase() === ex.content.trim().toLowerCase())
-                );
-                if (sample) {
-                  replacement = {
-                    questionNumber: i + 1,
-                    type: sample.type || q.type || 'MULTIPLE_CHOICE',
-                    cognitiveLevel: sample.cognitiveLevel || q.cognitiveLevel || 'COMPREHENSION',
-                    content: sample.content,
-                    options: Array.isArray(sample.options)
-                      ? sample.options.map((opt: string) => opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim())
-                      : [],
-                    correctAnswer: sample.correctAnswer || 'A',
-                    explanation: sample.explanation || 'Áp dụng theo kỹ năng sư phạm chuẩn hóa.',
-                    points: q.points || payload.totalPoints / payload.totalQuestions,
-                  };
-                  break;
-                }
-              }
-            }
+            // Generate fresh unique curriculum question without repeating few-shot samples
+            const fresh = getCurriculumQuestion(
+              payload.curriculum.subject,
+              payload.curriculum.grade,
+              levelStr,
+              i,
+              existingContents
+            );
 
-            // 2. Second priority: Standard curriculum question fallback
-            if (!replacement) {
-              const fresh = getCurriculumQuestion(
-                payload.curriculum.subject,
-                payload.curriculum.grade,
-                levelStr,
-                i,
-                existingContents
-              );
-
-              replacement = {
-                questionNumber: i + 1,
-                type: q.type || 'MULTIPLE_CHOICE',
-                cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
-                content: fresh.content,
-                options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
-                correctAnswer: fresh.correctAnswer,
-                explanation: fresh.explanation,
-                points: q.points || payload.totalPoints / payload.totalQuestions,
-              };
-            }
+            const replacement = {
+              questionNumber: i + 1,
+              type: q.type || 'MULTIPLE_CHOICE',
+              cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
+              content: fresh.content,
+              options: fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
+              correctAnswer: fresh.correctAnswer,
+              explanation: fresh.explanation,
+              points: q.points || payload.totalPoints / payload.totalQuestions,
+            };
 
             uniqueQuestions.push(replacement);
-            seenSignatures.add(
-              replacement.content
-                .toLowerCase()
-                .replace(/[^\p{L}\p{N}]+/gu, '')
-                .slice(0, 80)
-            );
             existingContents.push(replacement.content);
           } else {
-            seenSignatures.add(signature);
             existingContents.push(q.content);
             q.questionNumber = i + 1;
             if (Array.isArray(q.options)) {

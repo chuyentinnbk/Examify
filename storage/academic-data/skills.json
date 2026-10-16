@@ -1,5 +1,19 @@
 [
   {
+    "id": "skill_1792142095720_rdhv1",
+    "title": "Kỹ năng chuẩn sư phạm: Toán 1 - Làm quen với số",
+    "description": "Bộ quy chuẩn sư phạm bám sát \"Toán 1 - Làm quen với số\" (Toán học - Lớp 1), phân hóa Bloom và câu hỏi thực chứng.",
+    "subject": "Toán học",
+    "grade": "Lớp 1",
+    "skillInstructions": "=== BỘ QUY CHUẨN SƯ PHẠM: Toán 1 - Làm quen với số ===\n1. ĐỊNH HƯỚNG MA TRẬN & NHẬN THỨC:\n- Môn học: Toán học | Cấp độ: Lớp 1\n- Loại tài liệu gốc: Sách giáo khoa / Chuyên đề\n- Tuân thủ phân hóa 4 cấp độ nhận thức Bloom:\n  + Nhận biết (40%): Tái hiện định nghĩa, công thức, nhận diện đại lượng.\n  + Thông hiểu (30%): Giải thích, biến đổi công thức, so sánh, phân loại.\n  + Vận dụng (20%): Áp dụng công thức vào bài toán đơn hoặc thực tiễn.\n  + Vận dụng cao (10%): Bài toán tổng hợp, tư duy logic nhiều bước.\n\n2. QUY CHUẨN ĐỊNH DẠNG & CÂU HỎI:\n- Bắt buộc dùng ký hiệu LaTeX $...$ hoặc $$...$$ cho toàn bộ công thức Toán học, Vật lí, Hóa học.\n- Các phương án nhiễu (B, C, D) phải xuất phát từ sai lầm tư duy điển hình của học sinh.\n- Lời giải chi tiết phải giải thích lý do chọn đáp án đúng và phân tích lỗi sai của các phương án khác.",
+    "fewShotExamples": "[{\"questionNumber\":1,\"type\":\"MULTIPLE_CHOICE\",\"cognitiveLevel\":\"RECOGNITION\",\"content\":\"Hình vẽ có bao nhiêu con mèo? (Giả sử có 2 con mèo trong hình minh họa)\",\"options\":[\"A. 1\",\"B. 2\",\"C. 3\",\"D. 4\"],\"correctAnswer\":\"B\",\"explanation\":\"Đếm số lượng con mèo trong hình ta được 2 con mèo, vậy chọn đáp án B.\",\"points\":1},{\"questionNumber\":2,\"type\":\"MULTIPLE_CHOICE\",\"cognitiveLevel\":\"COMPREHENSION\",\"content\":\"Số nào lớn nhất trong các số sau: 1, 3, 2?\",\"options\":[\"A. 1\",\"B. 2\",\"C. 3\",\"D. Không có số nào\"],\"correctAnswer\":\"C\",\"explanation\":\"Thứ tự các số từ bé đến lớn là 1, 2, 3. Số 3 đứng sau cùng nên số 3 lớn nhất.\",\"points\":1},{\"questionNumber\":3,\"type\":\"MULTIPLE_CHOICE\",\"cognitiveLevel\":\"APPLICATION\",\"content\":\"Kết quả của phép tính $1 + 2$ là bao nhiêu?\",\"options\":[\"A. 1\",\"B. 2\",\"C. 3\",\"D. 4\"],\"correctAnswer\":\"C\",\"explanation\":\"Gộp 1 đối tượng với 2 đối tượng ta được tất cả 3 đối tượng, vậy $1 + 2 = 3$.\",\"points\":1}]",
+    "isActive": true,
+    "teacherId": "teacher_default",
+    "documentId": "doc_1791723977479_oskmh",
+    "createdAt": "2026-10-16T09:14:55.720Z",
+    "updatedAt": "2026-10-16T09:14:55.720Z"
+  },
+  {
     "id": "skill_1791725881137_ewgkd",
     "title": "Kỹ năng ra đề Toán lớp 1 - Ôn tập cuối kì I (MATHX)",
     "description": "Bộ quy chuẩn sư phạm giúp AI tạo ra các câu hỏi trắc nghiệm Toán lớp 1 bám sát ma trận nhận thức, phân hóa Bloom và phong cách ôn tập cuối kì I theo chuẩn chương trình.",
