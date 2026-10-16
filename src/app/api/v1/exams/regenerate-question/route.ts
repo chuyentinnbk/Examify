@@ -4,6 +4,7 @@ import { AIFactory, SupportedAIProvider } from '@/core/ai/ai-factory';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
+import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
 
 const RegenerateQuestionSchema = z.object({
   subject: z.string().default('Toán học'),
@@ -89,7 +90,9 @@ YÊU CẦU ĐẶC BIỆT: Bạn phải tính toán chi tiết trong "explanation
 }`;
         }
 
+        const gradeDirectives = ExamPromptBuilder.getCurriculumGradeDirectives(grade, subject);
         const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi tại Việt Nam.
+${gradeDirectives ? `${gradeDirectives}\n` : ''}
 ${typeInstruction}
 Chuyên đề/Chủ đề: ${currentTopic || subject}
 QUY TẮC BẮT BUỘC: Không được trùng lặp với bất kỳ câu hỏi nào đã có trong đề thi.

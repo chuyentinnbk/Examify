@@ -100,6 +100,12 @@ You have been provided with specialized pedagogical skills extracted from offici
 - TOÀN DIỆN CHƯƠNG TRÌNH: Đảm bảo phủ đều các chủ đề, chuyên đề và bài học của môn học trong học kỳ, không dồn vào một dạng bài duy nhất.`;
     }
 
+    // 2.5 Grade-level curriculum directives (GDPT 2018)
+    const gradeDirectives = this.getCurriculumGradeDirectives(curriculum.grade, curriculum.subject);
+    if (gradeDirectives) {
+      systemPrompt += `\n\n${gradeDirectives}`;
+    }
+
     // 3. Assemble Curriculum Hierarchy Details
     const curriculumHierarchy = `
 - Education Level: ${curriculum.level}
@@ -132,6 +138,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
 ### CURRICULUM HIERARCHY:
 ${curriculumHierarchy}
 
+${gradeDirectives ? `${gradeDirectives}\n` : ''}
 ### EXAM MATRIX & CONSTRAINTS:
 ${matrixSpecs}
 - IMPORTANT: All ${totalQuestions} questions MUST BE COMPLETELY UNIQUE. Do not repeat any questions, numbers, or problem types!
@@ -192,5 +199,70 @@ ${matrixSpecs}
       userPrompt,
       sanitizationNotes: sanitizationNotes.length ? sanitizationNotes : undefined,
     };
+  }
+
+  /**
+   * Generates strict GDPT 2018 grade-level difficulty and scope directives.
+   */
+  public static getCurriculumGradeDirectives(grade: string, subject: string): string {
+    const norm = (grade || '').toLowerCase();
+    const match = norm.match(/(?:lớp|khối|grade)?\s*(\d{1,2})(?!\d)/i);
+    const num = match ? parseInt(match[1], 10) : null;
+
+    if (num === 10 || norm.includes('10')) {
+      return `
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ CHƯƠNG TRÌNH GDPT 2018 - KHỐI LỚP 10:
+1. TUYỆT ĐỐI NGHIÊM CẤM: KHÔNG BAO GIỜ sinh câu hỏi cấp tiểu học (như phép cộng trừ số học 4 + 7, số liền sau, so sánh số nhỏ) hay toán THCS cấp 2. Mọi câu hỏi phải kiểm tra đúng chuẩn kiến thức THPT Lớp 10!
+2. NỘI DUNG TRỌNG TÂM MÔN ${subject} LỚP 10:
+   - Mệnh đề toán học, Tập hợp và các phép toán trên tập hợp (giao, hợp, hiệu, phần bù).
+   - Bất phương trình và hệ bất phương trình bậc nhất hai ẩn (miền nghiệm trên mặt phẳng toạ độ Oxy).
+   - Hàm số bậc hai, đồ thị parabol (toạ độ đỉnh, trục đối xứng), Dấu của tam thức bậc hai ax² + bx + c và bất phương trình bậc hai một ẩn.
+   - Hệ thức lượng trong tam giác: Định lí côsin (a² = b² + c² - 2bc*cos(A)), Định lí sin (a/sin(A) = 2R), Công thức tính diện tích tam giác (Heron, S = 1/2*ab*sin(C)).
+   - Vectơ trong mặt phẳng: Các phép toán vectơ, Tích vô hướng của hai vectơ (a.b = |a||b|cos(a,b)), Toạ độ của vectơ trong Oxy.
+   - Thống kê: Các số đặc trưng đo xu thế trung tâm (số trung bình, trung vị, tứ phân vị, mốt), đo độ phân tán (khoảng biến thiên, khoảng tứ phân vị, phương sai, độ lệch chuẩn).
+   - Đại số tổ hợp: Quy tắc cộng, quy tắc nhân, Hoán vị, Chỉnh hợp, Tổ hợp, Nhị thức Newton; Xác suất của biến cố.
+3. PHÂN PHỐI 4 CẤP ĐỘ BLOOM CHO LỚP 10:
+   - Nhận biết (Knowledge): Nhận diện định nghĩa, kí hiệu, công thức chuẩn mực của lớp 10.
+   - Thông hiểu (Comprehension): Vận dụng trực tiếp 1-2 bước tính toán, biến đổi cơ bản trong chương trình lớp 10.
+   - Vận dụng (Application): Bài toán tổng hợp, kết hợp nhiều công thức hoặc giải quyết bài toán thực tế đo đạc/tối ưu hoá.
+   - Vận dụng cao (High Application): Bài toán nâng cao, cực trị hình học toạ độ Oxy, quy hoạch tuyến tính, mô hình xác suất phức tạp.`;
+    }
+
+    if (num === 11 || norm.includes('11')) {
+      return `
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ CHƯƠNG TRÌNH GDPT 2018 - KHỐI LỚP 11:
+1. TUYỆT ĐỐI KHÔNG sinh câu hỏi dưới trình độ Lớp 11.
+2. NỘI DUNG TRỌNG TÂM LỚP 11:
+   - Hàm số lượng giác và phương trình lượng giác cơ bản.
+   - Dãy số, Cấp số cộng (u_n = u_1 + (n - 1)d), Cấp số nhân (u_n = u_1 * q^(n-1)).
+   - Giới hạn dãy số, giới hạn hàm số, hàm số liên tục.
+   - Đạo hàm và quy tắc tính đạo hàm, ý nghĩa hình học của đạo hàm (phương trình tiếp tuyến).
+   - Quan hệ song song và quan hệ vuông góc trong không gian, góc và khoảng cách trong không gian.`;
+    }
+
+    if (num === 12 || norm.includes('12')) {
+      return `
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ CHƯƠNG TRÌNH GDPT 2018 - KHỐI LỚP 12:
+1. NỘI DUNG TRỌNG TÂM LỚP 12:
+   - Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số (đơn điệu, cực trị, GTLN-GTNN, tiệm cận).
+   - Hàm số luỹ thừa, hàm số mũ và hàm số logarit; phương trình, bất phương trình mũ - logarit.
+   - Nguyên hàm, tích phân và ứng dụng tính diện tích hình phẳng, thể tích khối tròn xoay.
+   - Phương pháp toạ độ trong không gian Oxyz (mặt phẳng, đường thẳng, mặt cầu).
+   - Số phức (các phép toán số phức, môđun, tập hợp điểm biểu diễn).`;
+    }
+
+    if (num && num >= 6 && num <= 9) {
+      return `
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ THCS (KHỐI LỚP ${num}):
+Mọi câu hỏi phải kiểm tra chuẩn kiến thức THCS Lớp ${num}, không sử dụng kiến thức tiểu học hay cấp 3.`;
+    }
+
+    if (num && num >= 1 && num <= 5) {
+      return `
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ TIỂU HỌC (KHỐI LỚP ${num}):
+Câu hỏi phù hợp lứa tuổi học sinh tiểu học Lớp ${num}.`;
+    }
+
+    return '';
   }
 }
