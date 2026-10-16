@@ -306,11 +306,11 @@ export const LoginView: React.FC = () => {
                         mail
                       </span>
                       <input
-                        type="email"
+                        type="text"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="minhmcpc.tao@gmail.com"
+                        placeholder="minhmcpc hoặc minhmcpc.tao@gmail.com"
                         className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -353,6 +353,25 @@ export const LoginView: React.FC = () => {
                         </span>
                       </button>
                     </div>
+                  </div>
+
+                  {/* Quick preset for Admin */}
+                  <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 text-[11.5px]">
+                      <span className="material-symbols-outlined text-sm text-blue-600">verified</span>
+                      <span>Admin: <strong>minhmcpc</strong> / Pass: <strong>2011</strong></span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmail('minhmcpc.tao@gmail.com');
+                        setPassword('2011');
+                        showToast('Đã điền tài khoản Quản trị viên!', 'info');
+                      }}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer shrink-0"
+                    >
+                      Điền nhanh
+                    </button>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
