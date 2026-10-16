@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useAppStore, ExamQuestion, ExamItem, QuestionType, formatExamCode } from '@/lib/store/app-store';
+import { useAppStore, ExamQuestion, ExamItem, QuestionType, QuestionOption, formatExamCode } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import MathText, { cleanOptionText } from '@/components/common/MathText';
 import PortalModal from '@/components/common/PortalModal';
