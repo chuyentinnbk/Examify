@@ -114,16 +114,21 @@ Your sole objective is to author high-quality, academically rigorous, and curric
        + Không gian thực tế: Lều cắm trại dã ngoại hình chóp, mái nhà chống bão hình lăng trụ, bể chứa nước công nghiệp.
        + Tin học: Mô phỏng bài toán xếp hàng mua vé, quản lý kho hàng, giải thuật tối ưu hóa đường đi giao hàng.
      * Lời văn phải mềm mại, trau chuốt, tự nhiên, kích thích tư duy giải quyết vấn đề theo chuẩn GDPT 2018.
-11. QUY CHUẨN HÌNH VẼ HÌNH HỌC BẰNG VECTOR SVG (GEOMETRIC DIAGRAMS):
-   - Đối với các câu hỏi Hình học (Hình học không gian như hình chóp, lăng trụ, tứ diện, khối hộp, hình nón, trụ; hoặc Hình học phẳng có cấu trúc đa giác/đường tròn):
+11. QUY CHUẨN ĐỒ HỌA HÌNH HỌC BẰNG VECTOR SVG (GEOMETRIC DIAGRAMS & RIGHT-ANGLE MARKS):
+   - Đối với các câu hỏi Hình học (Hình học không gian như hình chóp S.ABC, tứ diện, lăng trụ, nón, trụ; hoặc Hình học phẳng):
      * BẮT BUỘC nhúng một đoạn mã Vector SVG chuẩn vào trong trường "content" của câu hỏi:
-       <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
-     * QUY ƯỚC ĐỒ HỌA HÌNH HỌC KHÔNG GIAN BẮT BUỘC:
+       <svg viewBox="0 0 300 200" width="300" height="200" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
+     * QUY ƯỚC ĐỒ HỌA BẮT BUỘC:
        - Đường nét: stroke="black", stroke-width="1.5", fill="none".
        - Cạnh nhìn thấy: Nét liền (stroke="black").
-       - Cạnh bị che khuất: BẮT BUỘC dùng nét đứt với thuộc tính stroke-dasharray="4,4".
-       - Nhãn đỉnh (S, A, B, C, D...): Dùng thẻ <text x="..." y="..." font-size="12" font-family="serif" font-weight="bold">S</text>, đặt lệch ra ngoài đỉnh 6-10px để không bị nét vẽ đè lên chữ.
-       - Góc vuông / Ký hiệu vuông góc: Vẽ góc vuông nhỏ ở chân đường cao nếu có (stroke="black" stroke-width="1").`;
+       - Cạnh bị che khuất bên trong: BẮT BUỘC dùng nét đứt với thuộc tính stroke-dasharray="4,4".
+       - Nhãn đỉnh (S, A, B, C, D...): Dùng thẻ <text x="..." y="..." font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">S</text>.
+         + QUY TẮC TRÁNH ĐÈ CHỮ: Nhãn đỉnh phải đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S đặt ở trên y-12; B đặt ở góc dưới bên trái x-16, y+10; C đặt ở góc dưới bên phải x+12, y+10; đỉnh trong A đặt lệch hẳn sang bên trái x-18, y-4). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
+       - KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK) CHUẨN XÁC:
+         + BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), góc vuông phải song song tuyệt đối với 2 cạnh chứa góc vuông đó (theo phép chiếu phối cảnh 3D).
+         + Kích thước góc vuông phải nhỏ gọn (cạnh khoảng 8px đến 10px).
+         + Ví dụ tại đỉnh A(100, 120) vuông góc với SA(thẳng đứng) và AC(xiên): dùng <polyline points="100,110 112,114 112,124" fill="none" stroke="black" stroke-width="1" />.
+         + TUYỆT ĐỐI KHÔNG vẽ các nét gãy rời rạc, méo mó, xiên lệch hoặc đè lên chữ cái! Nếu không tính được tọa độ góc vuông phối cảnh chuẩn xác, HÃY BỎ QUA ký hiệu vuông góc trên hình vẽ (để giả thiết trong đề bài nêu "$SA \\perp (ABC)$") chứ KHÔNG ĐƯỢC vẽ cẩu thả!`;
 
     if (payload.appliedSkills && payload.appliedSkills.length > 0) {
       systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS & STRICT ZERO-DUPLICATION:

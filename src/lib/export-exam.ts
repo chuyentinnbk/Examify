@@ -84,6 +84,9 @@ export function cleanMathForDoc(text: string): string {
 
   let res = text;
 
+  // Strip raw SVG XML blocks into a clean note so Word document doesn't get flooded with XML code
+  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n[Hình vẽ minh họa: Vui lòng xem trên bản in PDF hoặc giao diện web]\n');
+
   // Convert LaTeX fractions: \frac{a}{b} -> (a)/(b)
   res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
   res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
@@ -199,6 +202,85 @@ export function getOptionsLayout(options: { text: string }[]): 4 | 2 | 1 {
   }
   // Otherwise: 2 on 1 line (2 rows x 2 cols)
   return 2;
+}
+
+/**
+ * Renders question content into formatted docx paragraphs,
+ * properly supporting both regular text and highlighted monospace code blocks (Python, C++...).
+ */
+function renderQuestionContentToDocx(qNum: number, rawContent: string): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+  const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let isFirstPart = true;
+
+  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
+    const textBefore = rawContent.slice(lastIndex, match.index).trim();
+    if (textBefore || isFirstPart) {
+      const runs: TextRun[] = [];
+      if (isFirstPart) {
+        runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+        isFirstPart = false;
+      }
+      if (textBefore) {
+        runs.push(new TextRun({ text: cleanMathForDoc(textBefore), size: 22 }));
+      }
+      paragraphs.push(
+        new Paragraph({
+          children: runs,
+          spacing: { before: 140, after: 60 },
+        })
+      );
+    }
+
+    const code = match[1].replace(/\r\n/g, '\n').trimEnd();
+    const codeLines = code.split('\n');
+    paragraphs.push(
+      new Paragraph({
+        children: codeLines.map((line, lineIdx) =>
+          new TextRun({
+            text: line,
+            font: 'Consolas',
+            size: 20,
+            color: '1E293B',
+            break: lineIdx > 0 ? 1 : 0,
+          })
+        ),
+        shading: { fill: 'F1F5F9' },
+        indent: { left: 400, right: 400 },
+        spacing: { before: 80, after: 80 },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 12, color: '3B82F6' },
+          top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+          right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+        },
+      })
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  const textAfter = rawContent.slice(lastIndex).trim();
+  if (textAfter || isFirstPart) {
+    const runs: TextRun[] = [];
+    if (isFirstPart) {
+      runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+    }
+    if (textAfter) {
+      runs.push(new TextRun({ text: cleanMathForDoc(textAfter), size: 22 }));
+    }
+    paragraphs.push(
+      new Paragraph({
+        children: runs,
+        spacing: { before: isFirstPart ? 140 : 60, after: 60 },
+      })
+    );
+  }
+
+  return paragraphs;
 }
 
 /**
@@ -410,16 +492,9 @@ export async function generateDocxBlob(
       }
     }
 
-    // Question Title & Content (chuẩn đề thi: Câu 1. nội dung)
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({ text: `Câu ${idx + 1}. `, bold: true, size: 22, color: '2563EB' }),
-          new TextRun({ text: cleanMathForDoc(q.content || ''), size: 22 }),
-        ],
-        spacing: { before: 140, after: 60 },
-      })
-    );
+    // Question Title & Content (chuẩn đề thi: Câu 1. nội dung, hỗ trợ khối mã nguồn code block)
+    const contentParagraphs = renderQuestionContentToDocx(idx + 1, q.content || '');
+    contentParagraphs.forEach((p) => docChildren.push(p));
 
     // 1. Loại: Đúng / Sai (Bảng 4 cột chuẩn Bộ GD&ĐT: STT, Mệnh đề, Đúng, Sai)
     if (normType === 'true_false') {
@@ -932,6 +1007,38 @@ export async function exportExamToDocx(
 }
 
 /**
+ * Formats question content for Microsoft Word HTML (.doc),
+ * rendering code snippets with Consolas blocks and preserving clean math typography.
+ */
+function formatContentForDocHtml(rawContent: string): string {
+  if (!rawContent) return '';
+  const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const parts: string[] = [];
+
+  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
+    const textBefore = rawContent.slice(lastIndex, match.index);
+    if (textBefore) {
+      parts.push(cleanMathForDoc(textBefore));
+    }
+    const escapedCode = match[1]
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    parts.push(
+      `<pre style="background: #f1f5f9; border-left: 3px solid #2563eb; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; padding: 8px 12px; margin: 8px 0; font-family: Consolas, 'Courier New', monospace; font-size: 10pt; line-height: 1.4; color: #0f172a; white-space: pre-wrap;"><code>${escapedCode}</code></pre>`
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  const textAfter = rawContent.slice(lastIndex);
+  if (textAfter) {
+    parts.push(cleanMathForDoc(textAfter));
+  }
+  return parts.join('');
+}
+
+/**
  * Generates Word HTML (.doc) string with complete Microsoft Word Office namespaces,
  * ensuring modern Word versions open without file block or corruption warnings.
  */
@@ -1068,7 +1175,7 @@ export function generateDocHtml(
 
     htmlContent += `
     <div class="question">
-      <div class="q-title"><strong style="color: #2563eb;">Câu ${idx + 1}.</strong> ${cleanMathForDoc(q.content || '')}</div>
+      <div class="q-title"><strong style="color: #2563eb;">Câu ${idx + 1}.</strong> ${formatContentForDocHtml(q.content || '')}</div>
     `;
 
     if (normType === 'true_false') {
@@ -1248,6 +1355,22 @@ export function exportExamToDoc(
 }
 
 /**
+ * Formats question content for LaTeX (.tex),
+ * escaping raw SVG to a clean LaTeX framebox and formatting code blocks with verbatim.
+ */
+function formatContentForLatex(rawContent: string): string {
+  if (!rawContent) return '';
+  let res = rawContent;
+  // Replace SVG with a neat centered LaTeX framebox so pdflatex never crashes
+  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n\\begin{center}\\fbox{\\textit{[Hình vẽ minh họa: Vui lòng xem bản vẽ trên web hoặc bản PDF]}}\\end{center}\n');
+  // Format code blocks using standard LaTeX verbatim
+  res = res.replace(/```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g, (_, code) => {
+    return `\n\\begin{verbatim}\n${code.trimEnd()}\n\\end{verbatim}\n`;
+  });
+  return res;
+}
+
+/**
  * Generates LaTeX (.tex) string for Overleaf / TeXStudio
  */
 export function generateLatexString(
@@ -1320,7 +1443,7 @@ export function generateLatexString(
     const qType = (q.type || 'multiple_choice').toLowerCase().replace('_', '');
 
     latex += `% --- Câu ${idx + 1} ---\n`;
-    latex += `\\noindent \\textbf{Câu ${idx + 1}:} ${q.content}\\\\[0.2em]\n`;
+    latex += `\\noindent \\textbf{Câu ${idx + 1}:} ${formatContentForLatex(q.content)}\\\\[0.2em]\n`;
 
     if (normType === 'true_false') {
       const items = (q.options || []).length > 0 ? q.options : [
@@ -1415,7 +1538,7 @@ export function generateLatexString(
 
     latex += `\\noindent\\textbf{HƯỚNG DẪN GIẢI CHI TIẾT:}\\\\[0.5em]\n`;
     questions.forEach((q, idx) => {
-      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${q.correctAnswer}):} \\textit{${q.explanation || 'Xem định nghĩa SGK.'}}\\\\[0.6em]\n`;
+      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${q.correctAnswer}):} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
     });
   }
 

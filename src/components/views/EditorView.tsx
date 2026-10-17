@@ -201,10 +201,16 @@ export default function EditorView() {
         setIsAddOpen(false);
       }
     }
+    let printRestoreTimeout: NodeJS.Timeout | null = null;
     const handleBeforePrint = () => {
       document.title = '';
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
+      printRestoreTimeout = setTimeout(() => {
+        document.title = 'Examify AI - Hệ Thống Khảo Thí & Tạo Đề Thi Thông Minh';
+      }, 3000);
     };
     const handleAfterPrint = () => {
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
       document.title = 'Examify AI - Hệ Thống Khảo Thí & Tạo Đề Thi Thông Minh';
     };
     window.addEventListener('beforeprint', handleBeforePrint);
@@ -212,6 +218,7 @@ export default function EditorView() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('beforeprint', handleBeforePrint);
       window.removeEventListener('afterprint', handleAfterPrint);
@@ -823,17 +830,20 @@ export default function EditorView() {
       ? variants.map((v, i) => (i === selectedVariantIdx ? { ...v, code: examCode, questions } : v))
       : undefined;
 
+    const baseQuestions = updatedVariants && updatedVariants[0] ? updatedVariants[0].questions : questions;
+    const baseCode = updatedVariants && updatedVariants[0] ? updatedVariants[0].code : examCode;
+
     updateExam(activeExam.id, {
       title,
-      code: examCode,
+      code: baseCode,
       department,
       schoolName,
       sessionTitle,
       academicYear,
       sectionTitles,
       sectionDescriptions,
-      questions,
-      questionsCount: questions.length,
+      questions: baseQuestions,
+      questionsCount: baseQuestions.length,
       variants: updatedVariants,
       updatedAt: 'Vừa lưu',
     });

@@ -13,7 +13,7 @@ const RegenerateQuestionSchema = z.object({
   level: z.string().default('Thông hiểu'),
   type: z.enum(['multiple_choice', 'true_false', 'short_answer', 'essay']).optional(),
   currentTopic: z.string().optional(),
-  customPrompt: z.string().max(1000).optional(),
+  customPrompt: z.string().max(1500).optional(),
   currentQuestionContent: z.string().optional(),
   avoidQuestions: z.array(z.string()).optional(),
   existingQuestions: z.array(z.string()).optional(),
@@ -135,6 +135,22 @@ ${typeInstruction}
 - Học kỳ: ${term}
 - Chuyên đề/Chủ đề trọng tâm: ${currentTopic || subject}
 ${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${customPrompt}` : ''}
+
+### QUY CHUẨN CÂU HỎI VẬN DỤNG & VẬN DỤNG CAO (REAL-WORLD MODELING):
+- Nếu câu hỏi ở cấp độ Vận dụng hoặc Vận dụng cao:
+  * TUYỆT ĐỐI NGHIÊM CẤM ra đề bài cộc cằn, thuần túy hình thức toán học ("Cho tam giác có 3 cạnh... tính góc").
+  * BẮT BUỘC đặt bài toán vào bối cảnh thực tiễn đời sống sinh động ("văn thơ", giàu ngôn ngữ thực tế): đo khoảng cách giữa hai ngôi nhà X và Y bị ngăn cách bởi hồ nước/dòng sông; vị trí tàu cứu hộ; tối ưu hóa chi phí sản xuất, vòm cầu parabol; lều cắm trại dã ngoại hình chóp... Lời văn tự nhiên, kích thích tư duy chuẩn GDPT 2018.
+
+### QUY CHUẨN ĐỒ HỌA HÌNH HỌC BẰNG VECTOR SVG:
+- Đối với câu hỏi Hình học (Hình học không gian hoặc hình học phẳng):
+  * BẮT BUỘC nhúng đoạn mã Vector SVG chuẩn vào trong trường "content":
+    <svg viewBox="0 0 300 200" width="300" height="200" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
+  * Cạnh nhìn thấy: nét liền (stroke="black" stroke-width="1.5").
+  * Cạnh bị khuất: nét đứt (stroke="black" stroke-width="1.5" stroke-dasharray="4,4").
+  * Nhãn đỉnh (S, A, B, C...): Dùng <text>, đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S ở trên y-12, A lệch trái x-18, y-4, B dưới trái x-16, y+10, C dưới phải x+12, y+10). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
+  * KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK):
+    - BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), nhỏ gọn khoảng 8-10px, hai cạnh phải song song với 2 cạnh chứa góc vuông theo phối cảnh 3D.
+    - TUYỆT ĐỐI KHÔNG vẽ các nét gãy rời rạc, méo mó, xiên lệch hoặc đè lên chữ cái! NẾU KHÔNG TÍNH ĐƯỢC TỌA ĐỘ PHỐI CẢNH CHUẨN XÁC, HÃY BỎ QUA KÝ HIỆU VUÔNG GÓC (để giả thiết trong đề bài nêu "$SA \\perp (ABC)$") chứ KHÔNG ĐƯỢC vẽ cẩu thả!
 
 ### QUY TẮC BẮT BUỘC (CRITICAL MANDATE):
 1. Đúng 100% phạm vi kiến thức khối lớp ${grade}, môn ${subject}, học kỳ ${term} và bám sát chủ đề "${currentTopic || subject}".

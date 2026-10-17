@@ -1,11 +1,12 @@
 /**
  * Exam Shuffler Utility
  * Generates multiple exam codes (e.g. 101, 102, 103, 104) with:
- * 1. Question order & option shuffling (within sections)
- * 2. Number/parameter variation
+ * 1. Question order & option shuffling (within sections, respecting MoET standard order)
+ * 2. Safe number/parameter variation without breaking SVG or LaTeX formulas
  */
 
 import { ExamQuestion, QuestionOption } from '@/lib/store/app-store';
+import { normalizeQuestionType } from './exam-sections';
 
 export type ExamOption = QuestionOption;
 export type BaseQuestion = ExamQuestion;
@@ -22,6 +23,8 @@ export interface ShuffleConfig {
   shuffleValues: boolean; // Permute numeric values/variables
   baseCode?: number; // default 101
 }
+
+const STANDARD_SECTION_ORDER = ['multiple_choice', 'true_false', 'short_answer', 'essay'];
 
 /**
  * Pseudo-random seeded number generator
@@ -48,25 +51,49 @@ function shuffleArray<T>(array: T[], rng: () => number): T[] {
 }
 
 /**
- * Slightly permutes numeric constants in question statement and options
- * while keeping mathematical sense (e.g. scaling by +1, -1, or +2).
+ * Safely permutes numeric constants in question statement and options,
+ * strictly protecting SVG diagrams and LaTeX mathematical expressions from corruption.
  */
 function permuteNumericalValues(content: string, delta: number): string {
-  if (delta === 0) return content;
-  // Look for numbers like = 10, = 5, or standalone integers
-  return content.replace(/\b([1-9]\d*)\b/g, (match) => {
+  if (delta === 0 || !content) return content;
+
+  // 1. Preserve raw SVG diagram blocks so coordinates are never modified
+  const svgs: string[] = [];
+  let safeContent = content.replace(/<svg\b[\s\S]*?<\/svg>/gi, (match) => {
+    svgs.push(match);
+    return `__SVG_PLACEHOLDER_${svgs.length - 1}__`;
+  });
+
+  // 2. Protect LaTeX formulas, exponents, subscripts, and commands
+  const latexTokens: string[] = [];
+  safeContent = safeContent.replace(/(\\[a-zA-Z]+|\^\{?\d+\}?|_\{?\d+\}?|\$\$?[^\$]+\$\$?)/g, (match) => {
+    latexTokens.push(match);
+    return `__LATEX_TOKEN_${latexTokens.length - 1}__`;
+  });
+
+  // 3. Only permute small standalone numbers in word context
+  safeContent = safeContent.replace(/\b([1-9]\d*)\b/g, (match) => {
     const val = parseInt(match, 10);
-    // Only permute small arbitrary numbers, avoid year-like numbers or large numbers
-    if (val >= 2 && val <= 50 && val !== 10 && val !== 15 && val !== 45 && val !== 90) {
-      const newVal = Math.max(1, val + (delta % 3 === 0 ? 1 : delta % 2 === 0 ? 2 : -1));
+    // Only permute small arbitrary numbers; avoid years, right angles, and standard multiples
+    if (val >= 2 && val <= 50 && val !== 10 && val !== 15 && val !== 30 && val !== 45 && val !== 90) {
+      const offset = delta % 2 === 0 ? 1 : -1;
+      const newVal = Math.max(1, val + offset);
       return String(newVal);
     }
     return match;
   });
+
+  // 4. Restore LaTeX tokens
+  safeContent = safeContent.replace(/__LATEX_TOKEN_(\d+)__/g, (_, idx) => latexTokens[parseInt(idx, 10)] || '');
+
+  // 5. Restore SVGs
+  safeContent = safeContent.replace(/__SVG_PLACEHOLDER_(\d+)__/g, (_, idx) => svgs[parseInt(idx, 10)] || '');
+
+  return safeContent;
 }
 
 /**
- * Generates N shuffled variants of an exam.
+ * Generates N shuffled variants of an exam according to official MoET regulations.
  */
 export function generateExamVariants(
   baseQuestions: BaseQuestion[],
@@ -94,58 +121,72 @@ export function generateExamVariants(
     // Deep clone questions
     const clonedQuestions: BaseQuestion[] = JSON.parse(JSON.stringify(baseQuestions));
 
-    // Group by section so questions don't jump between Section I, II, III, IV
+    // Group by section using official MoET normalization
     const sectionGroups: Record<string, BaseQuestion[]> = {};
-    const sectionOrder: string[] = [];
-
     clonedQuestions.forEach((q) => {
-      const secKey = (q.type || q.section || 'multiple_choice').toLowerCase();
-      if (!sectionGroups[secKey]) {
-        sectionGroups[secKey] = [];
-        sectionOrder.push(secKey);
+      const normType = normalizeQuestionType(q.type || q.section);
+      if (!sectionGroups[normType]) {
+        sectionGroups[normType] = [];
       }
-      sectionGroups[secKey].push(q);
+      sectionGroups[normType].push(q);
+    });
+
+    // Enforce official MoET section order (Phần I -> Phần II -> Phần III -> Phần IV)
+    const existingSectionKeys = Object.keys(sectionGroups);
+    const sortedSectionKeys = existingSectionKeys.sort((a, b) => {
+      const orderA = STANDARD_SECTION_ORDER.indexOf(a);
+      const orderB = STANDARD_SECTION_ORDER.indexOf(b);
+      const rankA = orderA === -1 ? 99 : orderA;
+      const rankB = orderB === -1 ? 99 : orderB;
+      return rankA - rankB;
     });
 
     const assembledQuestions: BaseQuestion[] = [];
 
-    sectionOrder.forEach((secKey) => {
+    sortedSectionKeys.forEach((secKey) => {
       let group = sectionGroups[secKey];
 
-      // 1. Shuffle question order within the section
+      // 1. Shuffle question order within the section (only for variant codes c > 0)
       if (shuffleOrder && c > 0) {
         group = shuffleArray(group, rng);
       }
 
       // Process each question
       group.forEach((q) => {
-        const isMC = String(q.type).toLowerCase().includes('multiple') || (!q.type && q.options && q.options.length === 4);
-        const isTF = String(q.type).toLowerCase().includes('true');
+        const normType = normalizeQuestionType(q.type || q.section);
+        const isMC = normType === 'multiple_choice';
+        const isTF = normType === 'true_false';
 
-        // 2. Shuffle multiple choice options
+        // 2. Shuffle multiple choice options safely
         if (shuffleOrder && isMC && Array.isArray(q.options) && q.options.length === 4 && c > 0) {
           const originalCorrectKey = (q.correctAnswer || 'A').trim().toUpperCase();
-          const targetOpt = q.options.find(
-            (o) => o.key.toUpperCase() === originalCorrectKey || o.isCorrect
+          let correctIndex = q.options.findIndex(
+            (o) => (o.key || '').trim().toUpperCase() === originalCorrectKey
           );
+          if (correctIndex === -1) {
+            correctIndex = q.options.findIndex((o) => o.isCorrect === true);
+          }
+          if (correctIndex === -1) {
+            correctIndex = 0;
+          }
 
-          // Shuffle the options
-          const shuffledOpts = shuffleArray(q.options, rng);
+          // Tag each option with a stable boolean flag before shuffling
+          const taggedOptions = q.options.map((opt, idx) => ({
+            text: opt.text,
+            wasCorrect: idx === correctIndex,
+          }));
+
+          const shuffledOpts = shuffleArray(taggedOptions, rng);
           const newKeys = ['A', 'B', 'C', 'D'];
 
-          q.options = shuffledOpts.map((opt, i) => {
-            const isThisCorrect = targetOpt ? opt.text === targetOpt.text : i === 0;
-            return {
-              key: newKeys[i],
-              text: opt.text,
-              isCorrect: isThisCorrect,
-            };
-          });
+          q.options = shuffledOpts.map((opt, i) => ({
+            key: newKeys[i],
+            text: opt.text,
+            isCorrect: opt.wasCorrect,
+          }));
 
           const newCorrect = q.options.find((o) => o.isCorrect);
-          if (newCorrect) {
-            q.correctAnswer = newCorrect.key;
-          }
+          q.correctAnswer = newCorrect ? newCorrect.key : 'A';
         }
 
         // 3. Shuffle True/False sub-items

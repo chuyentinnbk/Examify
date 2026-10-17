@@ -140,6 +140,11 @@ export default function MathText({ content, className = '', inline = false }: Ma
         // Inline Math: $...$
         if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
           const rawFormula = part.slice(1, -1).trim();
+          // Guard against currency amounts like "$15 and $20"
+          const hasMathIndicators = /[\\^_{}=+\-*\/<>()]/.test(rawFormula) || /^[a-zA-Z0-9.,]+$/.test(rawFormula);
+          if (!hasMathIndicators && /\s{2,}|[a-zA-Z]+\s+[a-zA-Z]+/.test(rawFormula)) {
+            return escapeHtml(part);
+          }
           try {
             return katex.renderToString(rawFormula, {
               displayMode: false,
@@ -204,12 +209,21 @@ export default function MathText({ content, className = '', inline = false }: Ma
     // Step 4: Replace SVG tokens with responsive & print-friendly geometry diagrams
     svgBlocks.forEach((rawSvg, idx) => {
       const token = `__SVG_BLOCK_${idx}__`;
-      let cleanSvg = rawSvg;
+      // Sanitize SVG against XSS
+      let cleanSvg = rawSvg
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
+        .replace(/javascript\s*:/gi, '');
+
+      // Constrain size so it doesn't blow up across the page
       if (!cleanSvg.includes('class=')) {
-        cleanSvg = cleanSvg.replace('<svg', '<svg class="exam-geo-svg w-auto max-h-56 mx-auto object-contain print:max-h-48"');
+        cleanSvg = cleanSvg.replace('<svg', '<svg class="exam-geo-svg w-full max-h-52 mx-auto object-contain print:max-h-44"');
+      } else {
+        cleanSvg = cleanSvg.replace(/class="([^"]*)"/, 'class="$1 w-full max-h-52 mx-auto object-contain print:max-h-44"');
       }
+
       const svgBoxHtml = `
-<div class="my-2.5 flex justify-center items-center overflow-x-auto print:my-1.5 bg-slate-50/50 dark:bg-slate-900/40 p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 print:bg-white print:border-none print:p-0">
+<div class="my-2 max-w-xs sm:max-w-sm mx-auto flex justify-center items-center overflow-hidden print:my-1 bg-slate-50/60 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 print:bg-white print:border-none print:p-0">
   ${cleanSvg}
 </div>
 `.trim();
