@@ -189,17 +189,10 @@ export function generateExamVariants(
           q.correctAnswer = newCorrect ? newCorrect.key : 'A';
         }
 
-        // 3. Shuffle True/False sub-items
-        if (shuffleOrder && isTF && Array.isArray(q.options) && q.options.length === 4 && c > 0) {
-          const shuffledOpts = shuffleArray(q.options, rng);
-          const subKeys = ['a', 'b', 'c', 'd'];
-          q.options = shuffledOpts.map((opt, i) => ({
-            ...opt,
-            key: subKeys[i],
-            isCorrect: opt.isCorrect ?? false,
-          }));
-          q.correctAnswer = q.options.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
-        }
+        // 3. True/False sub-items (a, b, c, d) are NOT shuffled internally to maintain pedagogical
+        // dependency (e.g. part a computes derivative, part b computes extremum) and ensure 100%
+        // alignment with step-by-step detailed explanations.
+        // The True/False questions themselves are already shuffled within the section!
 
         // 4. Permute numbers if requested
         if (shuffleValues && c > 0) {

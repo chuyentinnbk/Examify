@@ -117,19 +117,33 @@ export async function POST(req: NextRequest) {
 
     const geminiKey = process.env.GEMINI_API_KEY?.split(/[,;]+/)[0]?.trim();
 
+    const levelMap: Record<string, string> = {
+      KNOWLEDGE: 'Nhận biết',
+      COMPREHENSION: 'Thông hiểu',
+      APPLICATION: 'Vận dụng',
+      HIGH_APPLICATION: 'Vận dụng cao',
+    };
+
     // Prepare simplified questions to minimize prompt payload
     const simplifiedBase = baseQuestions.map((q: any, i: number) => {
       const normType = normalizeQuestionType(q.type);
+      const level = q.level || (q.cognitiveLevel ? levelMap[q.cognitiveLevel] : undefined) || 'Thông hiểu';
       return {
         index: i + 1,
         type: normType,
-        level: q.level || 'Thông hiểu',
+        level,
         topic: q.topic || subject,
         content: q.content,
         options: normType === 'multiple_choice'
           ? (q.options || []).map((o: any) => cleanTextOpt(o))
           : normType === 'true_false'
-          ? (q.options || []).map((o: any) => ({ key: o.key, text: o.text, isCorrect: o.isCorrect }))
+          ? (q.options || []).map((o: any, idx: number) => {
+              const defaultKeys = ['a', 'b', 'c', 'd'];
+              if (typeof o === 'string') {
+                return { key: defaultKeys[idx] || 'a', text: o, isCorrect: undefined };
+              }
+              return { key: o.key || defaultKeys[idx] || 'a', text: o.text || '', isCorrect: o.isCorrect };
+            })
           : [],
         correctAnswer: q.correctAnswer,
         explanation: q.explanation,
@@ -157,10 +171,10 @@ export async function POST(req: NextRequest) {
       });
 
       const diversityDirectives = [
-        'Chọn các số chẵn hoặc bội số thích hợp, giữ nghiệm nguyên dương đẹp.',
-        'Chọn các số lẻ hoặc phân số tối giản đẹp, tọa độ đối xứng qua gốc tọa độ.',
-        'Chọn các số nguyên tố nhỏ (2, 3, 5, 7) hoặc mở rộng khoảng giá trị, nghiệm gọn gàng.',
-        'Đổi dấu hệ số hoặc tịnh tiến biến số (x -> x-1, x+2), bài toán mang tính chất tương đương nhưng biểu thức khác biệt.',
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 1): Hãy chọn hệ số chẵn đẹp hoặc nhân hệ số k = 2; các nghiệm số nguyên dương gọn gàng.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 2): Hãy chọn hệ số lẻ hoặc phân số tối giản đẹp, nhân hệ số k = 3 hoặc tịnh tiến biến số; tuyệt đối không chọn lại các số của Mã 101 và Mã 102.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 3): Hãy chọn hệ số nguyên tố nhỏ (2, 3, 5, 7) hoặc đổi dấu âm/dương, nhân hệ số k = 4; đảm bảo số liệu hoàn toàn khác biệt với các mã trước.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 4): Tịnh tiến thông số (ví dụ đổi bán kính, diện tích, hoành độ theo chiều hướng mới), nghiệm nguyên đẹp, số liệu độc lập 100%.`,
       ];
       const directive = diversityDirectives[codeIndex % diversityDirectives.length];
 
@@ -186,10 +200,21 @@ Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${target
      * Tính toán lại tính đúng/sai thực tế, định dạng "correctAnswer" như "a: Đ, b: S, c: Đ, d: S" (phân bố cân bằng 2Đ-2S hoặc 3Đ-1S, không được 4Đ hoặc 4S).
    - Đối với Trả lời ngắn (short_answer):
      * Tính toán ra kết quả số học mới chính xác và ghi vào "correctAnswer" (ví dụ: "12", "-4", "3/5").
+     * ĐẶC BIỆT: Mỗi mã đề PHẢI RA MỘT ĐÁP SỐ KHÁC NHAU HOÀN TOÀN so với Đề gốc và các mã khác (chọn thông số độc lập, ví dụ nếu đề gốc tính ra 108, mã 102 tính ra 256, thì mã 103 chọn thông số tính ra 500 hoặc 32... TUYỆT ĐỐI KHÔNG TRÙNG ĐÁP SỐ giữa các mã).
    - Đối với Tự luận (essay):
      * Cập nhật lại đề bài và barem điểm giải chi tiết trong "explanation".
 3. KHÔNG ĐƯỢC ĐẢO THỨ TỰ CÂU TRONG BƯỚC NÀY:
    - Giữ nguyên thứ tự câu 1 đến câu ${simplifiedBase.length} đúng theo đề gốc để đảm bảo sự đồng bộ 1-1.
+
+### QUY TẮC BẢO ĐẢM TÍNH SƯ PHẠM VÀ LỜI GIẢI (BẮT BUỘC):
+1. TUYỆT ĐỐI KHÔNG ĐỂ LỘ SUY NGHĨ NỘI TÂM (CHAIN-OF-THOUGHT) TRONG "explanation":
+   - Trường "explanation" là lời giải sư phạm hoàn chỉnh, chỉn chu, trang trọng dành trực tiếp cho giáo viên và học sinh đọc.
+   - NGHIÊM CẤM độc thoại nội tâm, nghiêm cấm ghi "ta cần phân bố 2Đ-2S", không tự bình luận về quy tắc đề thi hay quá trình chế đề trong "explanation".
+2. ĐỒNG BỘ 100% GIỮA ĐỀ BÀI CÂU ĐÚNG/SAI VÀ LỜI GIẢI:
+   - Với câu Đúng/Sai: Nếu muốn mệnh đề là SAI, BẮT BUỘC phải viết thẳng con số/nội dung sai vào trường "text" của option đó trong "options", và trong "explanation" giải thích rõ vì sao khẳng định với con số đó là SAI.
+   - Tuyệt đối không được viết một đằng trong "options" rồi trong "explanation" lại giải thích cho một nội dung khác!
+3. GIỮ NGUYÊN THỨ TỰ CÁC Ý a, b, c, d TRONG CÂU ĐÚNG/SAI:
+   - Giữ nguyên thứ tự logic a -> b -> c -> d của câu Đúng/Sai.
 
 ### QUY CÁCH TRÌNH BÀY CODE (NẾU CÓ):
 - Đoạn mã Python/C++ phải đặt trong khối \`\`\`python ... \`\`\` với dấu xuống dòng (\\n) và thụt lề 4 dấu cách rõ ràng.
