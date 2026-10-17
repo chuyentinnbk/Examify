@@ -36,6 +36,7 @@ export default function EditorView() {
   const [shuffleCodesCount, setShuffleCodesCount] = useState<number>(4);
   const [shuffleOrderOpt, setShuffleOrderOpt] = useState(true);
   const [shuffleValuesOpt, setShuffleValuesOpt] = useState(false);
+  const [isGeneratingAiVariants, setIsGeneratingAiVariants] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingQId, setEditingQId] = useState<number | string | null>(null);
@@ -159,14 +160,64 @@ export default function EditorView() {
     showToast(`Đang hiển thị đề thi: Mã đề ${target.code}`, 'info');
   };
 
-  const handlePerformShuffle = () => {
+  const handlePerformShuffle = async () => {
+    if (shuffleCodesCount <= 1 && !shuffleOrderOpt && !shuffleValuesOpt) {
+      showToast('Vui lòng chọn ít nhất 2 mã đề hoặc chọn phương thức xáo trộn', 'warning');
+      return;
+    }
+
+    if (shuffleValuesOpt && shuffleCodesCount > 1) {
+      setIsGeneratingAiVariants(true);
+      showToast(`AI đang tiến hành đổi số liệu và tự động giải lại đáp án cho ${shuffleCodesCount} mã đề...`, 'info');
+      try {
+        const targetCodes = Array.from({ length: shuffleCodesCount - 1 }, (_, i) => String(102 + i));
+        const res = await fetch('/api/v1/exams/isomorphic-variants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseQuestions: questions,
+            baseTitle: title || activeExam?.title || 'Đề thi',
+            subject: activeExam?.subject || 'Toán học',
+            grade: activeExam?.grade || 'Lớp 12',
+            term: activeExam?.term || 'Học kỳ 1',
+            variantCodes: targetCodes,
+            shuffleOrder: shuffleOrderOpt,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data?.variants) && data.data.variants.length > 0) {
+          const newVariants = data.data.variants;
+          setVariants(newVariants);
+          setSelectedVariantIdx(0);
+          if (newVariants[0]) {
+            setExamCode(newVariants[0].code);
+            setQuestions(newVariants[0].questions);
+          }
+          if (activeExam?.id) {
+            updateExam(activeExam.id, {
+              variants: newVariants,
+            });
+          }
+          setIsShuffleModalOpen(false);
+          showToast(`Đã tạo thành công ${newVariants.length} mã đề đồng dạng bằng AI với số liệu mới và đáp án tự động tính toán lại!`, 'success');
+          return;
+        }
+      } catch (err) {
+        console.warn('AI isomorphic shuffle failed, falling back to safe offline shuffle:', err);
+        showToast('Không thể kết nối AI, hệ thống tự động chuyển sang chế độ xáo thứ tự câu an toàn.', 'warning');
+      } finally {
+        setIsGeneratingAiVariants(false);
+      }
+    }
+
+    // Fast instant offline shuffle
     const newVariants = generateExamVariants(
       questions,
       title || activeExam?.title || 'Đề thi',
       {
         codeCount: shuffleCodesCount,
         shuffleOrder: shuffleOrderOpt,
-        shuffleValues: shuffleValuesOpt,
+        shuffleValues: false,
         baseCode: 101,
       }
     );
@@ -2800,11 +2851,21 @@ export default function EditorView() {
             </button>
             <button
               type="button"
+              disabled={isGeneratingAiVariants}
               onClick={handlePerformShuffle}
-              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
             >
-              <span className="material-symbols-outlined text-sm">shuffle</span>
-              <span>Tạo các mã đề</span>
+              {isGeneratingAiVariants ? (
+                <>
+                  <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  <span>AI đang giải lại đáp án...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">shuffle</span>
+                  <span>Tạo các mã đề</span>
+                </>
+              )}
             </button>
           </div>
         }
@@ -2869,11 +2930,12 @@ export default function EditorView() {
                 className="mt-0.5 rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
               />
               <div>
-                <div className="font-bold text-slate-800 dark:text-slate-200">
-                  Xáo thông số số liệu (Numerical Variation)
+                <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <span>Đổi thông số số liệu bằng AI (Tự động giải & tính lại đáp án)</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">AI Tương đương</span>
                 </div>
-                <div className="text-[11px] text-slate-400">
-                  Tinh chỉnh các tham số hằng số trong đề bài để mỗi mã đề có bài toán tương đương nhưng số liệu khác nhau.
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  AI giữ nguyên dạng bài từng câu của đề gốc, tạo bộ số liệu mới và tự động tính toán lại 100% đáp án đúng, phương án sai và lời giải chi tiết cho từng mã đề. Đồng bộ 1-1 ma trận giữa các mã đề!
                 </div>
               </div>
             </label>

@@ -572,17 +572,43 @@ export default function CreateExamView() {
         });
       }
 
-      // Multi-code Shuffling (101, 102, 103, 104...)
-      const examVariants = generateExamVariants(
+      // Multi-code Shuffling & AI Isomorphic Variants (101, 102, 103, 104...)
+      let examVariants = generateExamVariants(
         questions,
         examTitle,
         {
           codeCount: examCodesCount,
           shuffleOrder,
-          shuffleValues,
+          shuffleValues: false,
           baseCode: 101,
         }
       );
+
+      // If user enabled AI Parameter Variation (Đổi số liệu bằng AI & tự động giải lại đáp án)
+      if (examCodesCount > 1 && shuffleValues) {
+        try {
+          const targetCodes = Array.from({ length: examCodesCount - 1 }, (_, i) => String(102 + i));
+          const varRes = await fetch('/api/v1/exams/isomorphic-variants', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              baseQuestions: questions,
+              baseTitle: examTitle,
+              subject,
+              grade,
+              term: examType === 'CUSTOM' ? 'Tùy chỉnh' : 'Học kỳ 1',
+              variantCodes: targetCodes,
+              shuffleOrder,
+            }),
+          });
+          const varData = await varRes.json();
+          if (varData.success && Array.isArray(varData.data?.variants) && varData.data.variants.length > 0) {
+            examVariants = varData.data.variants;
+          }
+        } catch (varErr) {
+          console.warn('AI isomorphic variants call failed, falling back to safe offline shuffle:', varErr);
+        }
+      }
 
       const newExam: ExamItem = {
         id: data.data?.examId || `EX-${Date.now().toString().slice(-6)}`,
@@ -1559,7 +1585,7 @@ export default function CreateExamView() {
                     </div>
                   </label>
 
-                  {/* Option 2: Xáo số liệu bài toán */}
+                  {/* Option 2: Đổi thông số số liệu bằng AI */}
                   <label
                     className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition ${
                       shuffleValues
@@ -1574,11 +1600,12 @@ export default function CreateExamView() {
                       className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
                     />
                     <div>
-                      <div className="text-xs font-bold text-slate-800">
-                        Xáo thông số số liệu (Numerical Permutation)
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>Đổi thông số số liệu bằng AI (Tự động giải & tính lại đáp án)</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-700">AI Tương đương</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Cùng dạng bài nhưng biến thiên các hằng số số học giữa các mã đề để chống chép số liệu.
+                        AI giữ nguyên dạng bài từng câu của đề gốc, tạo bộ số liệu mới và tự động tính toán lại 100% đáp án đúng, phương án sai và lời giải chi tiết cho từng mã đề (102, 103, 104...). Đồng bộ 1-1 ma trận giữa các mã đề!
                       </p>
                     </div>
                   </label>
