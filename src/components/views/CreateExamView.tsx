@@ -562,14 +562,9 @@ export default function CreateExamView() {
 
         questions = uniqueFormatted;
       } else {
-        // High-quality curriculum question generator with zero duplicate guarantee
-        const { generateUniqueExamQuestions } = await import('@/lib/curriculum-questions');
-        questions = generateUniqueExamQuestions(subject, grade, questionCount, {
-          easy,
-          medium,
-          hard,
-          veryHard,
-        });
+        const errorMsg = data.error || data.message || 'Không thể tạo đề thi bằng AI. Vui lòng kiểm tra lại API Key hoặc hạn mức dịch vụ.';
+        showToast(errorMsg, 'error');
+        return;
       }
 
       // Multi-code Shuffling & AI Isomorphic Variants (101, 102, 103, 104...)

@@ -280,7 +280,7 @@ export default function MathText({ content, className = '', inline = false }: Ma
 </div>
 `.trim();
 
-      html = html.replace(token, codeBoxHtml);
+      html = html.replace(token, () => codeBoxHtml);
     });
 
     // Step 4: Replace SVG tokens with responsive & print-friendly geometry diagrams
@@ -305,13 +305,13 @@ export default function MathText({ content, className = '', inline = false }: Ma
 </div>
 `.trim();
 
-      html = html.replace(token, svgBoxHtml);
+      html = html.replace(token, () => svgBoxHtml);
     });
 
     // Step 5: Replace Table tokens
     tableBlocks.forEach((tb, idx) => {
       const token = `__TABLE_BLOCK_${idx}__`;
-      html = html.replace(token, tb);
+      html = html.replace(token, () => tb);
     });
 
     return html;

@@ -1707,20 +1707,32 @@ export function generateLatexString(
 
     latex += `\\noindent\\textbf{BẢNG ĐÁP ÁN:}\\\\[0.5em]\n`;
     latex += `\\begin{center}\n`;
-    latex += `\\begin{tabular}{|` + Array(Math.min(10, questions.length)).fill('c').join('|') + `|}\n`;
+    const cols = 10;
+    const actualCols = Math.min(cols, Math.max(1, questions.length));
+    latex += `\\begin{tabular}{|` + Array(actualCols).fill('c').join('|') + `|}\n`;
     latex += `\\hline\n`;
 
-    const cols = 10;
-    const totalRows = Math.ceil(questions.length / cols);
+    const totalRows = Math.ceil(questions.length / actualCols);
     for (let r = 0; r < totalRows; r++) {
       // Question headers
-      const qNums = [];
-      const answers = [];
-      for (let c = 0; c < cols; c++) {
-        const qIdx = r * cols + c;
+      const qNums: string[] = [];
+      const answers: string[] = [];
+      for (let c = 0; c < actualCols; c++) {
+        const qIdx = r * actualCols + c;
         if (qIdx < questions.length) {
           qNums.push(`\\textbf{${qIdx + 1}}`);
-          answers.push(`\\textbf{${questions[qIdx].correctAnswer}}`);
+          let ansText = String(questions[qIdx].correctAnswer || '').trim();
+          // Escape LaTeX special characters
+          ansText = ansText.replace(/(?<!\\)%/g, '\\%').replace(/_/g, '\\_');
+          // Shorten long answers so table does not overflow page
+          if (ansText.length > 16) {
+            ansText = ansText.slice(0, 14) + '..';
+          }
+          answers.push(`\\textbf{${ansText}}`);
+        } else {
+          // Pad empty cells to guarantee exact column count
+          qNums.push('');
+          answers.push('');
         }
       }
       latex += qNums.join(' & ') + ' \\\\\\hline\n';
@@ -1731,7 +1743,8 @@ export function generateLatexString(
 
     latex += `\\noindent\\textbf{HƯỚNG DẪN GIẢI CHI TIẾT:}\\\\[0.5em]\n`;
     questions.forEach((q, idx) => {
-      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${q.correctAnswer}):} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
+      const safeAns = String(q.correctAnswer || '').replace(/(?<!\\)%/g, '\\%').replace(/_/g, '\\_');
+      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${safeAns}):} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
     });
   }
 

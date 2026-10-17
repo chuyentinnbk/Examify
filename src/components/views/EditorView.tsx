@@ -866,27 +866,73 @@ export default function EditorView() {
       const data = await res.json();
       if (data.success && data.data?.question) {
         const newQ = data.data.question;
-        setQuestions((prev) =>
-          prev.map((item) =>
-            item.id === q.id
-              ? {
-                  ...item,
-                  _previousContents: Array.from(new Set([...updatedHistory, newQ.content])),
-                  content: newQ.content,
-                  type: newQ.type || q.type || 'multiple_choice',
-                  options: (newQ.options || []).map((opt: any) => ({
-                    ...opt,
-                    text: cleanOptionText(opt.text),
-                  })),
-                  correctAnswer: newQ.correctAnswer,
-                  explanation: newQ.explanation,
-                  level: newQ.level || item.level,
-                  points: newQ.points || item.points,
-                }
-              : item
-          )
+        const normType = newQ.type || q.type || 'multiple_choice';
+        const updatedList = questions.map((item) =>
+          item.id === q.id
+            ? {
+                ...item,
+                _previousContents: Array.from(new Set([...updatedHistory, newQ.content])),
+                content: newQ.content,
+                type: normType,
+                section: normType,
+                options: (newQ.options || []).map((opt: any) => ({
+                  ...opt,
+                  text: cleanOptionText(opt.text),
+                })),
+                correctAnswer: newQ.correctAnswer,
+                explanation: newQ.explanation,
+                level: newQ.level || item.level,
+                points: newQ.points || item.points,
+              }
+            : item
         );
-        showToast(`Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI`, 'success');
+        const sorted = sortQuestionsBySection(updatedList);
+        setQuestions(sorted);
+
+        const qIndex = questions.findIndex((item) => item.id === q.id);
+        const replacedItem = sorted.find((item) => item.id === q.id);
+
+        if (variants && variants.length > 0) {
+          const updatedVariants = variants.map((v, vIdx) => {
+            if (vIdx === selectedVariantIdx) {
+              return { ...v, questions: sorted };
+            }
+            const vQuestions = (v.questions || []).map((vQ: ExamQuestion, idx: number) => {
+              if (vQ.id === q.id || (qIndex >= 0 && idx === qIndex)) {
+                return {
+                  ...vQ,
+                  content: replacedItem?.content ?? newQ.content,
+                  type: normType,
+                  section: normType,
+                  options: replacedItem?.options ?? newQ.options,
+                  correctAnswer: replacedItem?.correctAnswer ?? newQ.correctAnswer,
+                  explanation: replacedItem?.explanation ?? newQ.explanation,
+                  level: replacedItem?.level ?? newQ.level,
+                  points: replacedItem?.points ?? newQ.points,
+                };
+              }
+              return vQ;
+            });
+            return {
+              ...v,
+              questions: sortQuestionsBySection(vQuestions),
+            };
+          });
+          setVariants(updatedVariants);
+          if (activeExam?.id) {
+            updateExam(activeExam.id, {
+              variants: updatedVariants,
+              questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+              questionsCount: sorted.length,
+            });
+          }
+        } else if (activeExam?.id) {
+          updateExam(activeExam.id, {
+            questions: sorted,
+            questionsCount: sorted.length,
+          });
+        }
+        showToast(`Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI và đồng bộ các mã đề!`, 'success');
       } else {
         showToast('Không thể tạo lại câu hỏi AI', 'error');
       }
@@ -949,38 +995,109 @@ export default function EditorView() {
       });
 
       const data = await res.json();
-      if (data.success && data.data?.exam) {
-        const generated = data.data.exam;
-        const newQuestions: ExamQuestion[] = (generated.questions || []).map((q: any, i: number) => ({
-          id: Date.now() + i,
-          order: `Câu ${String(i + 1).padStart(2, '0')}`,
-          level: q.level || 'Thông hiểu',
-          levelClass:
-            q.level === 'Nhận biết'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : q.level === 'Thông hiểu'
-              ? 'bg-blue-50 text-blue-700 border-blue-200'
-              : q.level === 'Vận dụng'
-              ? 'bg-amber-50 text-amber-700 border-amber-200'
-              : 'bg-rose-50 text-rose-700 border-rose-200',
-          topic: activeExam.subject,
-          content: q.content,
-          options: (q.options || []).map((opt: any, optIdx: number) => {
-            const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
-            const optText = typeof opt === 'string' ? opt : opt.text || '';
-            return {
-              key,
-              text: cleanOptionText(optText),
-              isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
-            };
-          }),
-          points: q.points || 0.25,
-          correctAnswer: q.correctAnswer || 'A',
-          explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
-        }));
+      const generated = data.data?.exam || data.data?.examData;
+      if (data.success && generated) {
+        const rawList = generated.questions || [];
+        const newQuestions: ExamQuestion[] = rawList.map((q: any, i: number) => {
+          const rawType = String(q.type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
+          const qType: QuestionType = rawType.includes('true') || rawType.includes('dung')
+            ? 'true_false'
+            : rawType.includes('short') || rawType.includes('ngan')
+            ? 'short_answer'
+            : rawType.includes('essay') || rawType.includes('luan')
+            ? 'essay'
+            : 'multiple_choice';
 
-        setQuestions(newQuestions);
-        showToast(`Đã tạo lại thành công toàn bộ ${newQuestions.length} câu hỏi mới bằng AI!`, 'success');
+          const levelStr = q.level || 'Thông hiểu';
+          let formattedOptions: any[] = [];
+          if (qType === 'true_false') {
+            const subKeys = ['a', 'b', 'c', 'd'];
+            formattedOptions = (q.options || ['Mệnh đề a', 'Mệnh đề b', 'Mệnh đề c', 'Mệnh đề d']).map((opt: any, optIdx: number) => {
+              const key = subKeys[optIdx] || String(optIdx);
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const isCorrect = q.correctAnswer
+                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                : optIdx % 2 === 0;
+              return { key, text: cleanText || textVal, isCorrect };
+            });
+          } else if (qType === 'multiple_choice') {
+            formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
+              const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              return {
+                key,
+                text: cleanText || textVal,
+                isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
+              };
+            });
+          }
+
+          let finalAnswer = q.correctAnswer || 'A';
+          if (qType === 'short_answer') {
+            finalAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+          } else if (qType === 'essay') {
+            finalAnswer = q.correctAnswer && !q.correctAnswer.includes('Xem') ? q.correctAnswer : 'Xem hướng dẫn chấm';
+          } else if (qType === 'true_false') {
+            finalAnswer = q.correctAnswer || 'a: Đ, b: S, c: Đ, d: S';
+          }
+
+          return {
+            id: Date.now() + i,
+            order: `Câu ${String(i + 1).padStart(2, '0')}`,
+            type: qType,
+            section: qType,
+            level: levelStr,
+            levelClass:
+              levelStr === 'Nhận biết'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : levelStr === 'Thông hiểu'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : levelStr === 'Vận dụng'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200',
+            topic: activeExam.subject,
+            content: q.content,
+            options: formattedOptions,
+            points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
+            correctAnswer: finalAnswer,
+            explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+          };
+        });
+
+        const sorted = sortQuestionsBySection(newQuestions);
+        sorted.forEach((item, idx) => {
+          item.order = `Câu ${String(idx + 1).padStart(2, '0')}`;
+        });
+        setQuestions(sorted);
+
+        let updatedVariants: any[] | undefined = undefined;
+        if (variants && variants.length > 1) {
+          updatedVariants = generateExamVariants(
+            sorted,
+            title || activeExam?.title || 'Đề thi',
+            {
+              codeCount: variants.length,
+              shuffleOrder: true,
+              shuffleValues: false,
+              baseCode: 101,
+            }
+          );
+          setVariants(updatedVariants);
+        } else if (variants && variants.length === 1) {
+          updatedVariants = [{ ...variants[0], questions: sorted }];
+          setVariants(updatedVariants);
+        }
+
+        if (activeExam?.id) {
+          updateExam(activeExam.id, {
+            questions: sorted,
+            questionsCount: sorted.length,
+            variants: updatedVariants,
+          });
+        }
+        showToast(`Đã tạo lại thành công toàn bộ ${sorted.length} câu hỏi mới bằng AI!`, 'success');
       } else {
         showToast(data.message || 'Lỗi khi tạo lại toàn bộ đề thi', 'error');
       }

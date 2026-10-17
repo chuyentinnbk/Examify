@@ -274,7 +274,11 @@ export default function DashboardView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => deleteExam(exam.id)}
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn đề thi "${exam.title}" không?`)) {
+                      deleteExam(exam.id);
+                    }
+                  }}
                   title="Xóa đề"
                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                 >
