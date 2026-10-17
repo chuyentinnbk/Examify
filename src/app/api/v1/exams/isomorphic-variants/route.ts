@@ -162,13 +162,6 @@ export async function POST(req: NextRequest) {
       }
 
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.8-flash',
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: Math.min(0.95, 0.75 + codeIndex * 0.05),
-        },
-      });
 
       const diversityDirectives = [
         `MÃ ĐỀ ${targetCode} (Biến thể thứ 1): Hãy chọn hệ số chẵn đẹp hoặc nhân hệ số k = 2; các nghiệm số nguyên dương gọn gàng.`,
@@ -245,8 +238,41 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
   }
 ]`;
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const fallbackModels = (process.env.GEMINI_MODEL || 'gemini-3.7-flash, gemini-3.5-flash, gemini-3.8-flash')
+        .split(/[,;]+/)
+        .map((m) => m.trim())
+        .filter((m) => m.length > 0);
+
+      let lastErr: any = null;
+      let text = '';
+
+      for (const currentModel of fallbackModels) {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: currentModel,
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: Math.min(0.95, 0.75 + codeIndex * 0.05),
+            },
+          });
+          const result = await model.generateContent(prompt);
+          text = result.response.text();
+          if (text) break;
+        } catch (err: any) {
+          lastErr = err;
+          const msg = err?.message || '';
+          console.warn(`[isomorphic-variants] Model ${currentModel} error: ${msg}. Trying next fallback model...`);
+          if (msg.includes('429') || msg.includes('404') || msg.toLowerCase().includes('quota')) {
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!text) {
+        throw lastErr || new Error('All fallback models failed to generate content');
+      }
+
       const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
       const parsedArray = JSON.parse(clean);
 

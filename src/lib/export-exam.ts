@@ -1014,9 +1014,57 @@ function escapeHtmlForDoc(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
+function formatMarkdownTableForDocHtml(tableBlock: string): string {
+  const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+  if (lines.length < 2) return escapeHtmlForDoc(tableBlock);
+
+  const parseRow = (line: string) => {
+    const trimmed = line.replace(/^\||\|$/g, '');
+    return trimmed.split('|').map((cell) => cell.trim());
+  };
+
+  const headerCells = parseRow(lines[0]);
+  const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+  const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+
+  let rowsHtml = `<tr style="background-color: #f1f5f9;">` +
+    headerCells.map((c) => `<th style="border: 1pt solid #000; padding: 4px 8px; text-align: center; font-weight: bold; font-size: 10pt;">${escapeHtmlForDoc(cleanMathForDoc(c))}</th>`).join('') +
+    `</tr>`;
+
+  dataLines.forEach((line) => {
+    const cells = parseRow(line);
+    rowsHtml += `<tr>` +
+      cells.map((c) => `<td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; font-size: 10pt;">${escapeHtmlForDoc(cleanMathForDoc(c))}</td>`).join('') +
+      `</tr>`;
+  });
+
+  return `<table style="border-collapse: collapse; width: 100%; margin: 8px 0; border: 1pt solid #000;">${rowsHtml}</table>`;
+}
+
+function formatTextAndTablesForDocHtml(text: string): string {
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  const res: string[] = [];
+
+  while ((m = tableRegex.exec(text)) !== null) {
+    const before = text.slice(lastIdx, m.index);
+    if (before) {
+      res.push(escapeHtmlForDoc(cleanMathForDoc(before)));
+    }
+    res.push(formatMarkdownTableForDocHtml(m[0]));
+    lastIdx = m.index + m[0].length;
+  }
+  const after = text.slice(lastIdx);
+  if (after) {
+    res.push(escapeHtmlForDoc(cleanMathForDoc(after)));
+  }
+  return res.join('');
+}
+
 /**
  * Formats question content for Microsoft Word HTML (.doc),
- * rendering code snippets with Consolas blocks and preserving clean math typography.
+ * rendering code snippets with Consolas blocks, tables, and preserving clean math typography.
  */
 function formatContentForDocHtml(rawContent: string): string {
   if (!rawContent) return '';
@@ -1028,7 +1076,7 @@ function formatContentForDocHtml(rawContent: string): string {
   while ((match = codeBlockRegex.exec(rawContent)) !== null) {
     const textBefore = rawContent.slice(lastIndex, match.index);
     if (textBefore) {
-      parts.push(escapeHtmlForDoc(cleanMathForDoc(textBefore)));
+      parts.push(formatTextAndTablesForDocHtml(textBefore));
     }
     const escapedCode = match[1]
       .replace(/&/g, '&amp;')
@@ -1041,7 +1089,7 @@ function formatContentForDocHtml(rawContent: string): string {
   }
   const textAfter = rawContent.slice(lastIndex);
   if (textAfter) {
-    parts.push(escapeHtmlForDoc(cleanMathForDoc(textAfter)));
+    parts.push(formatTextAndTablesForDocHtml(textAfter));
   }
   return parts.join('');
 }

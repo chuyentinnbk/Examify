@@ -115,6 +115,47 @@ export default function MathText({ content, className = '', inline = false }: Ma
       return token;
     });
 
+    // Step 1.5: Extract and tokenise Markdown tables
+    const tableBlocks: string[] = [];
+    const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+
+    preprocessed = preprocessed.replace(tableRegex, (tableBlock) => {
+      const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+      if (lines.length < 2) return tableBlock;
+
+      const parseRow = (line: string) => {
+        const trimmed = line.replace(/^\||\|$/g, '');
+        return trimmed.split('|').map((cell) => cell.trim());
+      };
+
+      const headerCells = parseRow(lines[0]);
+      const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+      const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+
+      let rowsHtml = `<thead class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200"><tr>` +
+        headerCells.map((c) => `<th class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-center font-bold text-xs select-text">${escapeHtml(c)}</th>`).join('') +
+        `</tr></thead><tbody>`;
+
+      dataLines.forEach((line, rIdx) => {
+        const cells = parseRow(line);
+        const bg = rIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/60 dark:bg-slate-800/40';
+        rowsHtml += `<tr class="${bg}">` +
+          cells.map((c) => `<td class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 select-text">${escapeHtml(c)}</td>`).join('') +
+          `</tr>`;
+      });
+      rowsHtml += `</tbody>`;
+
+      const tableBoxHtml = `
+<div class="my-2.5 overflow-x-auto rounded-lg border border-slate-300 dark:border-slate-700 shadow-sm print:shadow-none print:border-black print:my-1.5 not-italic">
+  <table class="w-full border-collapse text-xs not-italic text-left">${rowsHtml}</table>
+</div>
+`.trim();
+
+      const token = `__TABLE_BLOCK_${tableBlocks.length}__`;
+      tableBlocks.push(tableBoxHtml);
+      return token;
+    });
+
     // Step 2: Extract LaTeX math: $$...$$ or $...$
     const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?:\\.|[^\$\\])+\$)/g;
     const parts = preprocessed.split(mathRegex);
@@ -168,8 +209,8 @@ export default function MathText({ content, className = '', inline = false }: Ma
       .join('');
 
     // Clean up excessive <br /> tags surrounding block tokens so layout doesn't have huge blank vertical gaps
-    html = html.replace(/(?:<br\s*\/?>\s*)+(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__)/gi, '$1');
-    html = html.replace(/(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__)(?:\s*<br\s*\/?>)+/gi, '$1');
+    html = html.replace(/(?:<br\s*\/?>\s*)+(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__|__TABLE_BLOCK_\d+__)/gi, '$1');
+    html = html.replace(/(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__|__TABLE_BLOCK_\d+__)(?:\s*<br\s*\/?>)+/gi, '$1');
 
     // Step 3: Replace code block tokens with 2-column line numbered IDE cards
     codeBlocks.forEach((cb, idx) => {
@@ -233,6 +274,12 @@ export default function MathText({ content, className = '', inline = false }: Ma
 `.trim();
 
       html = html.replace(token, svgBoxHtml);
+    });
+
+    // Step 5: Replace Table tokens
+    tableBlocks.forEach((tb, idx) => {
+      const token = `__TABLE_BLOCK_${idx}__`;
+      html = html.replace(token, tb);
     });
 
     return html;
