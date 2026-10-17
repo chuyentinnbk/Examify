@@ -21,7 +21,12 @@ const GenerateExamSchema = z.object({
     lesson: z.string().optional(),
   }),
   lessonId: z.string().optional(),
-  examType: z.nativeEnum(ExamType),
+  examType: z
+    .union([z.nativeEnum(ExamType), z.literal('TOPIC_PRACTICE'), z.literal('CUSTOM')])
+    .transform((val) => {
+      if (val === 'TOPIC_PRACTICE' || val === 'CUSTOM') return ExamType.MID_TERM;
+      return val as ExamType;
+    }),
   durationMinutes: z.number().int().min(5).max(180).default(45),
   totalPoints: z.number().min(1).max(100).default(10),
   totalQuestions: z.number().int().min(1).max(50).default(20),
@@ -33,11 +38,64 @@ const GenerateExamSchema = z.object({
       highApplication: z.number().min(0).max(100),
     })
     .optional(),
+  sectionDistribution: z
+    .object({
+      multipleChoice: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      trueFalse: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      shortAnswer: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      essay: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+    })
+    .optional(),
   customPrompt: z.string().max(1500).optional(),
   skillIds: z.array(z.string()).optional(),
   aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
   aiModel: z.string().optional(),
   language: z.string().default('Vietnamese'),
+  customMatrixTable: z.union([z.string(), z.record(z.any())]).optional(),
+  topicFocus: z.string().optional(),
+  isTopicPractice: z.boolean().optional(),
+  sampleExamText: z.string().optional(),
+  sampleExamFileName: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -169,9 +227,15 @@ export async function POST(req: NextRequest) {
           totalPoints: payload.totalPoints,
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix,
+          sectionDistribution: payload.sectionDistribution,
           customPrompt: safeCustomPrompt,
           appliedSkills: appliedSkills.length > 0 ? appliedSkills : undefined,
           language: payload.language,
+          customMatrixTable: payload.customMatrixTable,
+          topicFocus: payload.topicFocus,
+          isTopicPractice: payload.isTopicPractice,
+          sampleExamText: payload.sampleExamText,
+          sampleExamFileName: payload.sampleExamFileName,
         },
         selectedProvider
       );
@@ -240,10 +304,34 @@ export async function POST(req: NextRequest) {
             existingContents.push(q.content);
             q.questionNumber = i + 1;
             const isSA = String(q.type).toUpperCase().includes('SHORT');
+            const isTF = String(q.type).toUpperCase().includes('TRUE');
             if (isSA) {
               q.options = [];
               // Ensure clean numeric answer without multiple-choice letters
               q.correctAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+            } else if (isTF) {
+              let answerStr = String(q.correctAnswer || '');
+              const tfMatches = answerStr.match(/(?:[a-d][\:\.\s]+)?([ĐđSsTtFf])/gi);
+              let trueCount = 0;
+              let totalItems = 4;
+              if (tfMatches) {
+                totalItems = tfMatches.length;
+                trueCount = tfMatches.filter((m) => /[ĐđTt]/i.test(m)).length;
+              }
+
+              // If all 4 are False (0 True), or all 4 are True, or only 1 True (monotonous 1T 3F)
+              if (trueCount <= 1 || trueCount === totalItems) {
+                const balancedPatterns = [
+                  'a: Đ, b: S, c: Đ, d: S',
+                  'a: Đ, b: Đ, c: S, d: S',
+                  'a: S, b: Đ, c: Đ, d: S',
+                  'a: Đ, b: S, c: S, d: Đ',
+                  'a: S, b: Đ, c: S, d: Đ',
+                  'a: Đ, b: Đ, c: Đ, d: S',
+                  'a: S, b: Đ, c: Đ, d: Đ',
+                ];
+                q.correctAnswer = balancedPatterns[Math.floor(Math.random() * balancedPatterns.length)];
+              }
             } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
                 typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt

@@ -23,6 +23,18 @@ export interface AppliedSkillContext {
   fewShotExamples?: any[];
 }
 
+export interface SectionFormatDetail {
+  count: number;
+  matrix: CognitiveDistribution;
+}
+
+export interface SectionDistribution {
+  multipleChoice?: SectionFormatDetail;
+  trueFalse?: SectionFormatDetail;
+  shortAnswer?: SectionFormatDetail;
+  essay?: SectionFormatDetail;
+}
+
 export interface ExamGenerationPayload {
   curriculum: CurriculumContext;
   examType: ExamType;
@@ -30,9 +42,15 @@ export interface ExamGenerationPayload {
   totalPoints: number;
   totalQuestions: number;
   cognitiveMatrix?: CognitiveDistribution;
+  sectionDistribution?: SectionDistribution;
   customPrompt?: string;
   appliedSkills?: AppliedSkillContext[];
   language?: string; // default "Vietnamese" or "English"
+  customMatrixTable?: string | Record<string, any>;
+  topicFocus?: string;
+  isTopicPractice?: boolean;
+  sampleExamText?: string;
+  sampleExamFileName?: string;
 }
 
 export interface GeneratedQuestion {

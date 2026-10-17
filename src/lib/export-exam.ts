@@ -84,6 +84,9 @@ export function cleanMathForDoc(text: string): string {
 
   let res = text;
 
+  // Strip raw SVG XML blocks into a clean note so Word document doesn't get flooded with XML code
+  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n[Hình vẽ minh họa: Vui lòng xem trên bản in PDF hoặc giao diện web]\n');
+
   // Convert LaTeX fractions: \frac{a}{b} -> (a)/(b)
   res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
   res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
@@ -199,6 +202,85 @@ export function getOptionsLayout(options: { text: string }[]): 4 | 2 | 1 {
   }
   // Otherwise: 2 on 1 line (2 rows x 2 cols)
   return 2;
+}
+
+/**
+ * Renders question content into formatted docx paragraphs,
+ * properly supporting both regular text and highlighted monospace code blocks (Python, C++...).
+ */
+function renderQuestionContentToDocx(qNum: number, rawContent: string): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+  const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let isFirstPart = true;
+
+  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
+    const textBefore = rawContent.slice(lastIndex, match.index).trim();
+    if (textBefore || isFirstPart) {
+      const runs: TextRun[] = [];
+      if (isFirstPart) {
+        runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+        isFirstPart = false;
+      }
+      if (textBefore) {
+        runs.push(new TextRun({ text: cleanMathForDoc(textBefore), size: 22 }));
+      }
+      paragraphs.push(
+        new Paragraph({
+          children: runs,
+          spacing: { before: 140, after: 60 },
+        })
+      );
+    }
+
+    const code = match[1].replace(/\r\n/g, '\n').trimEnd();
+    const codeLines = code.split('\n');
+    paragraphs.push(
+      new Paragraph({
+        children: codeLines.map((line, lineIdx) =>
+          new TextRun({
+            text: line,
+            font: 'Consolas',
+            size: 20,
+            color: '1E293B',
+            break: lineIdx > 0 ? 1 : 0,
+          })
+        ),
+        shading: { fill: 'F1F5F9' },
+        indent: { left: 400, right: 400 },
+        spacing: { before: 80, after: 80 },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 12, color: '3B82F6' },
+          top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+          right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+        },
+      })
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  const textAfter = rawContent.slice(lastIndex).trim();
+  if (textAfter || isFirstPart) {
+    const runs: TextRun[] = [];
+    if (isFirstPart) {
+      runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+    }
+    if (textAfter) {
+      runs.push(new TextRun({ text: cleanMathForDoc(textAfter), size: 22 }));
+    }
+    paragraphs.push(
+      new Paragraph({
+        children: runs,
+        spacing: { before: isFirstPart ? 140 : 60, after: 60 },
+      })
+    );
+  }
+
+  return paragraphs;
 }
 
 /**
@@ -410,16 +492,9 @@ export async function generateDocxBlob(
       }
     }
 
-    // Question Title & Content (chuẩn đề thi: Câu 1. nội dung)
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({ text: `Câu ${idx + 1}. `, bold: true, size: 22, color: '2563EB' }),
-          new TextRun({ text: cleanMathForDoc(q.content || ''), size: 22 }),
-        ],
-        spacing: { before: 140, after: 60 },
-      })
-    );
+    // Question Title & Content (chuẩn đề thi: Câu 1. nội dung, hỗ trợ khối mã nguồn code block)
+    const contentParagraphs = renderQuestionContentToDocx(idx + 1, q.content || '');
+    contentParagraphs.forEach((p) => docChildren.push(p));
 
     // 1. Loại: Đúng / Sai (Bảng 4 cột chuẩn Bộ GD&ĐT: STT, Mệnh đề, Đúng, Sai)
     if (normType === 'true_false') {
@@ -931,6 +1006,94 @@ export async function exportExamToDocx(
   downloadBlob(blob, `${safeTitle}.docx`);
 }
 
+function escapeHtmlForDoc(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatMarkdownTableForDocHtml(tableBlock: string): string {
+  const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+  if (lines.length < 2) return escapeHtmlForDoc(tableBlock);
+
+  const parseRow = (line: string) => {
+    const trimmed = line.replace(/^\||\|$/g, '');
+    return trimmed.split('|').map((cell) => cell.trim());
+  };
+
+  const headerCells = parseRow(lines[0]);
+  const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+  const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+
+  let rowsHtml = `<tr style="background-color: #f1f5f9;">` +
+    headerCells.map((c) => `<th style="border: 1pt solid #000; padding: 4px 8px; text-align: center; font-weight: bold; font-size: 10pt;">${escapeHtmlForDoc(cleanMathForDoc(c))}</th>`).join('') +
+    `</tr>`;
+
+  dataLines.forEach((line) => {
+    const cells = parseRow(line);
+    rowsHtml += `<tr>` +
+      cells.map((c) => `<td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; font-size: 10pt;">${escapeHtmlForDoc(cleanMathForDoc(c))}</td>`).join('') +
+      `</tr>`;
+  });
+
+  return `<table style="border-collapse: collapse; width: 100%; margin: 8px 0; border: 1pt solid #000;">${rowsHtml}</table>`;
+}
+
+function formatTextAndTablesForDocHtml(text: string): string {
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  const res: string[] = [];
+
+  while ((m = tableRegex.exec(text)) !== null) {
+    const before = text.slice(lastIdx, m.index);
+    if (before) {
+      res.push(escapeHtmlForDoc(cleanMathForDoc(before)));
+    }
+    res.push(formatMarkdownTableForDocHtml(m[0]));
+    lastIdx = m.index + m[0].length;
+  }
+  const after = text.slice(lastIdx);
+  if (after) {
+    res.push(escapeHtmlForDoc(cleanMathForDoc(after)));
+  }
+  return res.join('');
+}
+
+/**
+ * Formats question content for Microsoft Word HTML (.doc),
+ * rendering code snippets with Consolas blocks, tables, and preserving clean math typography.
+ */
+function formatContentForDocHtml(rawContent: string): string {
+  if (!rawContent) return '';
+  const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const parts: string[] = [];
+
+  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
+    const textBefore = rawContent.slice(lastIndex, match.index);
+    if (textBefore) {
+      parts.push(formatTextAndTablesForDocHtml(textBefore));
+    }
+    const escapedCode = match[1]
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    parts.push(
+      `<pre style="background: #f1f5f9; border-left: 3px solid #2563eb; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; padding: 8px 12px; margin: 8px 0; font-family: Consolas, 'Courier New', monospace; font-size: 10pt; line-height: 1.4; color: #0f172a; white-space: pre-wrap;"><code>${escapedCode}</code></pre>`
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  const textAfter = rawContent.slice(lastIndex);
+  if (textAfter) {
+    parts.push(formatTextAndTablesForDocHtml(textAfter));
+  }
+  return parts.join('');
+}
+
 /**
  * Generates Word HTML (.doc) string with complete Microsoft Word Office namespaces,
  * ensuring modern Word versions open without file block or corruption warnings.
@@ -1068,7 +1231,7 @@ export function generateDocHtml(
 
     htmlContent += `
     <div class="question">
-      <div class="q-title"><strong style="color: #2563eb;">Câu ${idx + 1}.</strong> ${cleanMathForDoc(q.content || '')}</div>
+      <div class="q-title"><strong style="color: #2563eb;">Câu ${idx + 1}.</strong> ${formatContentForDocHtml(q.content || '')}</div>
     `;
 
     if (normType === 'true_false') {
@@ -1098,7 +1261,7 @@ export function generateDocHtml(
               return `
             <tr>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; font-weight: bold; width: 6%;">${labelKey})</td>
-              <td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; width: 70%;">${cleanMathForDoc(cleanOpt(item.text))}</td>
+              <td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; width: 70%;">${escapeHtmlForDoc(cleanMathForDoc(cleanOpt(item.text)))}</td>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; width: 12%; font-size: 13pt;">${dungMark}</td>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; width: 12%; font-size: 13pt;">${saiMark}</td>
             </tr>
@@ -1142,10 +1305,10 @@ export function generateDocHtml(
         htmlContent += `
         <table class="options-grid">
           <tr>
-            <td style="width: 25%"><strong>A.</strong> ${cleanOpt(optA)}</td>
-            <td style="width: 25%"><strong>B.</strong> ${cleanOpt(optB)}</td>
-            <td style="width: 25%"><strong>C.</strong> ${cleanOpt(optC)}</td>
-            <td style="width: 25%"><strong>D.</strong> ${cleanOpt(optD)}</td>
+            <td style="width: 25%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td>
+            <td style="width: 25%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td>
+            <td style="width: 25%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td>
+            <td style="width: 25%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td>
           </tr>
         </table>
         `;
@@ -1153,22 +1316,22 @@ export function generateDocHtml(
         htmlContent += `
         <table class="options-grid">
           <tr>
-            <td style="width: 50%"><strong>A.</strong> ${cleanOpt(optA)}</td>
-            <td style="width: 50%"><strong>B.</strong> ${cleanOpt(optB)}</td>
+            <td style="width: 50%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td>
+            <td style="width: 50%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td>
           </tr>
           <tr>
-            <td style="width: 50%"><strong>C.</strong> ${cleanOpt(optC)}</td>
-            <td style="width: 50%"><strong>D.</strong> ${cleanOpt(optD)}</td>
+            <td style="width: 50%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td>
+            <td style="width: 50%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td>
           </tr>
         </table>
         `;
       } else {
         htmlContent += `
         <table class="options-grid">
-          <tr><td style="width: 100%"><strong>A.</strong> ${cleanOpt(optA)}</td></tr>
-          <tr><td style="width: 100%"><strong>B.</strong> ${cleanOpt(optB)}</td></tr>
-          <tr><td style="width: 100%"><strong>C.</strong> ${cleanOpt(optC)}</td></tr>
-          <tr><td style="width: 100%"><strong>D.</strong> ${cleanOpt(optD)}</td></tr>
+          <tr><td style="width: 100%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td></tr>
+          <tr><td style="width: 100%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td></tr>
+          <tr><td style="width: 100%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td></tr>
+          <tr><td style="width: 100%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td></tr>
         </table>
         `;
       }
@@ -1197,7 +1360,7 @@ export function generateDocHtml(
       if (idx > 0 && idx % 10 === 0) {
         htmlContent += `</tr><tr>`;
       }
-      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${cleanMathForDoc(q.correctAnswer || '')}</span></td>`;
+      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}</span></td>`;
     });
 
     htmlContent += `
@@ -1210,7 +1373,7 @@ export function generateDocHtml(
     questions.forEach((q, idx) => {
       htmlContent += `
       <div class="solution-item">
-        <strong>Câu ${idx + 1} (Đáp án ${cleanMathForDoc(q.correctAnswer || '')}):</strong> <em>${cleanMathForDoc(q.explanation || 'Xem định nghĩa SGK.')}</em>
+        <strong>Câu ${idx + 1} (Đáp án ${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}):</strong> <em>${escapeHtmlForDoc(cleanMathForDoc(q.explanation || 'Xem định nghĩa SGK.'))}</em>
       </div>
       `;
     });
@@ -1245,6 +1408,22 @@ export function exportExamToDoc(
     .replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, '_')
     .replace(/_+/g, '_');
   downloadBlob(blob, `${safeTitle}.doc`);
+}
+
+/**
+ * Formats question content for LaTeX (.tex),
+ * escaping raw SVG to a clean LaTeX framebox and formatting code blocks with verbatim.
+ */
+function formatContentForLatex(rawContent: string): string {
+  if (!rawContent) return '';
+  let res = rawContent;
+  // Replace SVG with a neat centered LaTeX framebox so pdflatex never crashes
+  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n\\begin{center}\\fbox{\\textit{[Hình vẽ minh họa: Vui lòng xem bản vẽ trên web hoặc bản PDF]}}\\end{center}\n');
+  // Format code blocks using standard LaTeX verbatim
+  res = res.replace(/```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g, (_, code) => {
+    return `\n\\begin{verbatim}\n${code.trimEnd()}\n\\end{verbatim}\n`;
+  });
+  return res;
 }
 
 /**
@@ -1320,7 +1499,7 @@ export function generateLatexString(
     const qType = (q.type || 'multiple_choice').toLowerCase().replace('_', '');
 
     latex += `% --- Câu ${idx + 1} ---\n`;
-    latex += `\\noindent \\textbf{Câu ${idx + 1}:} ${q.content}\\\\[0.2em]\n`;
+    latex += `\\noindent \\textbf{Câu ${idx + 1}:} ${formatContentForLatex(q.content)}\\\\[0.2em]\n`;
 
     if (normType === 'true_false') {
       const items = (q.options || []).length > 0 ? q.options : [
@@ -1415,7 +1594,7 @@ export function generateLatexString(
 
     latex += `\\noindent\\textbf{HƯỚNG DẪN GIẢI CHI TIẾT:}\\\\[0.5em]\n`;
     questions.forEach((q, idx) => {
-      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${q.correctAnswer}):} \\textit{${q.explanation || 'Xem định nghĩa SGK.'}}\\\\[0.6em]\n`;
+      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${q.correctAnswer}):} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
     });
   }
 
@@ -1846,7 +2025,7 @@ export async function exportExamToZipAll(
     .replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, '_')
     .replace(/_+/g, '_');
 
-  // 1. Generate Docx Blob
+  // 1. Generate Docx Blob for base / current exam
   const docxBlob = await generateDocxBlob(exam, options);
   zip.file(`${safeTitle}.docx`, docxBlob);
 
@@ -1861,6 +2040,26 @@ export async function exportExamToZipAll(
   // 4. Generate JSON String
   const jsonStr = generateJsonString(exam);
   zip.file(`${safeTitle}.json`, jsonStr);
+
+  // 4.1. If multi-code variants exist, package each variant into dedicated subfolders
+  if (exam.variants && exam.variants.length > 1) {
+    for (const variant of exam.variants) {
+      const vCode = variant.code || '101';
+      const variantExam: ExamItem = {
+        ...exam,
+        title: variant.title || `${exam.title} - Mã đề ${vCode}`,
+        code: vCode,
+        questions: variant.questions,
+        questionsCount: variant.questions.length,
+      };
+      const vBlob = await generateDocxBlob(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.docx`, vBlob);
+      const vDoc = generateDocHtml(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.doc`, '\ufeff' + vDoc);
+      const vTex = generateLatexString(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.tex`, vTex);
+    }
+  }
 
   const department = (options.departmentName || exam.department || 'SỞ GIÁO DỤC VÀ ĐÀO TẠO').trim();
   const school = (options.schoolName || exam.schoolName || 'TRƯỜNG THPT CHUYÊN CHẤT LƯỢNG CAO').trim();
