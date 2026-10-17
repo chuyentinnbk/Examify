@@ -194,7 +194,12 @@ export default function EditorView() {
             setQuestions(newVariants[0].questions);
           }
           if (activeExam?.id) {
+            const baseCode = newVariants[0]?.code || '101';
+            const baseQuestions = newVariants[0]?.questions || questions;
             updateExam(activeExam.id, {
+              code: baseCode,
+              questions: baseQuestions,
+              questionsCount: baseQuestions.length,
               variants: newVariants,
             });
           }
@@ -228,7 +233,12 @@ export default function EditorView() {
       setQuestions(newVariants[0].questions);
     }
     if (activeExam?.id) {
+      const baseCode = newVariants[0]?.code || '101';
+      const baseQuestions = newVariants[0]?.questions || questions;
       updateExam(activeExam.id, {
+        code: baseCode,
+        questions: baseQuestions,
+        questionsCount: baseQuestions.length,
         variants: newVariants,
       });
     }
@@ -632,10 +642,40 @@ export default function EditorView() {
       showToast('Vui lòng bật Chế độ chỉnh sửa để xóa câu hỏi', 'warning');
       return;
     }
+    const qIndex = questions.findIndex((q) => q.id === qId);
     const remaining = questions.filter((q) => q.id !== qId);
     const sorted = sortQuestionsBySection(remaining);
     setQuestions(sorted);
-    showToast('Đã xóa câu hỏi và cập nhật lại thứ tự đề thi', 'info');
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        let newVariantQuestions = (v.questions || []).filter((q: ExamQuestion) => q.id !== qId);
+        if (newVariantQuestions.length === (v.questions || []).length && qIndex >= 0 && qIndex < (v.questions || []).length) {
+          newVariantQuestions = (v.questions || []).filter((_: ExamQuestion, idx: number) => idx !== qIndex);
+        }
+        return {
+          ...v,
+          questions: sortQuestionsBySection(newVariantQuestions),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+    showToast('Đã xóa câu hỏi và đồng bộ qua tất cả mã đề', 'info');
   };
 
   const handleAddQuestion = (type: QuestionType = 'multiple_choice') => {
@@ -695,7 +735,36 @@ export default function EditorView() {
 
     const sorted = sortQuestionsBySection([...questions, newQ]);
     setQuestions(sorted);
-    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(normType)}) và tự động sắp xếp vào phần tương ứng`, 'success');
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        const clonedNewQ: ExamQuestion = {
+          ...newQ,
+          id: Date.now() + vIdx * 1000 + Math.floor(Math.random() * 500),
+        };
+        return {
+          ...v,
+          questions: sortQuestionsBySection([...v.questions, clonedNewQ]),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(normType)}) và đồng bộ vào tất cả các mã đề`, 'success');
   };
 
   // Single Question AI Regeneration

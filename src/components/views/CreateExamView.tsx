@@ -613,6 +613,7 @@ export default function CreateExamView() {
       const newExam: ExamItem = {
         id: data.data?.examId || `EX-${Date.now().toString().slice(-6)}`,
         title: examTitle,
+        code: examVariants[0]?.code || '101',
         subject,
         grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
         term:

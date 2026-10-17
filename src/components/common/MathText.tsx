@@ -167,6 +167,10 @@ export default function MathText({ content, className = '', inline = false }: Ma
       })
       .join('');
 
+    // Clean up excessive <br /> tags surrounding block tokens so layout doesn't have huge blank vertical gaps
+    html = html.replace(/(?:<br\s*\/?>\s*)+(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__)/gi, '$1');
+    html = html.replace(/(__CODE_BLOCK_\d+__|__SVG_BLOCK_\d+__)(?:\s*<br\s*\/?>)+/gi, '$1');
+
     // Step 3: Replace code block tokens with 2-column line numbered IDE cards
     codeBlocks.forEach((cb, idx) => {
       const token = `__CODE_BLOCK_${idx}__`;

@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Helper to generate isomorphic questions for a single variant code using Gemini
-    async function generateVariantQuestions(targetCode: string): Promise<ExamQuestion[]> {
+    async function generateVariantQuestions(targetCode: string, codeIndex: number): Promise<ExamQuestion[]> {
       if (!geminiKey) {
         throw new Error('No GEMINI_API_KEY found');
       }
@@ -152,13 +152,25 @@ export async function POST(req: NextRequest) {
         model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.8-flash',
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.8,
+          temperature: Math.min(0.95, 0.75 + codeIndex * 0.05),
         },
       });
 
+      const diversityDirectives = [
+        'Chọn các số chẵn hoặc bội số thích hợp, giữ nghiệm nguyên dương đẹp.',
+        'Chọn các số lẻ hoặc phân số tối giản đẹp, tọa độ đối xứng qua gốc tọa độ.',
+        'Chọn các số nguyên tố nhỏ (2, 3, 5, 7) hoặc mở rộng khoảng giá trị, nghiệm gọn gàng.',
+        'Đổi dấu hệ số hoặc tịnh tiến biến số (x -> x-1, x+2), bài toán mang tính chất tương đương nhưng biểu thức khác biệt.',
+      ];
+      const directive = diversityDirectives[codeIndex % diversityDirectives.length];
+
       const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi chuẩn GDPT tại Việt Nam.
 Dưới đây là danh sách ${simplifiedBase.length} câu hỏi của ĐỀ THI GỐC (Mã đề 101) môn ${subject}, khối ${grade}.
-Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${targetCode}) ĐỒNG BỘ 1-1 VỚI ĐỀ GỐC:
+Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${targetCode} - Biến thể thứ ${codeIndex + 1}) ĐỒNG BỘ 1-1 VỚI ĐỀ GỐC:
+
+### ĐỊNH HƯỚNG TẠO SỐ LIỆU ĐỘC LẬP CHO MÃ ${targetCode}:
+- ${directive}
+- Đảm bảo các số liệu không bị trùng lặp với các mã đề khác nhưng độ khó và phương pháp giải hoàn toàn tương đồng.
 
 ### NGUYÊN TẮC ĐỒNG DẠNG BẮT BUỘC (ISOMORPHIC RULES):
 1. ĐỒNG BỘ 1-1 VỚI TỪNG CÂU HỎI CỦA ĐỀ GỐC:
@@ -180,7 +192,7 @@ Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${target
    - Giữ nguyên thứ tự câu 1 đến câu ${simplifiedBase.length} đúng theo đề gốc để đảm bảo sự đồng bộ 1-1.
 
 ### QUY CÁCH TRÌNH BÀY CODE (NẾU CÓ):
-- Đoạn mã Python/C++ phải đặt trong khối \`\`\`python ... \`\`\` với dấu xuống dòng (\n) và thụt lề 4 dấu cách rõ ràng.
+- Đoạn mã Python/C++ phải đặt trong khối \`\`\`python ... \`\`\` với dấu xuống dòng (\\n) và thụt lề 4 dấu cách rõ ràng.
 
 ### QUY CÁCH HÌNH HỌC SVG (NẾU CÓ):
 - Nếu đề gốc có nhúng <svg>, câu mới cũng nhúng <svg> tương ứng với số liệu mới. Ký hiệu vuông góc nếu có phải dùng <polyline> trượt song song cạnh hoặc bỏ qua nếu không tính được phối cảnh 3D.
@@ -269,27 +281,39 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
       return formatted;
     }
 
-    // Generate all variants in parallel
-    const generatedVariants: ShuffledVariant[] = [];
-
     // Mã 101 is always base questions
-    generatedVariants.push({
-      code: '101',
-      title: `${baseTitle} - Mã đề 101`,
-      questions: baseQuestions,
-    });
+    const generatedVariants: ShuffledVariant[] = [
+      {
+        code: '101',
+        title: `${baseTitle} - Mã đề 101`,
+        questions: baseQuestions,
+      },
+    ];
 
-    const variantResults = await Promise.allSettled(
-      variantCodes.map(async (code) => {
-        const questions = await generateVariantQuestions(code);
-        return { code, questions };
-      })
-    );
+    // Batch requests in chunks of 2 to avoid Gemini rate limits
+    const batchSize = 2;
+    const variantResults: Array<{ code: string; status: 'fulfilled' | 'rejected'; questions?: ExamQuestion[] }> = [];
 
-    variantResults.forEach((res, i) => {
-      const code = variantCodes[i];
-      if (res.status === 'fulfilled' && res.value.questions.length > 0) {
-        let qs = res.value.questions;
+    for (let i = 0; i < variantCodes.length; i += batchSize) {
+      const batch = variantCodes.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (code) => {
+        const codeIndex = variantCodes.indexOf(code);
+        try {
+          const questions = await generateVariantQuestions(code, codeIndex);
+          return { code, status: 'fulfilled' as const, questions };
+        } catch (err) {
+          console.error(`Error generating variant ${code}:`, err);
+          return { code, status: 'rejected' as const };
+        }
+      });
+      const res = await Promise.all(batchPromises);
+      variantResults.push(...res);
+    }
+
+    variantResults.forEach((res) => {
+      const code = res.code;
+      if (res.status === 'fulfilled' && res.questions && res.questions.length > 0) {
+        let qs = res.questions;
 
         // If shuffleOrder is true, shuffle question positions & options within sections
         if (shuffleOrder) {

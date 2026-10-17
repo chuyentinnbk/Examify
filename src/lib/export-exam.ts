@@ -1006,6 +1006,14 @@ export async function exportExamToDocx(
   downloadBlob(blob, `${safeTitle}.docx`);
 }
 
+function escapeHtmlForDoc(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /**
  * Formats question content for Microsoft Word HTML (.doc),
  * rendering code snippets with Consolas blocks and preserving clean math typography.
@@ -1020,7 +1028,7 @@ function formatContentForDocHtml(rawContent: string): string {
   while ((match = codeBlockRegex.exec(rawContent)) !== null) {
     const textBefore = rawContent.slice(lastIndex, match.index);
     if (textBefore) {
-      parts.push(cleanMathForDoc(textBefore));
+      parts.push(escapeHtmlForDoc(cleanMathForDoc(textBefore)));
     }
     const escapedCode = match[1]
       .replace(/&/g, '&amp;')
@@ -1033,7 +1041,7 @@ function formatContentForDocHtml(rawContent: string): string {
   }
   const textAfter = rawContent.slice(lastIndex);
   if (textAfter) {
-    parts.push(cleanMathForDoc(textAfter));
+    parts.push(escapeHtmlForDoc(cleanMathForDoc(textAfter)));
   }
   return parts.join('');
 }
@@ -1205,7 +1213,7 @@ export function generateDocHtml(
               return `
             <tr>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; font-weight: bold; width: 6%;">${labelKey})</td>
-              <td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; width: 70%;">${cleanMathForDoc(cleanOpt(item.text))}</td>
+              <td style="border: 1pt solid #000; padding: 4px 8px; text-align: left; width: 70%;">${escapeHtmlForDoc(cleanMathForDoc(cleanOpt(item.text)))}</td>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; width: 12%; font-size: 13pt;">${dungMark}</td>
               <td style="border: 1pt solid #000; padding: 4px 6px; text-align: center; width: 12%; font-size: 13pt;">${saiMark}</td>
             </tr>
@@ -1249,10 +1257,10 @@ export function generateDocHtml(
         htmlContent += `
         <table class="options-grid">
           <tr>
-            <td style="width: 25%"><strong>A.</strong> ${cleanOpt(optA)}</td>
-            <td style="width: 25%"><strong>B.</strong> ${cleanOpt(optB)}</td>
-            <td style="width: 25%"><strong>C.</strong> ${cleanOpt(optC)}</td>
-            <td style="width: 25%"><strong>D.</strong> ${cleanOpt(optD)}</td>
+            <td style="width: 25%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td>
+            <td style="width: 25%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td>
+            <td style="width: 25%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td>
+            <td style="width: 25%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td>
           </tr>
         </table>
         `;
@@ -1260,22 +1268,22 @@ export function generateDocHtml(
         htmlContent += `
         <table class="options-grid">
           <tr>
-            <td style="width: 50%"><strong>A.</strong> ${cleanOpt(optA)}</td>
-            <td style="width: 50%"><strong>B.</strong> ${cleanOpt(optB)}</td>
+            <td style="width: 50%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td>
+            <td style="width: 50%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td>
           </tr>
           <tr>
-            <td style="width: 50%"><strong>C.</strong> ${cleanOpt(optC)}</td>
-            <td style="width: 50%"><strong>D.</strong> ${cleanOpt(optD)}</td>
+            <td style="width: 50%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td>
+            <td style="width: 50%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td>
           </tr>
         </table>
         `;
       } else {
         htmlContent += `
         <table class="options-grid">
-          <tr><td style="width: 100%"><strong>A.</strong> ${cleanOpt(optA)}</td></tr>
-          <tr><td style="width: 100%"><strong>B.</strong> ${cleanOpt(optB)}</td></tr>
-          <tr><td style="width: 100%"><strong>C.</strong> ${cleanOpt(optC)}</td></tr>
-          <tr><td style="width: 100%"><strong>D.</strong> ${cleanOpt(optD)}</td></tr>
+          <tr><td style="width: 100%"><strong>A.</strong> ${escapeHtmlForDoc(cleanOpt(optA))}</td></tr>
+          <tr><td style="width: 100%"><strong>B.</strong> ${escapeHtmlForDoc(cleanOpt(optB))}</td></tr>
+          <tr><td style="width: 100%"><strong>C.</strong> ${escapeHtmlForDoc(cleanOpt(optC))}</td></tr>
+          <tr><td style="width: 100%"><strong>D.</strong> ${escapeHtmlForDoc(cleanOpt(optD))}</td></tr>
         </table>
         `;
       }
@@ -1304,7 +1312,7 @@ export function generateDocHtml(
       if (idx > 0 && idx % 10 === 0) {
         htmlContent += `</tr><tr>`;
       }
-      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${cleanMathForDoc(q.correctAnswer || '')}</span></td>`;
+      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}</span></td>`;
     });
 
     htmlContent += `
@@ -1317,7 +1325,7 @@ export function generateDocHtml(
     questions.forEach((q, idx) => {
       htmlContent += `
       <div class="solution-item">
-        <strong>Câu ${idx + 1} (Đáp án ${cleanMathForDoc(q.correctAnswer || '')}):</strong> <em>${cleanMathForDoc(q.explanation || 'Xem định nghĩa SGK.')}</em>
+        <strong>Câu ${idx + 1} (Đáp án ${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}):</strong> <em>${escapeHtmlForDoc(cleanMathForDoc(q.explanation || 'Xem định nghĩa SGK.'))}</em>
       </div>
       `;
     });
