@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         userAgent,
       });
 
-      return apiSuccess({
+      const response = apiSuccess({
         requires2FA: false,
         token: session.token,
         user: {
@@ -90,6 +90,15 @@ export async function POST(req: NextRequest) {
         },
         expiresAt: session.expiresAt,
       });
+
+      response.cookies.set('examify_token', session.token, {
+        httpOnly: true,
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+
+      return response;
     }
 
     // 2. 2FA is ENABLED by user in account settings -> issue temporary token and require 2FA OTP

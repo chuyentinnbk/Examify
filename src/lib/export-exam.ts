@@ -137,7 +137,7 @@ export function cleanMathForDoc(text: string): string {
   res = res.replace(/\\Omega\b/g, 'Ω');
   res = res.replace(/\\sigma\b/g, 'σ');
 
-  // Operators & arrows
+  // Operators, relations & arrows
   res = res.replace(/\\times\b/g, '×');
   res = res.replace(/\\cdot\b/g, '·');
   res = res.replace(/\\div\b/g, '÷');
@@ -145,6 +145,19 @@ export function cleanMathForDoc(text: string): string {
   res = res.replace(/\\rightarrow\b/g, '→');
   res = res.replace(/\\Rightarrow\b/g, '⇒');
   res = res.replace(/\\Leftrightarrow\b/g, '⇔');
+
+  // Geometry & Trigonometry symbols
+  res = res.replace(/\\perp\b/g, '⊥');
+  res = res.replace(/\\parallel\b/g, '∥');
+  res = res.replace(/\\angle\b/g, '∠');
+  res = res.replace(/\\widehat\{([^{}]+)\}/g, '∠$1');
+  res = res.replace(/\\wideparen\{([^{}]+)\}/g, '⌒$1');
+  res = res.replace(/\\overrightarrow\{([^{}]+)\}/g, '→$1');
+  res = res.replace(/\\vec\{([^{}]+)\}/g, '→$1');
+  res = res.replace(/\\vec\s*([a-zA-Z])/g, '→$1');
+  res = res.replace(/\\triangle\b/g, '△');
+  res = res.replace(/\\square\b/g, '□');
+  res = res.replace(/\^\\circ\b|\^\{\\circ\}|\\circ\b/g, '°');
 
   // Superscripts
   const supers: Record<string, string> = {

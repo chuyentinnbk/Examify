@@ -79,6 +79,38 @@ function escapeHtml(str: string): string {
 }
 
 /**
+ * Safely renders cell content, compiling embedded LaTeX math ($...$) via KaTeX.
+ */
+function renderCellContent(cellText: string): string {
+  if (!cellText) return '';
+  if (!cellText.includes('$')) {
+    return escapeHtml(cellText);
+  }
+  const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?:\\.|[^\$\\])+\$)/g;
+  const parts = cellText.split(mathRegex);
+  return parts
+    .map((part) => {
+      if (!part) return '';
+      if (part.startsWith('$$') && part.endsWith('$$') && part.length > 4) {
+        try {
+          return katex.renderToString(part.slice(2, -2).trim(), { displayMode: true, throwOnError: false });
+        } catch {
+          return escapeHtml(part);
+        }
+      }
+      if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+        try {
+          return katex.renderToString(part.slice(1, -1).trim(), { displayMode: false, throwOnError: false });
+        } catch {
+          return escapeHtml(part);
+        }
+      }
+      return escapeHtml(part);
+    })
+    .join('');
+}
+
+/**
  * MathText renders mixed text with:
  * 1. Markdown code blocks (```python ... ```) rendered as syntax-highlighted IDE boxes
  * 2. Inline code (`...`)
@@ -133,14 +165,14 @@ export default function MathText({ content, className = '', inline = false }: Ma
       const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
 
       let rowsHtml = `<thead class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200"><tr>` +
-        headerCells.map((c) => `<th class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-center font-bold text-xs select-text">${escapeHtml(c)}</th>`).join('') +
+        headerCells.map((c) => `<th class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-center font-bold text-xs select-text">${renderCellContent(c)}</th>`).join('') +
         `</tr></thead><tbody>`;
 
       dataLines.forEach((line, rIdx) => {
         const cells = parseRow(line);
         const bg = rIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/60 dark:bg-slate-800/40';
         rowsHtml += `<tr class="${bg}">` +
-          cells.map((c) => `<td class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 select-text">${escapeHtml(c)}</td>`).join('') +
+          cells.map((c) => `<td class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 select-text">${renderCellContent(c)}</td>`).join('') +
           `</tr>`;
       });
       rowsHtml += `</tbody>`;

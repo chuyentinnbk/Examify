@@ -14,8 +14,8 @@ export default function DashboardView() {
   const filteredExams = exams.filter((exam) => {
     let matchesFilter = true;
     if (filter === 'math') matchesFilter = exam.subject.includes('Toán');
-    else if (filter === 'natural') matchesFilter = exam.subject.includes('Lý') || exam.subject.includes('Hóa') || exam.subject.includes('Sinh') || exam.subject.includes('KHTN');
-    else if (filter === 'social') matchesFilter = exam.subject.includes('Anh') || exam.subject.includes('Văn') || exam.subject.includes('Sử') || exam.subject.includes('Địa');
+    else if (filter === 'natural') matchesFilter = exam.subject.includes('Lý') || exam.subject.includes('Lí') || exam.subject.includes('Hóa') || exam.subject.includes('Sinh') || exam.subject.includes('Tin') || exam.subject.includes('KHTN');
+    else if (filter === 'social') matchesFilter = exam.subject.includes('Anh') || exam.subject.includes('Văn') || exam.subject.includes('Sử') || exam.subject.includes('Địa') || exam.subject.includes('Kinh tế');
 
     const matchesSearch =
       search === '' ||
@@ -42,10 +42,14 @@ export default function DashboardView() {
 
   const getSubjectIcon = (subject: string) => {
     if (subject.includes('Toán')) return 'functions';
-    if (subject.includes('Vật lý')) return 'science';
+    if (subject.includes('Vật lý') || subject.includes('Vật lí')) return 'science';
     if (subject.includes('Hóa')) return 'biotech';
     if (subject.includes('Sinh')) return 'psychology';
+    if (subject.includes('Tin')) return 'terminal';
     if (subject.includes('Anh')) return 'translate';
+    if (subject.includes('Sử')) return 'history_edu';
+    if (subject.includes('Địa')) return 'public';
+    if (subject.includes('Kinh tế') || subject.includes('Pháp luật') || subject.includes('GDCD')) return 'gavel';
     return 'menu_book';
   };
 

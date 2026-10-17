@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
         updatedAt: new Date(e.updatedAt).toLocaleDateString('vi-VN'),
         matrix: cognitiveMatrix,
         isAiGenerated: !!e.aiProvider,
+        variants: structuredMeta?.variants || undefined,
         questions,
       };
     });
@@ -199,6 +200,7 @@ const CreateManualExamSchema = z.object({
       veryHard: z.number().default(10),
     })
     .optional(),
+  variants: z.array(z.any()).optional(),
   questions: z.array(z.any()).default([]),
 });
 
@@ -243,6 +245,7 @@ export async function POST(req: NextRequest) {
       academicYear: data.academicYear,
       sectionTitles: data.sectionTitles,
       sectionDescriptions: data.sectionDescriptions,
+      variants: data.variants || undefined,
       questions: data.questions,
     });
 

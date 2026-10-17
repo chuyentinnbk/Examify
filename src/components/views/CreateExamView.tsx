@@ -588,9 +588,13 @@ export default function CreateExamView() {
       if (examCodesCount > 1 && shuffleValues) {
         try {
           const targetCodes = Array.from({ length: examCodesCount - 1 }, (_, i) => String(102 + i));
+          const varHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+          const authToken = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
+          if (authToken) varHeaders['Authorization'] = `Bearer ${authToken}`;
+
           const varRes = await fetch('/api/v1/exams/isomorphic-variants', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: varHeaders,
             body: JSON.stringify({
               baseQuestions: questions,
               baseTitle: examTitle,

@@ -159,7 +159,45 @@ ${currentQuestionContent ? `- Câu hỏi hiện tại vừa bị bấm tạo l�
 ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện trong đề thi (TUYỆT ĐỐI KHÔNG TRÙNG):\n${forbiddenList.slice(-10).map((q, i) => `- ${q.slice(0, 150)}`).join('\n')}` : ''}
 3. ĐỔI MỚI SÁNG TẠO: Tạo câu hỏi mới mẻ với số liệu, hàm số, biến số hoặc tình huống hoàn toàn khác biệt, mang lại trải nghiệm tươi mới cho giáo viên.`;
 
-        const result = await model.generateContent(prompt);
+        const candidateModels = Array.from(
+          new Set(
+            [
+              process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim(),
+              'gemini-3.7-flash',
+              'gemini-3.5-flash',
+              'gemini-3.8-flash',
+            ].filter(Boolean) as string[]
+          )
+        );
+
+        let result: any = null;
+        let lastError: any = null;
+
+        for (const candidateModel of candidateModels) {
+          try {
+            const genAI = new GoogleGenerativeAI(geminiKey);
+            const model = genAI.getGenerativeModel({
+              model: candidateModel,
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.85,
+              },
+            });
+
+            result = await model.generateContent(prompt);
+            if (result?.response?.text()) {
+              break;
+            }
+          } catch (err) {
+            lastError = err;
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+
+        if (!result && lastError) {
+          throw lastError;
+        }
+
         const text = result.response.text();
         const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         const parsed = JSON.parse(clean);

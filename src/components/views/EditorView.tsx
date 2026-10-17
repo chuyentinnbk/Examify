@@ -25,7 +25,7 @@ import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { generateExamVariants } from '@/lib/exam-shuffler';
 
 export default function EditorView() {
-  const { activeExam, updateExam, showToast, setCurrentRoute, user } = useAppStore();
+  const { activeExam, updateExam, showToast, setCurrentRoute, user, token } = useAppStore();
 
   const [title, setTitle] = useState(activeExam?.title || '');
   const [examCode, setExamCode] = useState(() => formatExamCode(activeExam?.id, activeExam?.code));
@@ -171,9 +171,13 @@ export default function EditorView() {
       showToast(`AI đang tiến hành đổi số liệu và tự động giải lại đáp án cho ${shuffleCodesCount} mã đề...`, 'info');
       try {
         const targetCodes = Array.from({ length: shuffleCodesCount - 1 }, (_, i) => String(102 + i));
+        const storedToken = token || (typeof window !== 'undefined' ? localStorage.getItem('examify_token') : '');
         const res = await fetch('/api/v1/exams/isomorphic-variants', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+          },
           body: JSON.stringify({
             baseQuestions: questions,
             baseTitle: title || activeExam?.title || 'Đề thi',

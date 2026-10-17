@@ -61,6 +61,7 @@ export async function PUT(
     if (body.sectionTitles !== undefined) newStructured.sectionTitles = body.sectionTitles;
     if (body.sectionDescriptions !== undefined) newStructured.sectionDescriptions = body.sectionDescriptions;
     if (body.code !== undefined) newStructured.code = body.code;
+    if (body.variants !== undefined) newStructured.variants = body.variants;
 
     updateData.structuredJson = JSON.stringify(newStructured);
 
