@@ -21,7 +21,12 @@ const GenerateExamSchema = z.object({
     lesson: z.string().optional(),
   }),
   lessonId: z.string().optional(),
-  examType: z.nativeEnum(ExamType),
+  examType: z
+    .union([z.nativeEnum(ExamType), z.literal('TOPIC_PRACTICE'), z.literal('CUSTOM')])
+    .transform((val) => {
+      if (val === 'TOPIC_PRACTICE' || val === 'CUSTOM') return ExamType.MID_TERM;
+      return val as ExamType;
+    }),
   durationMinutes: z.number().int().min(5).max(180).default(45),
   totalPoints: z.number().min(1).max(100).default(10),
   totalQuestions: z.number().int().min(1).max(50).default(20),

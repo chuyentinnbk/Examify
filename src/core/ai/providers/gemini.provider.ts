@@ -116,6 +116,11 @@ export class GeminiProvider implements IAIProvider {
         if (process.env.DEBUG === 'true') {
           console.warn(`⚠️ [GeminiProvider] Attempt ${attempt + 1} failed: ${errMessage}. Trying next key/model...`);
         }
+
+        // Add short backoff delay to allow connection/rate-limit recovery
+        if (attempt < Math.min(maxAttempts, 5) - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
       }
     }
 
