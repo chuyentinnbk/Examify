@@ -638,7 +638,49 @@ export default function EditorView() {
     // Auto-sort into official Ministry of Education sections (Phần I -> Phần II -> Phần III -> Phần IV)
     const sorted = sortQuestionsBySection(updatedQuestions);
     setQuestions(sorted);
-    showToast(`Đã chuyển câu hỏi sang dạng "${getTypeLabel(normNewType)}" và tự động sắp xếp chuẩn Bộ!`, 'success');
+
+    const qIndex = questions.findIndex((q) => q.id === qId);
+    const convertedQuestion = sorted.find((q) => q.id === qId);
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        const vQuestions = (v.questions || []).map((q: ExamQuestion, idx: number) => {
+          if (q.id === qId || (qIndex >= 0 && idx === qIndex)) {
+            return {
+              ...q,
+              type: normNewType,
+              section: normNewType,
+              points: convertedQuestion?.points ?? q.points,
+              options: convertedQuestion?.options ?? q.options,
+              correctAnswer: convertedQuestion?.correctAnswer ?? q.correctAnswer,
+            };
+          }
+          return q;
+        });
+        return {
+          ...v,
+          questions: sortQuestionsBySection(vQuestions),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+
+    showToast(`Đã chuyển câu hỏi sang dạng "${getTypeLabel(normNewType)}" và đồng bộ chuẩn hoá qua tất cả mã đề!`, 'success');
   };
 
   const handleDeleteQuestion = (qId: number | string) => {

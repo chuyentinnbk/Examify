@@ -218,39 +218,138 @@ export function getOptionsLayout(options: { text: string }[]): 4 | 2 | 1 {
 }
 
 /**
- * Renders question content into formatted docx paragraphs,
- * properly supporting both regular text and highlighted monospace code blocks (Python, C++...).
+ * Renders Markdown tables into native Microsoft Word Table objects with single borders and header styling.
  */
-function renderQuestionContentToDocx(qNum: number, rawContent: string): Paragraph[] {
-  const paragraphs: Paragraph[] = [];
+function renderMarkdownTableToDocx(tableBlock: string): Table {
+  const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+  const parseRow = (line: string) => {
+    const trimmed = line.replace(/^\||\|$/g, '');
+    return trimmed.split('|').map((cell) => cell.trim());
+  };
+
+  const headerCells = parseRow(lines[0]);
+  const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+  const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+  const numCols = Math.max(1, headerCells.length);
+  const colWidth = Math.floor(9600 / numCols);
+
+  const borderSingle = {
+    top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+    bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+    left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+    right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+    insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+    insideVertical: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  };
+
+  const rows: TableRow[] = [
+    new TableRow({
+      children: headerCells.map((c) =>
+        new TableCell({
+          width: { size: colWidth, type: WidthType.DXA },
+          shading: { fill: 'F1F5F9' },
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: cleanMathForDoc(c), bold: true, size: 20 })],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+        })
+      ),
+    }),
+  ];
+
+  dataLines.forEach((line) => {
+    const cells = parseRow(line);
+    rows.push(
+      new TableRow({
+        children: cells.map((c) =>
+          new TableCell({
+            width: { size: colWidth, type: WidthType.DXA },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: cleanMathForDoc(c), size: 20 })],
+                alignment: AlignmentType.LEFT,
+              }),
+            ],
+          })
+        ),
+      })
+    );
+  });
+
+  return new Table({
+    width: { size: 9600, type: WidthType.DXA },
+    borders: borderSingle,
+    rows,
+  });
+}
+
+function renderTextAndTablesToDocx(
+  text: string,
+  isFirstPartRef: { value: boolean },
+  qNum: number
+): (Paragraph | Table)[] {
+  const elements: (Paragraph | Table)[] = [];
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = tableRegex.exec(text)) !== null) {
+    const before = text.slice(lastIdx, m.index).trim();
+    if (before || isFirstPartRef.value) {
+      const runs: TextRun[] = [];
+      if (isFirstPartRef.value) {
+        runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+        isFirstPartRef.value = false;
+      }
+      if (before) {
+        runs.push(new TextRun({ text: cleanMathForDoc(before), size: 22 }));
+      }
+      elements.push(new Paragraph({ children: runs, spacing: { before: 140, after: 60 } }));
+    }
+
+    elements.push(renderMarkdownTableToDocx(m[0]));
+    lastIdx = m.index + m[0].length;
+  }
+
+  const after = text.slice(lastIdx).trim();
+  if (after || isFirstPartRef.value) {
+    const runs: TextRun[] = [];
+    if (isFirstPartRef.value) {
+      runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
+      isFirstPartRef.value = false;
+    }
+    if (after) {
+      runs.push(new TextRun({ text: cleanMathForDoc(after), size: 22 }));
+    }
+    elements.push(new Paragraph({ children: runs, spacing: { before: 140, after: 60 } }));
+  }
+
+  return elements;
+}
+
+/**
+ * Renders question content into formatted docx elements,
+ * supporting regular text, highlighted code blocks, and structured tables.
+ */
+function renderQuestionContentToDocx(qNum: number, rawContent: string): (Paragraph | Table)[] {
+  const elements: (Paragraph | Table)[] = [];
   const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  let isFirstPart = true;
+  const isFirstPartRef = { value: true };
 
   while ((match = codeBlockRegex.exec(rawContent)) !== null) {
-    const textBefore = rawContent.slice(lastIndex, match.index).trim();
-    if (textBefore || isFirstPart) {
-      const runs: TextRun[] = [];
-      if (isFirstPart) {
-        runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
-        isFirstPart = false;
-      }
-      if (textBefore) {
-        runs.push(new TextRun({ text: cleanMathForDoc(textBefore), size: 22 }));
-      }
-      paragraphs.push(
-        new Paragraph({
-          children: runs,
-          spacing: { before: 140, after: 60 },
-        })
-      );
+    const textBefore = rawContent.slice(lastIndex, match.index);
+    if (textBefore || isFirstPartRef.value) {
+      elements.push(...renderTextAndTablesToDocx(textBefore, isFirstPartRef, qNum));
     }
 
     const code = match[1].replace(/\r\n/g, '\n').trimEnd();
     const codeLines = code.split('\n');
-    paragraphs.push(
+    elements.push(
       new Paragraph({
         children: codeLines.map((line, lineIdx) =>
           new TextRun({
@@ -276,24 +375,12 @@ function renderQuestionContentToDocx(qNum: number, rawContent: string): Paragrap
     lastIndex = match.index + match[0].length;
   }
 
-  const textAfter = rawContent.slice(lastIndex).trim();
-  if (textAfter || isFirstPart) {
-    const runs: TextRun[] = [];
-    if (isFirstPart) {
-      runs.push(new TextRun({ text: `Câu ${qNum}. `, bold: true, size: 22, color: '2563EB' }));
-    }
-    if (textAfter) {
-      runs.push(new TextRun({ text: cleanMathForDoc(textAfter), size: 22 }));
-    }
-    paragraphs.push(
-      new Paragraph({
-        children: runs,
-        spacing: { before: isFirstPart ? 140 : 60, after: 60 },
-      })
-    );
+  const textAfter = rawContent.slice(lastIndex);
+  if (textAfter || isFirstPartRef.value) {
+    elements.push(...renderTextAndTablesToDocx(textAfter, isFirstPartRef, qNum));
   }
 
-  return paragraphs;
+  return elements;
 }
 
 /**
@@ -1423,19 +1510,56 @@ export function exportExamToDoc(
   downloadBlob(blob, `${safeTitle}.doc`);
 }
 
+function formatMarkdownTableForLatex(tableBlock: string): string {
+  const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+  if (lines.length < 2) return tableBlock;
+  const parseRow = (line: string) => {
+    const trimmed = line.replace(/^\||\|$/g, '');
+    return trimmed.split('|').map((c) => c.trim());
+  };
+  const headerCells = parseRow(lines[0]);
+  const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+  const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+  const colSpec = Array(headerCells.length).fill('|c').join('') + '|';
+  let tex = `\n\\begin{center}\n\\begin{tabular}{${colSpec}}\n\\hline\n`;
+  tex += headerCells.map((c) => `\\textbf{${c}}`).join(' & ') + ' \\\\ \\hline\n';
+  dataLines.forEach((l) => {
+    const cells = parseRow(l);
+    tex += cells.join(' & ') + ' \\\\ \\hline\n';
+  });
+  tex += `\\end{tabular}\n\\end{center}\n`;
+  return tex;
+}
+
 /**
  * Formats question content for LaTeX (.tex),
- * escaping raw SVG to a clean LaTeX framebox and formatting code blocks with verbatim.
+ * escaping raw SVG to a clean LaTeX framebox, formatting code blocks with verbatim,
+ * escaping % signs, and rendering Markdown tables into tabular environments.
  */
 function formatContentForLatex(rawContent: string): string {
   if (!rawContent) return '';
   let res = rawContent;
-  // Replace SVG with a neat centered LaTeX framebox so pdflatex never crashes
+
+  // 1. Replace SVG with a neat centered LaTeX framebox so pdflatex never crashes
   res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n\\begin{center}\\fbox{\\textit{[Hình vẽ minh họa: Vui lòng xem bản vẽ trên web hoặc bản PDF]}}\\end{center}\n');
-  // Format code blocks using standard LaTeX verbatim
+
+  // 2. Tokenize code blocks using standard LaTeX verbatim so verbatim contents are untouched
+  const verbatimBlocks: string[] = [];
   res = res.replace(/```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g, (_, code) => {
-    return `\n\\begin{verbatim}\n${code.trimEnd()}\n\\end{verbatim}\n`;
+    verbatimBlocks.push(`\n\\begin{verbatim}\n${code.trimEnd()}\n\\end{verbatim}\n`);
+    return `__LATEX_VERBATIM_${verbatimBlocks.length - 1}__`;
   });
+
+  // 3. Format Markdown tables into tabular environments
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  res = res.replace(tableRegex, (tbl) => formatMarkdownTableForLatex(tbl));
+
+  // 4. Safely escape unescaped % signs (e.g. 50% -> 50\%) so pdflatex does not treat question as comment
+  res = res.replace(/(?<!\\)%/g, '\\%');
+
+  // 5. Restore verbatim blocks
+  res = res.replace(/__LATEX_VERBATIM_(\d+)__/g, (_, idx) => verbatimBlocks[parseInt(idx, 10)] || '');
+
   return res;
 }
 
@@ -1677,6 +1801,80 @@ function loadHtml2PdfScript(): Promise<void> {
 }
 
 /**
+ * Formats question content for PDF HTML, preserving SVG diagrams, formatting code blocks,
+ * and turning Markdown tables into clean printable HTML tables.
+ */
+function formatContentForPdfHtml(rawContent: string): string {
+  if (!rawContent) return '';
+
+  // 1. Preserve Vector SVG diagrams
+  const svgs: string[] = [];
+  let safeContent = rawContent.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, (match) => {
+    svgs.push(match);
+    return `__PDF_SVG_${svgs.length - 1}__`;
+  });
+
+  // 2. Tokenize Code Blocks
+  const codeBlocks: string[] = [];
+  safeContent = safeContent.replace(/```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g, (_, code) => {
+    const escaped = code
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const block = `<pre style="background: #f1f5f9; border-left: 3px solid #2563eb; border: 1px solid #e2e8f0; padding: 6px 10px; margin: 6px 0; font-family: Consolas, monospace; font-size: 10pt; line-height: 1.4; color: #0f172a; white-space: pre-wrap; border-radius: 4px;"><code>${escaped}</code></pre>`;
+    codeBlocks.push(block);
+    return `__PDF_CODE_${codeBlocks.length - 1}__`;
+  });
+
+  // 3. Tokenize Markdown Tables
+  const tableBlocks: string[] = [];
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  safeContent = safeContent.replace(tableRegex, (tableBlock) => {
+    const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+    if (lines.length < 2) return tableBlock;
+    const parseRow = (line: string) => {
+      const trimmed = line.replace(/^\||\|$/g, '');
+      return trimmed.split('|').map((cell) => cell.trim());
+    };
+    const headerCells = parseRow(lines[0]);
+    const isSeparator = /^\|?(\s*:?-+:?\s*\|?)+$/.test(lines[1]);
+    const dataLines = isSeparator ? lines.slice(2) : lines.slice(1);
+
+    let rowsHtml = `<tr style="background-color: #f1f5f9;">` +
+      headerCells.map((c) => `<th style="border: 1pt solid #000; padding: 3px 6px; text-align: center; font-weight: bold; font-size: 10pt;">${cleanMathForDoc(c)}</th>`).join('') +
+      `</tr>`;
+
+    dataLines.forEach((l) => {
+      const cells = parseRow(l);
+      rowsHtml += `<tr>` +
+        cells.map((c) => `<td style="border: 1pt solid #000; padding: 3px 6px; text-align: left; font-size: 10pt;">${cleanMathForDoc(c)}</td>`).join('') +
+        `</tr>`;
+    });
+
+    const tbl = `<table style="width: 100%; border-collapse: collapse; margin: 6px 0; border: 1pt solid #000;">${rowsHtml}</table>`;
+    tableBlocks.push(tbl);
+    return `__PDF_TABLE_${tableBlocks.length - 1}__`;
+  });
+
+  // 4. Clean math symbols on remaining prose text (convert LaTeX formulas to Unicode symbols)
+  safeContent = cleanMathForDoc(safeContent);
+
+  // 5. Restore Table Blocks
+  safeContent = safeContent.replace(/__PDF_TABLE_(\d+)__/g, (_, idx) => tableBlocks[parseInt(idx, 10)] || '');
+
+  // 6. Restore Code Blocks
+  safeContent = safeContent.replace(/__PDF_CODE_(\d+)__/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || '');
+
+  // 7. Restore SVGs inside clean centered wrappers
+  safeContent = safeContent.replace(/__PDF_SVG_(\d+)__/g, (_, idx) => {
+    const rawSvg = svgs[parseInt(idx, 10)] || '';
+    return `<div style="text-align: center; margin: 8px 0; max-width: 100%; overflow: hidden;">${rawSvg}</div>`;
+  });
+
+  return safeContent;
+}
+
+/**
  * Tạo nội dung HTML thuần chuẩn A4 dành riêng cho xuất PDF trực tiếp (không dính XML của Word)
  */
 export function generatePdfHtml(
@@ -1761,7 +1959,7 @@ export function generatePdfHtml(
     html += `
     <div style="margin-bottom: 10px; page-break-inside: avoid; break-inside: avoid;">
       <div style="font-size: 11.5pt; margin-bottom: 4px; text-align: justify;">
-        <strong style="color: #1d4ed8;">Câu ${idx + 1}.</strong> ${cleanMathForDoc(q.content)}
+        <strong style="color: #1d4ed8;">Câu ${idx + 1}.</strong> ${formatContentForPdfHtml(q.content)}
       </div>
     `;
 
