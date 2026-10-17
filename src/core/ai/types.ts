@@ -46,6 +46,11 @@ export interface ExamGenerationPayload {
   customPrompt?: string;
   appliedSkills?: AppliedSkillContext[];
   language?: string; // default "Vietnamese" or "English"
+  customMatrixTable?: string | Record<string, any>;
+  topicFocus?: string;
+  isTopicPractice?: boolean;
+  sampleExamText?: string;
+  sampleExamFileName?: string;
 }
 
 export interface GeneratedQuestion {

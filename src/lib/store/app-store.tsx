@@ -61,6 +61,7 @@ export interface ExamItem {
   appliedSkills?: Array<{ id: string; title: string }>;
   customPrompt?: string;
   curriculumMetadata?: any;
+  variants?: any[];
 }
 
 /**

@@ -14,6 +14,8 @@ const RegenerateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'true_false', 'short_answer', 'essay']).optional(),
   currentTopic: z.string().optional(),
   customPrompt: z.string().max(1000).optional(),
+  currentQuestionContent: z.string().optional(),
+  avoidQuestions: z.array(z.string()).optional(),
   existingQuestions: z.array(z.string()).optional(),
   aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
 });
@@ -27,7 +29,18 @@ export async function POST(req: NextRequest) {
       return apiError(validation.error.flatten().fieldErrors, 422, 'Invalid payload');
     }
 
-    const { subject, grade, term = 'Học kỳ 1', level, type = 'multiple_choice', currentTopic, customPrompt, existingQuestions = [] } = validation.data;
+    const {
+      subject,
+      grade,
+      term = 'Học kỳ 1',
+      level,
+      type = 'multiple_choice',
+      currentTopic,
+      customPrompt,
+      currentQuestionContent,
+      avoidQuestions = [],
+      existingQuestions = [],
+    } = validation.data;
 
     const geminiKey = process.env.GEMINI_API_KEY?.split(/[,;]+/)[0]?.trim();
 
@@ -41,6 +54,17 @@ export async function POST(req: NextRequest) {
         ? 'APPLICATION (Vận dụng)'
         : 'HIGH_APPLICATION (Vận dụng cao)';
 
+    // Build comprehensive list of questions to avoid repeating
+    const forbiddenList = Array.from(
+      new Set(
+        [
+          ...(currentQuestionContent ? [currentQuestionContent] : []),
+          ...avoidQuestions,
+          ...existingQuestions,
+        ].filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+      )
+    );
+
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
@@ -48,7 +72,7 @@ export async function POST(req: NextRequest) {
           model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.8-flash',
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.6,
+            temperature: 0.85,
           },
         });
 
@@ -63,6 +87,10 @@ export async function POST(req: NextRequest) {
 
         if (type === 'true_false') {
           typeInstruction = `Hãy tạo MỘT (1) câu hỏi trắc nghiệm ĐÚNG / SAI (gồm bối cảnh/nội dung chung và 4 ý khẳng định a, b, c, d độc lập) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+BẮT BUỘC PHÂN BỐ TỈ LỆ ĐÚNG / SAI CÂN BẰNG THỰC TẾ:
+- 4 ý khẳng định a, b, c, d PHẢI CÓ TÍNH ĐÚNG/SAI ĐA DẠNG: Ưu tiên 2 Đúng - 2 Sai (ví dụ: a: Đúng, b: Sai, c: Đúng, d: Sai), hoặc 3 Đúng - 1 Sai, hoặc 1 Đúng - 3 Sai.
+- TUYỆT ĐỐI KHÔNG mặc định chỉ có 1 ý Đúng và 3 ý Sai (không được ra đề mà chỉ có 1 ý Đúng).
+- TUYỆT ĐỐI KHÔNG cả 4 ý đều Đúng hoặc cả 4 ý đều Sai.
 Định dạng JSON trả về:
 {
   "content": "Bối cảnh hoặc đề bài toán...",
@@ -96,6 +124,11 @@ YÊU CẦU ĐẶC BIỆT: Bạn phải tính toán chi tiết trong "explanation
 ${gradeDirectives ? `${gradeDirectives}\n` : ''}
 ${typeInstruction}
 
+### QUY CÁCH TRÌNH BÀY MÃ NGUỒN LẬP TRÌNH (PYTHON, C++, SQL...):
+- Nếu đề bài hoặc câu hỏi có chứa đoạn mã chương trình, BẮT BUỘC đặt trong khối markdown code block: \`\`\`python ... \`\`\`
+- BẮT BUỘC XUỐNG DÒNG RÕ RÀNG cho từng câu lệnh (mỗi lệnh trên một dòng) và thụt lề 4 dấu cách (indentation).
+- TUYỆT ĐỐI NGHIÊM CẤM viết code dồn tất cả lệnh trên 1 dòng duy nhất!
+
 ### THÔNG TIN BỐI CẢNH VÀ CHƯƠNG TRÌNH:
 - Môn học: ${subject}
 - Khối lớp: ${grade}
@@ -104,9 +137,11 @@ ${typeInstruction}
 ${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${customPrompt}` : ''}
 
 ### QUY TẮC BẮT BUỘC (CRITICAL MANDATE):
-1. Đúng 100% phạm vi kiến thức khối lớp ${grade}, môn ${subject}, học kỳ ${term} và bám sát chủ đề "${currentTopic || subject}". TUYỆT ĐỐI không đi lệch sang các bài học hoặc chủ đề khác (ví dụ: nếu chủ đề là Lượng giác/Hàm số thì không ra bài Vectơ hay Hình không gian).
-2. TUYỆT ĐỐI KHÔNG TRÙNG LẶP: Không được lặp lại bất kỳ câu hỏi, thông số, phương trình hay bài toán nào đã có trong đề thi dưới đây.
-${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề thi (TUYỆT ĐỐI KHÔNG TRÙNG NỘI DUNG VÀ THÔNG SỐ):\n${existingQuestions.slice(-7).map((q, i) => `- ${q}`).join('\n')}` : ''}`;
+1. Đúng 100% phạm vi kiến thức khối lớp ${grade}, môn ${subject}, học kỳ ${term} và bám sát chủ đề "${currentTopic || subject}".
+2. TUYỆT ĐỐI KHÔNG TRÙNG LẶP CÂU HỎI VỪA BỊ THAY THẾ HOẶC ĐÃ CÓ:
+${currentQuestionContent ? `- Câu hỏi hiện tại vừa bị bấm tạo lại (TUYỆT ĐỐI KHÔNG DÙNG LẠI HOẶC TẠO TƯƠNG TỰ CÂU NÀY):\n  "${currentQuestionContent.slice(0, 300)}"` : ''}
+${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện trong đề thi (TUYỆT ĐỐI KHÔNG TRÙNG):\n${forbiddenList.slice(-10).map((q, i) => `- ${q.slice(0, 150)}`).join('\n')}` : ''}
+3. ĐỔI MỚI SÁNG TẠO: Tạo câu hỏi mới mẻ với số liệu, hàm số, biến số hoặc tình huống hoàn toàn khác biệt, mang lại trải nghiệm tươi mới cho giáo viên.`;
 
         const result = await model.generateContent(prompt);
         const text = result.response.text();
@@ -126,18 +161,45 @@ ${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề thi (TUY�
           let formattedOptions: any[] = [];
           if (type === 'true_false') {
             const subKeys = ['a', 'b', 'c', 'd'];
-            formattedOptions = (parsed.options || []).map((opt: string, idx: number) => {
+            let opts = (parsed.options || []).map((opt: string, idx: number) => {
               const key = subKeys[idx] || 'a';
               const cleanText = String(opt || '').replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
               const isCorrect = parsed.correctAnswer
-                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(parsed.correctAnswer)
-                : idx % 2 === 0;
+                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(parsed.correctAnswer)
+                : false;
               return {
                 key,
                 text: cleanText || String(opt || ''),
                 isCorrect,
               };
             });
+
+            // Ensure 4 items
+            while (opts.length < 4) {
+              const k = subKeys[opts.length] || 'a';
+              opts.push({ key: k, text: `Khẳng định ý ${k}`, isCorrect: false });
+            }
+
+            const trueCount = opts.filter((o: any) => o.isCorrect).length;
+            // Prevent 1T-3F monotony: if AI produced 0, 4, or only 1 True, balance into realistic 2T-2F or 3T-1F
+            if (trueCount === 0 || trueCount === 4 || trueCount === 1) {
+              const patterns = [
+                [true, false, true, false],
+                [true, true, false, false],
+                [false, true, true, false],
+                [true, false, false, true],
+                [true, true, true, false],
+                [false, true, true, true],
+              ];
+              const chosen = patterns[Math.floor(Math.random() * patterns.length)];
+              opts = opts.map((o: any, idx: number) => ({
+                ...o,
+                isCorrect: chosen[idx] ?? (idx % 2 === 0),
+              }));
+            }
+
+            parsed.correctAnswer = opts.map((o: any) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
+            formattedOptions = opts;
           } else if (type === 'multiple_choice') {
             formattedOptions = (parsed.options || []).map((opt: string, idx: number) => {
               const key = ['A', 'B', 'C', 'D'][idx] || 'A';
@@ -176,13 +238,13 @@ ${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề thi (TUY�
       }
     }
 
-    // Fallback: Return rich curriculum question bank item avoiding existing questions
+    // Fallback: Return rich curriculum question bank item avoiding existing & previous questions
     const fallbackQ = getCurriculumQuestion(
       subject,
       grade,
       level,
-      Math.floor(Math.random() * 100),
-      existingQuestions,
+      Math.floor(Math.random() * 1000) + Date.now() % 100,
+      forbiddenList,
       type
     );
     return apiSuccess(

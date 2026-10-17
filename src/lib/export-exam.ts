@@ -1846,7 +1846,7 @@ export async function exportExamToZipAll(
     .replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, '_')
     .replace(/_+/g, '_');
 
-  // 1. Generate Docx Blob
+  // 1. Generate Docx Blob for base / current exam
   const docxBlob = await generateDocxBlob(exam, options);
   zip.file(`${safeTitle}.docx`, docxBlob);
 
@@ -1861,6 +1861,26 @@ export async function exportExamToZipAll(
   // 4. Generate JSON String
   const jsonStr = generateJsonString(exam);
   zip.file(`${safeTitle}.json`, jsonStr);
+
+  // 4.1. If multi-code variants exist, package each variant into dedicated subfolders
+  if (exam.variants && exam.variants.length > 1) {
+    for (const variant of exam.variants) {
+      const vCode = variant.code || '101';
+      const variantExam: ExamItem = {
+        ...exam,
+        title: variant.title || `${exam.title} - Mã đề ${vCode}`,
+        code: vCode,
+        questions: variant.questions,
+        questionsCount: variant.questions.length,
+      };
+      const vBlob = await generateDocxBlob(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.docx`, vBlob);
+      const vDoc = generateDocHtml(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.doc`, '\ufeff' + vDoc);
+      const vTex = generateLatexString(variantExam, options);
+      zip.file(`Cac_Ma_De_Thi/Ma_${vCode}/${safeTitle}_Ma_${vCode}.tex`, vTex);
+    }
+  }
 
   const department = (options.departmentName || exam.department || 'SỞ GIÁO DỤC VÀ ĐÀO TẠO').trim();
   const school = (options.schoolName || exam.schoolName || 'TRƯỜNG THPT CHUYÊN CHẤT LƯỢNG CAO').trim();

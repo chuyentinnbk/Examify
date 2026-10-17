@@ -22,6 +22,7 @@ import {
   getOptionsLayout,
 } from '@/lib/export-exam';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
+import { generateExamVariants } from '@/lib/exam-shuffler';
 
 export default function EditorView() {
   const { activeExam, updateExam, showToast, setCurrentRoute, user } = useAppStore();
@@ -29,6 +30,12 @@ export default function EditorView() {
   const [title, setTitle] = useState(activeExam?.title || '');
   const [examCode, setExamCode] = useState(() => formatExamCode(activeExam?.id, activeExam?.code));
   const [questions, setQuestions] = useState<ExamQuestion[]>(activeExam?.questions || []);
+  const [variants, setVariants] = useState<any[]>(() => activeExam?.variants || []);
+  const [selectedVariantIdx, setSelectedVariantIdx] = useState(0);
+  const [isShuffleModalOpen, setIsShuffleModalOpen] = useState(false);
+  const [shuffleCodesCount, setShuffleCodesCount] = useState<number>(4);
+  const [shuffleOrderOpt, setShuffleOrderOpt] = useState(true);
+  const [shuffleValuesOpt, setShuffleValuesOpt] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingQId, setEditingQId] = useState<number | string | null>(null);
@@ -82,6 +89,9 @@ export default function EditorView() {
   useEffect(() => {
     if (activeExam) {
       setTitle(activeExam.title);
+      const incomingVariants = activeExam.variants && activeExam.variants.length > 0 ? activeExam.variants : [];
+      setVariants(incomingVariants);
+      setSelectedVariantIdx(0);
       setQuestions(activeExam.questions || []);
       setExamCode(formatExamCode(activeExam.id, activeExam.code));
       if (activeExam.department) setDepartment(normalizeDepartmentAccents(activeExam.department));
@@ -131,6 +141,48 @@ export default function EditorView() {
       updateExam(activeExam.id, { sessionTitle: trimmed });
     }
     showToast(`Đã đổi tên bài kiểm tra: ${trimmed}`, 'success');
+  };
+
+  const handleSelectVariant = (idx: number) => {
+    if (idx === selectedVariantIdx || !variants[idx]) return;
+    const updatedVariants = [...variants];
+    updatedVariants[selectedVariantIdx] = {
+      ...updatedVariants[selectedVariantIdx],
+      code: examCode,
+      questions,
+    };
+    setVariants(updatedVariants);
+    setSelectedVariantIdx(idx);
+    const target = updatedVariants[idx];
+    setExamCode(target.code || String(101 + idx));
+    setQuestions(target.questions || []);
+    showToast(`Đang hiển thị đề thi: Mã đề ${target.code}`, 'info');
+  };
+
+  const handlePerformShuffle = () => {
+    const newVariants = generateExamVariants(
+      questions,
+      title || activeExam?.title || 'Đề thi',
+      {
+        codeCount: shuffleCodesCount,
+        shuffleOrder: shuffleOrderOpt,
+        shuffleValues: shuffleValuesOpt,
+        baseCode: 101,
+      }
+    );
+    setVariants(newVariants);
+    setSelectedVariantIdx(0);
+    if (newVariants[0]) {
+      setExamCode(newVariants[0].code);
+      setQuestions(newVariants[0].questions);
+    }
+    if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        variants: newVariants,
+      });
+    }
+    setIsShuffleModalOpen(false);
+    showToast(`Đã tạo thành công ${shuffleCodesCount} mã đề thi (101 - ${100 + shuffleCodesCount})!`, 'success');
   };
 
   // Click outside listener for dropdowns
@@ -615,6 +667,10 @@ export default function EditorView() {
         }
       }
 
+      // Accumulate previous contents for this question slot to prevent bouncing between X and Y
+      const previousVersions = ((q as any)._previousContents || []) as string[];
+      const updatedHistory = Array.from(new Set([...previousVersions, q.content].filter(Boolean)));
+
       const res = await fetch('/api/v1/exams/regenerate-question', {
         method: 'POST',
         headers,
@@ -626,6 +682,10 @@ export default function EditorView() {
           type: q.type || 'multiple_choice',
           currentTopic: q.topic && q.topic !== activeExam.subject ? q.topic : examTopic,
           customPrompt: activeExam.customPrompt || '',
+          currentQuestionContent: q.content,
+          avoidQuestions: Array.from(
+            new Set([...updatedHistory, ...questions.map((item) => item.content).filter(Boolean)])
+          ),
           existingQuestions: questions.map((item) => item.content).filter(Boolean),
         }),
       });
@@ -638,6 +698,7 @@ export default function EditorView() {
             item.id === q.id
               ? {
                   ...item,
+                  _previousContents: Array.from(new Set([...updatedHistory, newQ.content])),
                   content: newQ.content,
                   type: newQ.type || q.type || 'multiple_choice',
                   options: (newQ.options || []).map((opt: any) => ({
@@ -758,6 +819,10 @@ export default function EditorView() {
   };
 
   const handleSave = () => {
+    const updatedVariants = variants.length > 0
+      ? variants.map((v, i) => (i === selectedVariantIdx ? { ...v, code: examCode, questions } : v))
+      : undefined;
+
     updateExam(activeExam.id, {
       title,
       code: examCode,
@@ -769,6 +834,7 @@ export default function EditorView() {
       sectionDescriptions,
       questions,
       questionsCount: questions.length,
+      variants: updatedVariants,
       updatedAt: 'Vừa lưu',
     });
     showToast('Đã lưu tất cả thay đổi bộ đề thi', 'success');
@@ -786,6 +852,9 @@ export default function EditorView() {
     sectionDescriptions,
     questions,
     questionsCount: questions.length,
+    variants: variants.length > 0
+      ? variants.map((v, i) => (i === selectedVariantIdx ? { ...v, code: examCode, questions } : v))
+      : undefined,
   };
 
   const handleExportDocx = async () => {
@@ -1224,6 +1293,17 @@ export default function EditorView() {
             </button>
           )}
 
+          {/* Shuffle Exam Variants Button */}
+          <button
+            type="button"
+            onClick={() => setIsShuffleModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+            title="Tạo nhiều mã đề (101, 102, 103, 104...) bằng cách xáo trộn câu hỏi, phương án và số liệu"
+          >
+            <span className="material-symbols-outlined text-sm text-amber-600 dark:text-amber-400">shuffle</span>
+            <span>{variants && variants.length > 1 ? `Trộn đề (${variants.length} mã)` : 'Trộn đề phòng thi'}</span>
+          </button>
+
           {/* Save Button */}
           <button
             type="button"
@@ -1273,6 +1353,50 @@ export default function EditorView() {
             <span className="material-symbols-outlined text-xs">lock</span>
             <span>Khóa / Xong</span>
           </button>
+        </div>
+      )}
+
+      {/* Multi-Code Exam Switcher Tabs */}
+      {variants && variants.length > 1 && (
+        <div className="no-print bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs shrink-0">
+              <span className="material-symbols-outlined text-base">shuffle</span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <span>BỘ MÃ ĐỀ THI TRỘN CHỐNG GIAN LẬN</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">
+                  {variants.length} Mã đề
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Đang xem: <strong>Mã {variants[selectedVariantIdx]?.code || 101 + selectedVariantIdx}</strong>. Nhấp vào các tab dưới để chuyển mã đề cần xem hoặc in ấn riêng.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-stretch sm:self-auto overflow-x-auto">
+            {variants.map((v, idx) => {
+              const isSelected = idx === selectedVariantIdx;
+              return (
+                <button
+                  key={v.code || idx}
+                  type="button"
+                  onClick={() => handleSelectVariant(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 shrink-0 ${
+                    isSelected
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-blue-200/50 dark:border-blue-900/50'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-600 dark:bg-blue-400 animate-pulse' : 'bg-slate-400'}`}></span>
+                  <span>Mã {v.code}</span>
+                  {idx === 0 && <span className="text-[9px] font-sans text-slate-400 font-normal">(Gốc)</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1919,7 +2043,10 @@ export default function EditorView() {
                     <strong className="font-bold text-blue-600 dark:text-blue-400 mr-2 text-sm md:text-base">
                       Câu {qIndex + 1}.
                     </strong>
-                    <MathText content={q.content} inline />
+                    <MathText
+                      content={q.content}
+                      inline={!q.content?.includes('```') && !q.content?.includes('\n')}
+                    />
                   </div>
 
                   {/* 1. TRẮC NGHIỆM 4 LỰA CHỌN */}
@@ -2642,6 +2769,104 @@ export default function EditorView() {
             <div className="pt-2 border-t border-blue-200/80 dark:border-blue-900/60 pl-7 text-[11px] text-slate-600 dark:text-slate-400">
               ✅ <strong>Số trang:</strong> Hệ thống đã tự động tích hợp số trang chuẩn Bộ GD&ĐT (<em>Trang 1 / 2</em>) vào góc dưới của đề. Bỏ tích ô trên sẽ xóa sạch link web và ngày giờ mà <strong>vẫn giữ nguyên số trang</strong>!
             </div>
+          </div>
+        </div>
+      </PortalModal>
+
+      {/* Modal Cấu hình Trộn Đề Phòng Thi */}
+      <PortalModal
+        isOpen={isShuffleModalOpen}
+        onClose={() => setIsShuffleModalOpen(false)}
+        title="Trộn đề thi phòng thi (Nhiều mã đề)"
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setIsShuffleModalOpen(false)}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={handlePerformShuffle}
+              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-sm">shuffle</span>
+              <span>Tạo các mã đề</span>
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs text-slate-700 dark:text-slate-300">
+          <p className="text-slate-500 leading-relaxed">
+            Hệ thống sẽ giữ nguyên ma trận và các phần (I, II, III, IV), đồng thời tạo ra các biến thể đề thi độc lập để phát cho thí sinh trong phòng thi nhằm chống gian lận.
+          </p>
+
+          <div className="space-y-2">
+            <label className="font-bold text-slate-800 dark:text-slate-200 block">
+              Số lượng mã đề cần tạo:
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[1, 2, 4, 8].map((cnt) => (
+                <button
+                  key={cnt}
+                  type="button"
+                  onClick={() => setShuffleCodesCount(cnt)}
+                  className={`py-2 rounded-xl font-bold font-mono text-xs border transition-all ${
+                    shuffleCodesCount === cnt
+                      ? 'bg-amber-500 border-amber-600 text-white shadow-xs ring-2 ring-amber-300 dark:ring-amber-800'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {cnt} mã
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Các mã đề tạo ra sẽ có số hiệu: {Array.from({ length: shuffleCodesCount }, (_, i) => 101 + i).join(', ')}
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+            <label className="font-bold text-slate-800 dark:text-slate-200 block">
+              Tùy chọn xáo trộn độc lập:
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={shuffleOrderOpt}
+                onChange={(e) => setShuffleOrderOpt(e.target.checked)}
+                className="mt-0.5 rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
+              />
+              <div>
+                <div className="font-bold text-slate-800 dark:text-slate-200">
+                  Xáo thứ tự câu hỏi & phương án A, B, C, D
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Đảo vị trí câu hỏi trong từng phần và tráo thứ tự phương án trắc nghiệm, tự động cập nhật lại đáp án đúng.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={shuffleValuesOpt}
+                onChange={(e) => setShuffleValuesOpt(e.target.checked)}
+                className="mt-0.5 rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
+              />
+              <div>
+                <div className="font-bold text-slate-800 dark:text-slate-200">
+                  Xáo thông số số liệu (Numerical Variation)
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Tinh chỉnh các tham số hằng số trong đề bài để mỗi mã đề có bài toán tương đương nhưng số liệu khác nhau.
+                </div>
+              </div>
+            </label>
           </div>
         </div>
       </PortalModal>

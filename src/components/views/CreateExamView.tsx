@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import PortalModal from '@/components/common/PortalModal';
@@ -11,6 +11,7 @@ import {
   EXAM_FORMAT_PRESETS,
   CognitiveMatrixPercent,
 } from '@/lib/exam-sections';
+import { generateExamVariants } from '@/lib/exam-shuffler';
 
 interface SkillOption {
   id: string;
@@ -113,6 +114,71 @@ export default function CreateExamView() {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Topic Practice & Topic Focus
+  const [topicFocus, setTopicFocus] = useState('');
+
+  // School Custom Matrix (NBK / Tổ bộ môn)
+  const [customMatrixTable, setCustomMatrixTable] = useState('');
+  const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+
+  // Multi-code Exam Shuffling (Chống gian lận phòng thi)
+  const [examCodesCount, setExamCodesCount] = useState<number>(1);
+  const [shuffleOrder, setShuffleOrder] = useState(true);
+  const [shuffleValues, setShuffleValues] = useState(false);
+
+  // Sample Exam Reference (Đề thi mẫu)
+  const [useSampleExam, setUseSampleExam] = useState(false);
+  const [sampleExamFile, setSampleExamFile] = useState<File | null>(null);
+  const [sampleExamFileName, setSampleExamFileName] = useState('');
+  const [sampleExamFileSize, setSampleExamFileSize] = useState<number>(0);
+  const [sampleExamText, setSampleExamText] = useState('');
+  const [isReadingSampleExam, setIsReadingSampleExam] = useState(false);
+  const [sampleExamError, setSampleExamError] = useState('');
+  const [isSampleExamPreviewOpen, setIsSampleExamPreviewOpen] = useState(false);
+  const sampleExamInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSampleExamFileUpload = async (file: File) => {
+    if (!file) return;
+    setSampleExamFile(file);
+    setSampleExamFileName(file.name);
+    setSampleExamFileSize(file.size);
+    setIsReadingSampleExam(true);
+    setSampleExamError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('examify_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/v1/academic-data/ocr', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.data?.text) {
+        setSampleExamText(data.data.text);
+        showToast(`Đã đọc thành công đề thi mẫu (${data.data.text.length.toLocaleString('vi-VN')} ký tự)!`, 'success');
+      } else {
+        const errMsg = data.message || 'Không thể trích xuất nội dung từ tệp đề thi mẫu.';
+        setSampleExamError(errMsg);
+        showToast(errMsg, 'error');
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || 'Lỗi kết nối khi tải và đọc đề thi mẫu.';
+      setSampleExamError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsReadingSampleExam(false);
+    }
+  };
+
+  const isOfficialExam = examType === 'MID_TERM' || examType === 'FINAL_TERM' || examType === 'MIN_15' || examType === 'ENTRANCE';
 
   // Pedagogical Skills
   const [availableSkills, setAvailableSkills] = useState<SkillOption[]>([]);
@@ -300,16 +366,35 @@ export default function CreateExamView() {
     setIsGenerating(true);
 
     try {
-      const generatedTitle = `Đề kiểm tra ${subject} ${grade} - ${examType === 'MID_TERM' ? 'Giữa kì 1' : 'Định kỳ'}`;
+      const generatedTitle =
+        examType === 'CUSTOM'
+          ? `Đề thi Tùy chỉnh - Môn ${subject}`
+          : examType === 'TOPIC_PRACTICE'
+          ? `Đề ôn tập chuyên đề: ${topicFocus || subject} - ${grade}`
+          : `Đề kiểm tra ${subject} ${grade} - ${examType === 'MID_TERM' ? 'Giữa kì 1' : 'Định kỳ'}`;
+
       const payload = {
         title: generatedTitle,
         curriculum: {
-          level: level === 'UPPER_SEC' ? 'THPT' : level === 'LOWER_SEC' ? 'THCS' : 'Tiểu học',
-          grade,
+          level:
+            examType === 'CUSTOM'
+              ? 'Tùy chỉnh'
+              : level === 'UPPER_SEC'
+              ? 'THPT'
+              : level === 'LOWER_SEC'
+              ? 'THCS'
+              : 'Tiểu học',
+          grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
           subject,
-          semester: 'Học kỳ 1',
+          semester:
+            examType === 'CUSTOM'
+              ? 'Tùy chỉnh'
+              : examType === 'TOPIC_PRACTICE'
+              ? 'Ôn tập chuyên đề'
+              : 'Học kỳ 1',
+          topic: examType === 'TOPIC_PRACTICE' ? topicFocus : undefined,
         },
-        examType,
+        examType: examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE' ? 'MID_TERM' : examType,
         durationMinutes: duration,
         totalPoints: 10,
         totalQuestions: questionCount,
@@ -325,7 +410,12 @@ export default function CreateExamView() {
           shortAnswer: { count: saCount, matrix: saMatrix },
           essay: { count: essayCount, matrix: essayMatrix },
         },
-        customPrompt,
+        customPrompt: isOfficialExam ? undefined : customPrompt,
+        customMatrixTable: customMatrixTable || undefined,
+        topicFocus: examType === 'TOPIC_PRACTICE' ? topicFocus : undefined,
+        isTopicPractice: examType === 'TOPIC_PRACTICE',
+        sampleExamText: useSampleExam && sampleExamText ? sampleExamText : undefined,
+        sampleExamFileName: useSampleExam && sampleExamFileName ? sampleExamFileName : undefined,
         skillIds: selectedSkillIds.length > 0 ? selectedSkillIds : undefined,
         aiProvider,
         aiModel: selectedModel,
@@ -482,17 +572,39 @@ export default function CreateExamView() {
         });
       }
 
+      // Multi-code Shuffling (101, 102, 103, 104...)
+      const examVariants = generateExamVariants(
+        questions,
+        examTitle,
+        {
+          codeCount: examCodesCount,
+          shuffleOrder,
+          shuffleValues,
+          baseCode: 101,
+        }
+      );
+
       const newExam: ExamItem = {
         id: data.data?.examId || `EX-${Date.now().toString().slice(-6)}`,
         title: examTitle,
         subject,
-        grade,
-        term: 'Học kỳ 1',
+        grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
+        term:
+          examType === 'CUSTOM'
+            ? 'Tùy chỉnh'
+            : examType === 'TOPIC_PRACTICE'
+            ? 'Ôn tập chuyên đề'
+            : 'Học kỳ 1',
         year: '2024-2025',
         questionsCount: questions.length,
         duration,
         status: 'approved',
-        statusLabel: 'Chính thức',
+        statusLabel:
+          examType === 'CUSTOM'
+            ? 'Tùy chỉnh'
+            : examType === 'TOPIC_PRACTICE'
+            ? 'Ôn tập'
+            : 'Chính thức',
         author: user.name,
         updatedAt: 'Vừa tạo',
         matrix: { easy, medium, hard, veryHard },
@@ -500,11 +612,24 @@ export default function CreateExamView() {
         questions,
         appliedSkills: data.data?.appliedSkills || [],
         customPrompt,
+        variants: examVariants,
         curriculumMetadata: {
-          level: level === 'UPPER_SEC' ? 'THPT' : level === 'LOWER_SEC' ? 'THCS' : 'Tiểu học',
-          grade,
+          level:
+            examType === 'CUSTOM'
+              ? 'Tùy chỉnh'
+              : level === 'UPPER_SEC'
+              ? 'THPT'
+              : level === 'LOWER_SEC'
+              ? 'THCS'
+              : 'Tiểu học',
+          grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
           subject,
-          semester: 'Học kỳ 1',
+          semester:
+            examType === 'CUSTOM'
+              ? 'Tùy chỉnh'
+              : examType === 'TOPIC_PRACTICE'
+              ? 'Ôn tập chuyên đề'
+              : 'Học kỳ 1',
         },
       };
 
@@ -585,8 +710,14 @@ export default function CreateExamView() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Cấp học *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Cấp học *</label>
+                  {examType === 'CUSTOM' && (
+                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                  )}
+                </div>
                 <select
+                  disabled={examType === 'CUSTOM'}
                   value={level}
                   onChange={(e) => {
                     const newLevel = e.target.value;
@@ -596,7 +727,11 @@ export default function CreateExamView() {
                     else if (newLevel === 'LOWER_SEC') setGrade('Lớp 9');
                     else if (newLevel === 'PRIMARY') setGrade('Lớp 5');
                   }}
-                  className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                    examType === 'CUSTOM'
+                      ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
+                  }`}
                 >
                   <option value="UPPER_SEC">THPT (Cấp 3)</option>
                   <option value="LOWER_SEC">THCS (Cấp 2)</option>
@@ -605,11 +740,21 @@ export default function CreateExamView() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Khối lớp *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Khối lớp *</label>
+                  {examType === 'CUSTOM' && (
+                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                  )}
+                </div>
                 <select
+                  disabled={examType === 'CUSTOM'}
                   value={grade}
                   onChange={(e) => setGrade(e.target.value)}
-                  className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                    examType === 'CUSTOM'
+                      ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
+                  }`}
                 >
                   {level === 'UPPER_SEC' && (
                     <>
@@ -646,6 +791,7 @@ export default function CreateExamView() {
                   className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   <option value="Toán học">Toán học</option>
+                  <option value="Tin học">Tin học</option>
                   <option value="Vật lý">Vật lý</option>
                   <option value="Hóa học">Hóa học</option>
                   <option value="Sinh học">Sinh học</option>
@@ -668,15 +814,27 @@ export default function CreateExamView() {
                   <option value="FINAL_TERM">Kiểm tra Cuối kỳ</option>
                   <option value="MIN_15">Kiểm tra 15 phút</option>
                   <option value="ENTRANCE">Khảo sát Đầu vào / Thi thử</option>
+                  <option value="TOPIC_PRACTICE">Đề ôn tập chuyên đề / Luyện tập</option>
+                  <option value="CUSTOM">Tùy chỉnh (Tự do)</option>
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Thời gian làm bài</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Thời gian làm bài</label>
+                  {examType === 'CUSTOM' && (
+                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                  )}
+                </div>
                 <select
+                  disabled={examType === 'CUSTOM'}
                   value={duration}
                   onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                  className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                    examType === 'CUSTOM'
+                      ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
+                  }`}
                 >
                   <option value="15">15 phút</option>
                   <option value="45">45 phút</option>
@@ -698,6 +856,178 @@ export default function CreateExamView() {
                 />
               </div>
             </div>
+
+            {/* Chuyên đề trọng tâm (Chỉ hiển thị khi chọn Đề ôn tập chuyên đề) */}
+            {examType === 'TOPIC_PRACTICE' && (
+              <div className="mt-3 p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-blue-600 text-sm">filter_center_focus</span>
+                    <label className="text-xs font-bold text-blue-900">
+                      Chuyên đề / Bài học trọng tâm * (Bắt buộc)
+                    </label>
+                  </div>
+                  <span className="text-[10px] bg-blue-200/80 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                    Phạm vi chuyên đề đơn
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={topicFocus}
+                  onChange={(e) => setTopicFocus(e.target.value)}
+                  placeholder="Ví dụ: Định lý sin, côsin trong tam giác | Phương trình bậc hai | Vòng lặp while..."
+                  className="w-full h-9 px-3 text-xs rounded-lg border border-blue-300 bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 placeholder:text-slate-400"
+                />
+                <p className="text-[11px] text-blue-700 leading-relaxed">
+                  🎯 <strong>Luật bất khả xâm phạm:</strong> 100% câu hỏi sinh ra sẽ CHỈ tập trung vào chuyên đề này, tuyệt đối không bị lọt kiến thức từ các chương khác!
+                </p>
+              </div>
+            )}
+
+            {/* Toggle Đề thi mẫu (Tạo đề tương đương từ tệp) */}
+            <div className="mt-4 pt-3.5 border-t border-slate-150 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-lg">upload_file</span>
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800">Đề thi mẫu (Tạo đề tương đương)</span>
+                    <p className="text-[11px] text-slate-500">
+                      Tải lên tệp đề thi có sẵn (PDF, Word, Ảnh) để AI đọc ma trận và sinh đề mới cùng dạng
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !useSampleExam;
+                    setUseSampleExam(next);
+                    if (!next) {
+                      setSampleExamFile(null);
+                      setSampleExamFileName('');
+                      setSampleExamFileSize(0);
+                      setSampleExamText('');
+                      setSampleExamError('');
+                    }
+                  }}
+                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer shrink-0 ${
+                    useSampleExam ? 'bg-indigo-600' : 'bg-slate-300'
+                  }`}
+                  title={useSampleExam ? 'Tắt sử dụng đề thi mẫu' : 'Bật tải lên đề thi mẫu'}
+                >
+                  <div
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                      useSampleExam ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Upload Dropzone & Extracted Content Card */}
+              {useSampleExam && (
+                <div className="p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-3 animate-in fade-in duration-200">
+                  {!sampleExamFile ? (
+                    <div
+                      onClick={() => sampleExamInputRef.current?.click()}
+                      className="border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-white/80 hover:bg-white rounded-xl p-5 text-center cursor-pointer transition group"
+                    >
+                      <input
+                        ref={sampleExamInputRef}
+                        type="file"
+                        accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSampleExamFileUpload(file);
+                        }}
+                      />
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
+                        <span className="material-symbols-outlined text-xl">cloud_upload</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-800">
+                        Nhấp để tải lên tệp đề thi mẫu hoặc kéo thả tệp vào đây
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Hỗ trợ: PDF (.pdf), Word (.docx), Ảnh chụp đề (.jpg, .png), Văn bản (.txt)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white rounded-xl border border-indigo-200 space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-lg">
+                              {sampleExamFileName.endsWith('.pdf') ? 'picture_as_pdf' : sampleExamFileName.endsWith('.docx') ? 'description' : 'image'}
+                            </span>
+                          </div>
+                          <div className="truncate">
+                            <div className="text-xs font-bold text-slate-800 truncate" title={sampleExamFileName}>
+                              {sampleExamFileName}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {(sampleExamFileSize / 1024).toFixed(1)} KB • {isReadingSampleExam ? 'Đang trích xuất OCR/Multimodal...' : sampleExamText ? `Đã đọc ${sampleExamText.length.toLocaleString('vi-VN')} ký tự` : 'Chưa có nội dung'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {sampleExamText && (
+                            <button
+                              type="button"
+                              onClick={() => setIsSampleExamPreviewOpen(true)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1 transition"
+                            >
+                              <span className="material-symbols-outlined text-xs">visibility</span>
+                              <span>Xem nội dung</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSampleExamFile(null);
+                              setSampleExamFileName('');
+                              setSampleExamFileSize(0);
+                              setSampleExamText('');
+                              setSampleExamError('');
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition"
+                            title="Xóa tệp và tải lại"
+                          >
+                            <span className="material-symbols-outlined text-base">close</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {isReadingSampleExam && (
+                        <div className="flex items-center gap-2 text-[11px] text-indigo-600 font-medium py-1 animate-pulse">
+                          <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                          <span>Hệ thống AI Multimodal đang quét và giải mã nội dung đề thi mẫu...</span>
+                        </div>
+                      )}
+
+                      {sampleExamError && (
+                        <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-700 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm shrink-0">error</span>
+                          <span>{sampleExamError}</span>
+                        </div>
+                      )}
+
+                      {sampleExamText && !isReadingSampleExam && (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base shrink-0 text-emerald-600">check_circle</span>
+                          <span>
+                            AI đã giải mã xong cấu trúc đề. Khi bấm <strong>Tạo Đề Thi</strong>, AI sẽ tự động mô phỏng ma trận và độ khó của đề mẫu này để sinh đề mới tương đương!
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 2. Cấu trúc định dạng & Phân bổ câu hỏi theo phần (Chuẩn Bộ GD&ĐT) */}
@@ -715,20 +1045,37 @@ export default function CreateExamView() {
                 </div>
               </div>
 
-              {/* Status Badge */}
-              <div
-                className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${
-                  isSectionCountValid
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
-                }`}
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {isSectionCountValid ? 'check_circle' : 'warning'}
-                </span>
-                <span>
-                  Tổng các phần: {totalSectionQuestions} / {questionCount} câu
-                </span>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {/* Button: Thêm Ma trận riêng của trường */}
+                <button
+                  type="button"
+                  onClick={() => setIsMatrixModalOpen(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full border transition shadow-2xs ${
+                    customMatrixTable
+                      ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                  }`}
+                  title="Nhập hoặc dán bảng ma trận phân bổ câu hỏi chi tiết của trường/tổ bộ môn"
+                >
+                  <span className="material-symbols-outlined text-sm">grid_view</span>
+                  <span>{customMatrixTable ? 'Đã gán Ma trận trường ✓' : 'Thêm Ma trận trường (NBK...)'}</span>
+                </button>
+
+                {/* Status Badge */}
+                <div
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 ${
+                    isSectionCountValid
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    {isSectionCountValid ? 'check_circle' : 'warning'}
+                  </span>
+                  <span>
+                    Tổng các phần: {totalSectionQuestions} / {questionCount} câu
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -1149,21 +1496,146 @@ export default function CreateExamView() {
             </div>
           </div>
 
+          {/* 3. Cấu hình Mã đề thi & Trộn đề phòng thi (Chống gian lận) */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-600 text-lg">shuffle</span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    3. Cấu hình Mã đề thi & Trộn đề phòng thi
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Tự động tạo nhiều mã đề (101, 102...) từ đề gốc để chống nhìn bài khi thi tập trung
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0">
+                {[1, 2, 4, 8].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setExamCodesCount(count)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                      examCodesCount === count
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {count === 1 ? '1 Mã đề gốc' : `${count} Mã đề`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {examCodesCount > 1 && (
+              <div className="p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-3 animate-in fade-in duration-200">
+                <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-indigo-600">checklist</span>
+                  <span>Tùy chọn phương thức trộn đề (Có thể tick cả hai):</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Xáo thứ tự câu hỏi & phương án */}
+                  <label
+                    className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition ${
+                      shuffleOrder
+                        ? 'bg-white border-indigo-400 ring-1 ring-indigo-400'
+                        : 'bg-white/60 border-slate-200 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={shuffleOrder}
+                      onChange={(e) => setShuffleOrder(e.target.checked)}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        Xáo thứ tự câu hỏi & phương án A, B, C, D
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Đảo trật tự câu hỏi trong từng phần và tráo ngẫu nhiên vị trí các lựa chọn đáp án.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Xáo số liệu bài toán */}
+                  <label
+                    className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition ${
+                      shuffleValues
+                        ? 'bg-white border-indigo-400 ring-1 ring-indigo-400'
+                        : 'bg-white/60 border-slate-200 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={shuffleValues}
+                      onChange={(e) => setShuffleValues(e.target.checked)}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        Xáo thông số số liệu (Numerical Permutation)
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Cùng dạng bài nhưng biến thiên các hằng số số học giữa các mã đề để chống chép số liệu.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="text-[11px] text-indigo-700 bg-white/80 p-2.5 rounded-lg border border-indigo-100 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-indigo-600">verified</span>
+                  <span>
+                    Hệ thống sẽ tự động xuất <strong>{examCodesCount} mã đề: {Array.from({ length: examCodesCount }, (_, i) => 101 + i).join(', ')}</strong> với bảng đáp án riêng biệt được đồng bộ tự động!
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* 4. Yêu cầu chi tiết tùy biến */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-blue-600 text-lg">edit_note</span>
-              <h3 className="text-sm font-bold text-slate-800">
-                4. Yêu cầu chuyên biệt (Prompt Tuyển chọn)
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600 text-lg">edit_note</span>
+                <h3 className="text-sm font-bold text-slate-800">
+                  4. Yêu cầu chuyên biệt (Prompt Tuyển chọn)
+                </h3>
+              </div>
+              {isOfficialExam && (
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">lock</span>
+                  Khóa ở kỳ thi chính khóa
+                </span>
+              )}
             </div>
-            <textarea
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="Nhập yêu cầu trọng tâm bài học, ví dụ: 'Tập trung vào phần hàm số bậc hai và tính đồng biến nghịch biến, cho các dạng toán thực tế ứng dụng parabol...'"
-              rows={3}
-              className="w-full p-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
+            {isOfficialExam ? (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-slate-400 text-base mt-0.5">verified_user</span>
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-800">Kỳ thi chính khóa tuân thủ chuẩn Ma trận GDPT 2018</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Prompt tự do được khóa để đảm bảo đề thi bám sát phân phối chương trình của Bộ/Sở và ma trận khảo thí đã duyệt.
+                    Nếu muốn ra đề tự do hoặc theo chuyên đề riêng, vui lòng chọn loại kỳ thi là <strong>"Đề ôn tập chuyên đề"</strong> hoặc <strong>"Tùy chỉnh"</strong>.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder={
+                  examType === 'CUSTOM'
+                    ? subject === 'Tin học'
+                      ? "Nhập chủ đề chuyên sâu tùy chọn (ví dụ: 'Chuyên đề HSG Tin học: Quy hoạch động LIS, Tìm kiếm nhị phân, Cây Fenwick (BIT), Segment Tree, đồ thị...')"
+                      : "Nhập chủ đề và yêu cầu tùy chọn tự do cho đề thi..."
+                    : "Nhập yêu cầu trọng tâm cho chuyên đề ôn tập, ví dụ: 'Tập trung sâu vào phần giải tam giác, hệ thức lượng, không ra câu hỏi ngoài chủ đề...'"
+                }
+                rows={3}
+                className="w-full p-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            )}
           </div>
 
           {/* 5. Kỹ Năng Sư Phạm AI Áp Dụng */}
@@ -1622,6 +2094,117 @@ export default function CreateExamView() {
             )}
           </div>
         )}
+      </PortalModal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: NHẬP BẢN ĐẶC TẢ MA TRẬN RIÊNG CỦA TRƯỜNG / TỔ BỘ MÔN */}
+      {/* ========================================================================= */}
+      <PortalModal
+        isOpen={isMatrixModalOpen}
+        onClose={() => setIsMatrixModalOpen(false)}
+        title="Bản Đặc Tả Ma Trận Đề Thi Riêng (NBK / Tổ Bộ Môn)"
+      >
+        <div className="flex flex-col gap-3.5">
+          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm text-indigo-600">verified</span>
+              <span>Áp dụng quy chuẩn khảo thí riêng của Nhà trường</span>
+            </div>
+            <p className="text-[11px] text-indigo-700 leading-relaxed">
+              Dán hoặc nhập bảng ma trận phân bổ câu hỏi chi tiết theo từng chương/bài học đã được Tổ bộ môn phê duyệt.
+              AI sẽ xem bản đặc tả này là <strong>Mệnh lệnh tối cao</strong> để bốc đúng số câu và dạng bài.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Nội dung Ma trận đề thi (Văn bản / Markdown / Bảng đặc tả):
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomMatrixTable(
+`### BẢNG ĐẶC TẢ MA TRẬN ĐỀ THI - TỔ BỘ MÔN
+- Bài 1 (Khái niệm & Định nghĩa): 2 câu Nhận biết, 1 câu Thông hiểu
+- Bài 2 (Phương pháp & Công thức): 1 câu Thông hiểu, 1 câu Vận dụng
+- Bài 3 (Bài toán thực tiễn đời sống): 1 câu Vận dụng, 1 câu Vận dụng cao (bối cảnh thực tế)
+- Yêu cầu đặc biệt: Không ra các dạng bài đã giảm tải theo công văn của Sở GD&ĐT.`
+                  );
+                }}
+                className="text-[11px] font-semibold text-indigo-600 hover:underline flex items-center gap-0.5"
+              >
+                <span className="material-symbols-outlined text-xs">auto_fix_high</span>
+                Điền mẫu tham khảo
+              </button>
+            </div>
+            <textarea
+              value={customMatrixTable}
+              onChange={(e) => setCustomMatrixTable(e.target.value)}
+              placeholder="Dán nội dung ma trận của tổ bộ môn tại đây..."
+              rows={8}
+              className="w-full p-3 text-xs font-mono rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setCustomMatrixTable('');
+                setIsMatrixModalOpen(false);
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+            >
+              Xóa ma trận riêng
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMatrixModalOpen(false)}
+                className="px-4 py-2 border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMatrixModalOpen(false);
+                  showToast('Đã lưu Bản đặc tả ma trận riêng của trường thành công!', 'success');
+                }}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-xs"
+              >
+                Lưu & Áp Dụng
+              </button>
+            </div>
+          </div>
+        </div>
+      </PortalModal>
+
+      {/* Modal Preview Đề Thi Mẫu */}
+      <PortalModal
+        isOpen={isSampleExamPreviewOpen}
+        onClose={() => setIsSampleExamPreviewOpen(false)}
+        title={`Nội dung AI đã trích xuất từ đề thi mẫu: ${sampleExamFileName}`}
+        maxWidth="max-w-2xl"
+        footer={
+          <button
+            type="button"
+            onClick={() => setIsSampleExamPreviewOpen(false)}
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+          >
+            Đóng
+          </button>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">
+            Dưới đây là toàn bộ văn bản và công thức được trích xuất từ tệp đề mẫu của bạn qua AI Multimodal OCR. AI sẽ tự động phân tích ma trận nhận thức từ nội dung này để sinh đề thi mới tương đương.
+          </p>
+          <pre className="p-3.5 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono max-h-96 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">
+            {sampleExamText}
+          </pre>
+        </div>
       </PortalModal>
     </div>
   );
