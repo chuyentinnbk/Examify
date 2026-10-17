@@ -9,6 +9,7 @@ import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
 const RegenerateQuestionSchema = z.object({
   subject: z.string().default('Toán học'),
   grade: z.string().default('Lớp 12'),
+  term: z.string().optional(),
   level: z.string().default('Thông hiểu'),
   type: z.enum(['multiple_choice', 'true_false', 'short_answer', 'essay']).optional(),
   currentTopic: z.string().optional(),
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
       return apiError(validation.error.flatten().fieldErrors, 422, 'Invalid payload');
     }
 
-    const { subject, grade, level, type = 'multiple_choice', currentTopic, customPrompt, existingQuestions = [] } = validation.data;
+    const { subject, grade, term = 'Học kỳ 1', level, type = 'multiple_choice', currentTopic, customPrompt, existingQuestions = [] } = validation.data;
 
     const geminiKey = process.env.GEMINI_API_KEY?.split(/[,;]+/)[0]?.trim();
 
@@ -91,13 +92,21 @@ YÊU CẦU ĐẶC BIỆT: Bạn phải tính toán chi tiết trong "explanation
         }
 
         const gradeDirectives = ExamPromptBuilder.getCurriculumGradeDirectives(grade, subject);
-        const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi tại Việt Nam.
+        const prompt = `Bạn là chuyên gia khảo thí biên soạn đề thi chuẩn GDPT tại Việt Nam.
 ${gradeDirectives ? `${gradeDirectives}\n` : ''}
 ${typeInstruction}
-Chuyên đề/Chủ đề: ${currentTopic || subject}
-QUY TẮC BẮT BUỘC: Không được trùng lặp với bất kỳ câu hỏi nào đã có trong đề thi.
-${customPrompt ? `Yêu cầu thêm từ giáo viên: ${customPrompt}` : ''}
-${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề (TUYỆT ĐỐI KHÔNG TRÙNG NỘI DUNG):\n${existingQuestions.slice(-5).map((q, i) => `- ${q}`).join('\n')}` : ''}`;
+
+### THÔNG TIN BỐI CẢNH VÀ CHƯƠNG TRÌNH:
+- Môn học: ${subject}
+- Khối lớp: ${grade}
+- Học kỳ: ${term}
+- Chuyên đề/Chủ đề trọng tâm: ${currentTopic || subject}
+${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${customPrompt}` : ''}
+
+### QUY TẮC BẮT BUỘC (CRITICAL MANDATE):
+1. Đúng 100% phạm vi kiến thức khối lớp ${grade}, môn ${subject}, học kỳ ${term} và bám sát chủ đề "${currentTopic || subject}". TUYỆT ĐỐI không đi lệch sang các bài học hoặc chủ đề khác (ví dụ: nếu chủ đề là Lượng giác/Hàm số thì không ra bài Vectơ hay Hình không gian).
+2. TUYỆT ĐỐI KHÔNG TRÙNG LẶP: Không được lặp lại bất kỳ câu hỏi, thông số, phương trình hay bài toán nào đã có trong đề thi dưới đây.
+${existingQuestions.length > 0 ? `Các câu hỏi đã có trong đề thi (TUYỆT ĐỐI KHÔNG TRÙNG NỘI DUNG VÀ THÔNG SỐ):\n${existingQuestions.slice(-7).map((q, i) => `- ${q}`).join('\n')}` : ''}`;
 
         const result = await model.generateContent(prompt);
         const text = result.response.text();

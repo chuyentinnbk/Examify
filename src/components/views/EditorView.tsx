@@ -317,18 +317,32 @@ export default function EditorView() {
       if (normNewType === 'true_false') {
         const subKeys = ['a', 'b', 'c', 'd'];
 
+        // Helper: Sinh phân bố Đúng / Sai thực tế chuẩn Bộ GD&ĐT (1Đ-3S, 2Đ-2S, hoặc 3Đ-1S; tuyệt đối không 4Đ hay 4S)
+        const generateRealisticTfBooleans = (): boolean[] => {
+          const patterns = [
+            [true, false, false, false],
+            [true, true, false, false],
+            [true, true, false, false],
+            [true, true, true, false],
+          ];
+          const chosen = [...patterns[Math.floor(Math.random() * patterns.length)]];
+          for (let idx = chosen.length - 1; idx > 0; idx--) {
+            const j = Math.floor(Math.random() * (idx + 1));
+            [chosen[idx], chosen[j]] = [chosen[j], chosen[idx]];
+          }
+          return chosen;
+        };
+
         if (oldType === 'multiple_choice') {
           // Map existing 4 options to a, b, c, d without losing their texts
           const existingOpts = (q.options && q.options.length >= 4) ? q.options : backupOptions;
+          const tfBooleans = generateRealisticTfBooleans();
           newOptions = subKeys.map((k, i) => {
             const existing = existingOpts[i];
-            const isTargetCorrect = (q.correctAnswer && existing)
-              ? existing.key.toUpperCase() === q.correctAnswer.trim().toUpperCase()
-              : (existing ? !!existing.isCorrect : false);
             return {
               key: k,
               text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
-              isCorrect: isTargetCorrect,
+              isCorrect: tfBooleans[i],
             };
           });
         } else if (oldType === 'short_answer' || oldType === 'essay') {
@@ -338,20 +352,22 @@ export default function EditorView() {
             newOptions = previousTfOpts.map((o) => ({ ...o, key: o.key.toLowerCase() }));
           } else {
             const ansText = cleanOptionText(q.correctAnswer || backupAnswer);
+            const tfBooleans = generateRealisticTfBooleans();
             newOptions = [
-              { key: 'a', text: ansText && !ansText.includes('Xem') ? `Kết quả của bài toán là $${ansText}$` : 'Mệnh đề khẳng định ý a', isCorrect: true },
-              { key: 'b', text: 'Mệnh đề phủ định của ý a', isCorrect: false },
-              { key: 'c', text: 'Tập xác định của hàm số thỏa mãn yêu cầu bài toán', isCorrect: true },
-              { key: 'd', text: 'Tập nghiệm của phương trình là tập hợp rỗng', isCorrect: false },
+              { key: 'a', text: ansText && !ansText.includes('Xem') ? `Kết quả của bài toán là $${ansText}$` : 'Mệnh đề khẳng định ý a', isCorrect: tfBooleans[0] },
+              { key: 'b', text: 'Mệnh đề phủ định của ý a', isCorrect: tfBooleans[1] },
+              { key: 'c', text: 'Tập xác định của hàm số thỏa mãn yêu cầu bài toán', isCorrect: tfBooleans[2] },
+              { key: 'd', text: 'Tập nghiệm của phương trình là tập hợp rỗng', isCorrect: tfBooleans[3] },
             ];
           }
         } else {
+          const tfBooleans = generateRealisticTfBooleans();
           newOptions = subKeys.map((k, i) => {
             const existing = (q.options || [])[i] || backupOptions[i];
             return {
               key: k,
               text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
-              isCorrect: existing ? !!existing.isCorrect : i % 2 === 0,
+              isCorrect: existing && typeof existing.isCorrect === 'boolean' ? existing.isCorrect : tfBooleans[i],
             };
           });
         }
@@ -586,15 +602,30 @@ export default function EditorView() {
         headers['Authorization'] = `Bearer ${storedToken}`;
       }
 
+      let examTopic = activeExam.subject;
+      if (activeExam.curriculumMetadata) {
+        try {
+          const meta = typeof activeExam.curriculumMetadata === 'string'
+            ? JSON.parse(activeExam.curriculumMetadata)
+            : activeExam.curriculumMetadata;
+          if (meta.topic) examTopic = meta.topic;
+          if (meta.lesson) examTopic = `${meta.topic} - ${meta.lesson}`;
+        } catch {
+          // ignore
+        }
+      }
+
       const res = await fetch('/api/v1/exams/regenerate-question', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           subject: activeExam.subject,
           grade: activeExam.grade,
+          term: activeExam.term || 'Học kỳ 1',
           level: q.level,
           type: q.type || 'multiple_choice',
-          currentTopic: q.topic || activeExam.subject,
+          currentTopic: q.topic && q.topic !== activeExam.subject ? q.topic : examTopic,
+          customPrompt: activeExam.customPrompt || '',
           existingQuestions: questions.map((item) => item.content).filter(Boolean),
         }),
       });

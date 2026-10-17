@@ -59,6 +59,8 @@ export interface ExamItem {
   schoolName?: string;
   questions?: ExamQuestion[];
   appliedSkills?: Array<{ id: string; title: string }>;
+  customPrompt?: string;
+  curriculumMetadata?: any;
 }
 
 /**

@@ -33,6 +33,54 @@ const GenerateExamSchema = z.object({
       highApplication: z.number().min(0).max(100),
     })
     .optional(),
+  sectionDistribution: z
+    .object({
+      multipleChoice: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      trueFalse: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      shortAnswer: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      essay: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+    })
+    .optional(),
   customPrompt: z.string().max(1500).optional(),
   skillIds: z.array(z.string()).optional(),
   aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
@@ -169,6 +217,7 @@ export async function POST(req: NextRequest) {
           totalPoints: payload.totalPoints,
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix,
+          sectionDistribution: payload.sectionDistribution,
           customPrompt: safeCustomPrompt,
           appliedSkills: appliedSkills.length > 0 ? appliedSkills : undefined,
           language: payload.language,

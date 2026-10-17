@@ -1,6 +1,7 @@
 import { ExamType } from '@prisma/client';
 import { ExamGenerationPayload } from './types';
 import { PromptGuard } from '@/core/security/prompt-guard';
+import { calculateMinOneCognitiveCounts } from '@/lib/exam-sections';
 
 export interface BuiltPrompt {
   systemPrompt: string;
@@ -117,6 +118,60 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
 `.trim();
 
     // 4. Assemble Matrix & Structure Specifications
+    let sectionSpecs = '';
+    if (payload.sectionDistribution) {
+      const dist = payload.sectionDistribution;
+      const parts: string[] = [];
+
+      if (dist.multipleChoice && dist.multipleChoice.count > 0) {
+        const counts = calculateMinOneCognitiveCounts(dist.multipleChoice.count, dist.multipleChoice.matrix);
+        parts.push(`- PHẦN I: CÂU TRẮC NGHIỆM NHIỀU PHƯƠNG ÁN LỰA CHỌN (MULTIPLE_CHOICE)
+  * Số lượng: ĐÚNG ${dist.multipleChoice.count} câu
+  * Phân bổ mức độ nhận thức cụ thể:
+    + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
+    + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
+    + ${counts.application} câu Vận dụng (APPLICATION)
+    + ${counts.highApplication} câu Vận dụng cao (HIGH_APPLICATION)`);
+      }
+
+      if (dist.trueFalse && dist.trueFalse.count > 0) {
+        const counts = calculateMinOneCognitiveCounts(dist.trueFalse.count, dist.trueFalse.matrix);
+        parts.push(`- PHẦN II: CÂU TRẮC NGHIỆM ĐÚNG SAI (TRUE_FALSE)
+  * Số lượng: ĐÚNG ${dist.trueFalse.count} câu (mỗi câu gồm ngữ cảnh chung và 4 ý khẳng định a, b, c, d độc lập)
+  * Phân bổ mức độ nhận thức cụ thể:
+    + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
+    + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
+    + ${counts.application} câu Vận dụng (APPLICATION)
+    + ${counts.highApplication} câu Vận dụng cao (HIGH_APPLICATION)`);
+      }
+
+      if (dist.shortAnswer && dist.shortAnswer.count > 0) {
+        const counts = calculateMinOneCognitiveCounts(dist.shortAnswer.count, dist.shortAnswer.matrix);
+        parts.push(`- PHẦN III: CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN (SHORT_ANSWER)
+  * Số lượng: ĐÚNG ${dist.shortAnswer.count} câu (options: [], correctAnswer là đáp số số học/biểu thức rút gọn chính xác)
+  * Phân bổ mức độ nhận thức cụ thể:
+    + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
+    + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
+    + ${counts.application} câu Vận dụng (APPLICATION)
+    + ${counts.highApplication} câu Vận dụng cao (HIGH_APPLICATION)`);
+      }
+
+      if (dist.essay && dist.essay.count > 0) {
+        const counts = calculateMinOneCognitiveCounts(dist.essay.count, dist.essay.matrix);
+        parts.push(`- PHẦN IV: TỰ LUẬN (ESSAY)
+  * Số lượng: ĐÚNG ${dist.essay.count} câu
+  * Phân bổ mức độ nhận thức cụ thể:
+    + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
+    + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
+    + ${counts.application} câu Vận dụng (APPLICATION)
+    + ${counts.highApplication} câu Vận dụng cao (HIGH_APPLICATION)`);
+      }
+
+      if (parts.length > 0) {
+        sectionSpecs = `\n\n### CẤU TRÚC VÀ ĐẶC TẢ CHI TIẾT TỪNG PHẦN (BẮT BUỘC TUÂN THỦ 100% SỐ CÂU VÀ MỨC ĐỘ TỪNG PHẦN):\n${parts.join('\n\n')}`;
+      }
+    }
+
     const matrixSpecs = `
 - Total Duration: ${durationMinutes} minutes
 - Total Score: ${totalPoints} points
@@ -126,6 +181,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
   * Comprehension (Thông hiểu): ${cognitiveMatrix.comprehension}%
   * Application (Vận dụng): ${cognitiveMatrix.application}%
   * High-Level Application (Vận dụng cao): ${cognitiveMatrix.highApplication}%
+${sectionSpecs}
 `.trim();
 
     // 5. Assemble User Prompt
