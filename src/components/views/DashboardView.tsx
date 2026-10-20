@@ -11,11 +11,15 @@ export default function DashboardView() {
   const [search, setSearch] = useState('');
   const [previewExam, setPreviewExam] = useState<ExamItem | null>(null);
 
+  const isMatchCategory = (subject: string, cat: string) => {
+    if (cat === 'math') return subject.includes('Toán');
+    if (cat === 'natural') return subject.includes('Lý') || subject.includes('Lí') || subject.includes('Hóa') || subject.includes('Sinh') || subject.includes('Tin') || subject.includes('KHTN');
+    if (cat === 'social') return subject.includes('Anh') || subject.includes('Văn') || subject.includes('Sử') || subject.includes('Địa') || subject.includes('Kinh tế');
+    return true;
+  };
+
   const filteredExams = exams.filter((exam) => {
-    let matchesFilter = true;
-    if (filter === 'math') matchesFilter = exam.subject.includes('Toán');
-    else if (filter === 'natural') matchesFilter = exam.subject.includes('Lý') || exam.subject.includes('Lí') || exam.subject.includes('Hóa') || exam.subject.includes('Sinh') || exam.subject.includes('Tin') || exam.subject.includes('KHTN');
-    else if (filter === 'social') matchesFilter = exam.subject.includes('Anh') || exam.subject.includes('Văn') || exam.subject.includes('Sử') || exam.subject.includes('Địa') || exam.subject.includes('Kinh tế');
+    const matchesFilter = filter === 'all' ? true : isMatchCategory(exam.subject, filter);
 
     const matchesSearch =
       search === '' ||
@@ -146,9 +150,9 @@ export default function DashboardView() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
           {[
             { key: 'all', label: 'Tất cả đề thi', count: exams.length },
-            { key: 'math', label: 'Toán học', count: exams.filter((e) => e.subject.includes('Toán')).length },
-            { key: 'natural', label: 'KHTN / Lý - Hóa - Sinh', count: exams.filter((e) => e.subject.includes('Lý') || e.subject.includes('Hóa') || e.subject.includes('Sinh') || e.subject.includes('KHTN')).length },
-            { key: 'social', label: 'Tiếng Anh & Xã hội', count: exams.filter((e) => e.subject.includes('Anh') || e.subject.includes('Văn') || e.subject.includes('Sử') || e.subject.includes('Địa')).length },
+            { key: 'math', label: 'Toán học', count: exams.filter((e) => isMatchCategory(e.subject, 'math')).length },
+            { key: 'natural', label: 'KHTN / Lý - Hóa - Sinh - Tin', count: exams.filter((e) => isMatchCategory(e.subject, 'natural')).length },
+            { key: 'social', label: 'Tiếng Anh & Xã hội', count: exams.filter((e) => isMatchCategory(e.subject, 'social')).length },
           ].map((pill) => {
             const isActive = filter === pill.key;
             return (
