@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import katex from 'katex';
+import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
 interface MathTextProps {
   content: string;
@@ -286,11 +287,13 @@ export default function MathText({ content, className = '', inline = false }: Ma
     // Step 4: Replace SVG tokens with responsive & print-friendly geometry diagrams
     svgBlocks.forEach((rawSvg, idx) => {
       const token = `__SVG_BLOCK_${idx}__`;
-      // Sanitize SVG against XSS
-      let cleanSvg = rawSvg
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
-        .replace(/javascript\s*:/gi, '');
+      // Sanitize SVG against XSS and fix malformed geometry lines (<line points="..."> -> x1,y1,x2,y2)
+      let cleanSvg = normalizeSvgGeometry(
+        rawSvg
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
+          .replace(/javascript\s*:/gi, '')
+      );
 
       // Constrain size so it doesn't blow up across the page
       if (!cleanSvg.includes('class=')) {

@@ -146,7 +146,8 @@ ${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${cus
   * BẮT BUỘC nhúng đoạn mã Vector SVG chuẩn vào trong trường "content":
     <svg viewBox="0 0 300 200" width="300" height="200" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
   * Cạnh nhìn thấy: nét liền (stroke="black" stroke-width="1.5").
-  * Cạnh bị khuất: nét đứt (stroke="black" stroke-width="1.5" stroke-dasharray="4,4").
+  * Cạnh bị khuất, đường cao, đường trung tuyến: nét đứt (stroke="black" stroke-width="1.5" stroke-dasharray="4,4").
+  * Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... /> (TUYỆT ĐỐI CẤM dùng points trong thẻ <line>). Vẽ đường gấp khúc/tam giác thì dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
   * Nhãn đỉnh (S, A, B, C...): Dùng <text>, đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S ở trên y-12, A lệch trái x-18, y-4, B dưới trái x-16, y+10, C dưới phải x+12, y+10). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
   * KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK):
     - BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), nhỏ gọn khoảng 8-10px, hai cạnh phải song song với 2 cạnh chứa góc vuông theo phối cảnh 3D.

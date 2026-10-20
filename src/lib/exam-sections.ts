@@ -183,3 +183,24 @@ export const EXAM_FORMAT_PRESETS: SectionFormatPreset[] = [
     },
   },
 ];
+
+/**
+ * Chuẩn hóa các thuộc tính hình học SVG sinh bởi AI (ví dụ: chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="...">).
+ */
+export function normalizeSvgGeometry(content: string): string {
+  if (!content || !content.includes('<line') || !content.includes('points=')) {
+    return content;
+  }
+
+  return content.replace(
+    /<line\b([^>]*?)\bpoints=["']([^"']+)["']([^>]*?)(\/?>)/gi,
+    (match, before, points, after, closing) => {
+      const coords = points.trim().split(/[\s,]+/).filter(Boolean);
+      if (coords.length >= 4) {
+        return `<line x1="${coords[0]}" y1="${coords[1]}" x2="${coords[2]}" y2="${coords[3]}"${before}${after}${closing}`;
+      }
+      return `<polyline points="${points}" fill="none"${before}${after}${closing}`;
+    }
+  );
+}
+

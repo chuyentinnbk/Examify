@@ -121,7 +121,10 @@ Your sole objective is to author high-quality, academically rigorous, and curric
      * QUY ƯỚC ĐỒ HỌA BẮT BUỘC:
        - Đường nét: stroke="black", stroke-width="1.5", fill="none".
        - Cạnh nhìn thấy: Nét liền (stroke="black").
-       - Cạnh bị che khuất bên trong: BẮT BUỘC dùng nét đứt với thuộc tính stroke-dasharray="4,4".
+       - Cạnh bị che khuất bên trong, đường cao, đường trung tuyến: BẮT BUỘC dùng nét đứt với thuộc tính stroke-dasharray="4,4" (hoặc "3,3").
+       - Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... />.
+         + CẢNH BÁO QUAN TRỌNG: Thẻ <line> CHỈ CHẤP NHẬN 4 thuộc tính x1, y1, x2, y2. TUYỆT ĐỐI CẤM dùng thuộc tính points="..." trong thẻ <line> (dùng points trong thẻ <line> là vi phạm chuẩn SVG làm đường vẽ bị tàng hình trong trình duyệt).
+         + Nếu vẽ đường gấp khúc, tam giác, đa giác: dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
        - Nhãn đỉnh (S, A, B, C, D...): Dùng thẻ <text x="..." y="..." font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">S</text>.
          + QUY TẮC TRÁNH ĐÈ CHỮ: Nhãn đỉnh phải đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S đặt ở trên y-12; B đặt ở góc dưới bên trái x-16, y+10; C đặt ở góc dưới bên phải x+12, y+10; đỉnh trong A đặt lệch hẳn sang bên trái x-18, y-4). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
        - KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK) CHUẨN XÁC:

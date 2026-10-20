@@ -19,6 +19,7 @@ import {
   DEFAULT_SECTION_TITLES,
   DEFAULT_SECTION_DESCRIPTIONS,
   normalizeQuestionType,
+  normalizeSvgGeometry,
 } from './exam-sections';
 import { normalizeDepartmentAccents } from './education-departments';
 
@@ -1880,7 +1881,7 @@ function formatContentForPdfHtml(rawContent: string): string {
 
   // 7. Restore SVGs inside clean centered wrappers
   safeContent = safeContent.replace(/__PDF_SVG_(\d+)__/g, (_, idx) => {
-    const rawSvg = svgs[parseInt(idx, 10)] || '';
+    const rawSvg = normalizeSvgGeometry(svgs[parseInt(idx, 10)] || '');
     return `<div style="text-align: center; margin: 8px 0; max-width: 100%; overflow: hidden;">${rawSvg}</div>`;
   });
 
