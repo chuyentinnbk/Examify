@@ -369,4 +369,28 @@ body {
   color: #000000 !important;
 }
 
+/* ==============================================================================
+ * Geometric SVG Diagrams - Text Halo & Contrast Protection
+ * Prevents geometric lines/edges from cutting through coordinate numbers & labels
+ * ============================================================================== */
+.exam-geo-svg text {
+  paint-order: stroke fill !important;
+  stroke: #ffffff !important;
+  stroke-width: 3.5px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  user-select: none;
+}
+
+.dark .exam-geo-svg text {
+  stroke: #0f172a !important;
+}
+
+@media print {
+  .exam-geo-svg text {
+    stroke: #ffffff !important;
+  }
+}
+
+
 

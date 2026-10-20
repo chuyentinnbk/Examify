@@ -127,6 +127,7 @@ Your sole objective is to author high-quality, academically rigorous, and curric
          + Nếu vẽ đường gấp khúc, tam giác, đa giác: dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
        - Nhãn đỉnh (S, A, B, C, D...): Dùng thẻ <text x="..." y="..." font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">S</text>.
          + QUY TẮC TRÁNH ĐÈ CHỮ: Nhãn đỉnh phải đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S đặt ở trên y-12; B đặt ở góc dưới bên trái x-16, y+10; C đặt ở góc dưới bên phải x+12, y+10; đỉnh trong A đặt lệch hẳn sang bên trái x-18, y-4). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
+         + QUY TẮC ĐẶT NHÃN SỐ LIỆU ĐO CẠNH (ví dụ: '12 km', '20 km', 'a', 'h_a'): BẮT BUỘC đặt nhãn lệch hẳn ra ngoài hoặc bên trên/dưới đoạn thẳng ít nhất 8-12px (không đặt toạ độ trùng khít vào trung điểm thân đường kẻ làm nét vẽ đâm xuyên qua chữ).
        - KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK) CHUẨN XÁC:
          + BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), góc vuông phải song song tuyệt đối với 2 cạnh chứa góc vuông đó (theo phép chiếu phối cảnh 3D).
          + Kích thước góc vuông phải nhỏ gọn (cạnh khoảng 8px đến 10px).

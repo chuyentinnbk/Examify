@@ -185,22 +185,49 @@ export const EXAM_FORMAT_PRESETS: SectionFormatPreset[] = [
 ];
 
 /**
- * Chuẩn hóa các thuộc tính hình học SVG sinh bởi AI (ví dụ: chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="...">).
+ * Chuẩn hóa các thuộc tính hình học SVG sinh bởi AI:
+ * 1. Chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="...">.
+ * 2. Bổ sung viền bảo vệ Text Halo (paint-order: stroke fill) để đường kẻ không đâm xuyên qua chữ số/ký tự.
+ * 3. Đưa các thẻ <text> xuống cuối cùng của <svg> để luôn nằm ở lớp trên cùng (Painter's Algorithm).
  */
 export function normalizeSvgGeometry(content: string): string {
-  if (!content || !content.includes('<line') || !content.includes('points=')) {
+  if (!content || !content.includes('<svg')) {
     return content;
   }
 
-  return content.replace(
-    /<line\b([^>]*?)\bpoints=["']([^"']+)["']([^>]*?)(\/?>)/gi,
-    (match, before, points, after, closing) => {
-      const coords = points.trim().split(/[\s,]+/).filter(Boolean);
-      if (coords.length >= 4) {
-        return `<line x1="${coords[0]}" y1="${coords[1]}" x2="${coords[2]}" y2="${coords[3]}"${before}${after}${closing}`;
+  return content.replace(/<svg\b([\s\S]*?)<\/svg>/gi, (svgBlock) => {
+    // 1. Fix malformed <line points="...">
+    let fixed = svgBlock.replace(
+      /<line\b([^>]*?)\bpoints=["']([^"']+)["']([^>]*?)(\/?>)/gi,
+      (match, before, points, after, closing) => {
+        const coords = points.trim().split(/[\s,]+/).filter(Boolean);
+        if (coords.length >= 4) {
+          return `<line x1="${coords[0]}" y1="${coords[1]}" x2="${coords[2]}" y2="${coords[3]}"${before}${after}${closing}`;
+        }
+        return `<polyline points="${points}" fill="none"${before}${after}${closing}`;
       }
-      return `<polyline points="${points}" fill="none"${before}${after}${closing}`;
+    );
+
+    // 2. Add paint-order text halo to <text> tags if missing
+    fixed = fixed.replace(/<text\b([^>]*?)>/gi, (match, attrs) => {
+      if (!attrs.includes('paint-order')) {
+        return `<text ${attrs.trim()} paint-order="stroke fill" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">`;
+      }
+      return match;
+    });
+
+    // 3. Move all <text> elements to the end of the <svg> before </svg> so they render on top of lines
+    const textMatches: string[] = [];
+    const withoutText = fixed.replace(/<text\b[\s\S]*?<\/text>/gi, (m) => {
+      textMatches.push(m);
+      return '';
+    });
+
+    if (textMatches.length > 0) {
+      fixed = withoutText.replace(/<\/svg>/i, `${textMatches.join('')}</svg>`);
     }
-  );
+
+    return fixed;
+  });
 }
 
