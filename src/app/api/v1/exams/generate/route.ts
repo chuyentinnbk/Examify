@@ -22,10 +22,21 @@ const GenerateExamSchema = z.object({
     lesson: z.string().optional(),
   }),
   lessonId: z.string().optional(),
+  sessionTitle: z.string().optional(),
   examType: z
-    .union([z.nativeEnum(ExamType), z.literal('TOPIC_PRACTICE'), z.literal('CUSTOM')])
+    .union([
+      z.nativeEnum(ExamType),
+      z.literal('TOPIC_PRACTICE'),
+      z.literal('CUSTOM'),
+      z.literal('MID_TERM_1'),
+      z.literal('MID_TERM_2'),
+      z.literal('FINAL_TERM_1'),
+      z.literal('FINAL_TERM_2'),
+    ])
     .transform((val) => {
       if (val === 'TOPIC_PRACTICE' || val === 'CUSTOM') return ExamType.MID_TERM;
+      if (val === 'MID_TERM_1' || val === 'MID_TERM_2') return ExamType.MID_TERM;
+      if (val === 'FINAL_TERM_1' || val === 'FINAL_TERM_2') return ExamType.FINAL_TERM;
       return val as ExamType;
     }),
   durationMinutes: z.number().int().min(5).max(180).default(45),
@@ -346,6 +357,13 @@ export async function POST(req: NextRequest) {
           }
         }
         generationResult.examData.questions = uniqueQuestions;
+      }
+
+      if (generationResult.examData) {
+        generationResult.examData.term = payload.curriculum.semester;
+        if (payload.sessionTitle) {
+          generationResult.examData.sessionTitle = payload.sessionTitle;
+        }
       }
 
       // 6. Save JSON Artifact to Local File Storage (/storage/exams/YYYY/MM/{id}.json)

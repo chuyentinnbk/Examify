@@ -54,6 +54,35 @@ export class ExamPromptBuilder {
     } = payload;
 
     let examSpecs = this.getExamTypeSpecs(examType);
+    const semStr = (curriculum.semester || '').toLowerCase();
+    const isSem2 = semStr.includes('2') || semStr.includes('ii');
+
+    if (examType === ExamType.MID_TERM) {
+      if (isSem2) {
+        examSpecs = {
+          name: 'Mid-Term Examination Semester 2 (Kiểm tra Giữa học kỳ 2 / Kỳ II)',
+          focus: 'Kiểm tra đánh giá giữa học kỳ 2: Trọng tâm kiến thức các chương đầu học kỳ 2 theo chuẩn chương trình GDPT 2018.',
+        };
+      } else {
+        examSpecs = {
+          name: 'Mid-Term Examination Semester 1 (Kiểm tra Giữa học kỳ 1 / Kỳ I)',
+          focus: 'Kiểm tra đánh giá giữa học kỳ 1: Trọng tâm kiến thức nửa đầu học kỳ 1 theo chuẩn chương trình GDPT 2018.',
+        };
+      }
+    } else if (examType === ExamType.FINAL_TERM) {
+      if (isSem2) {
+        examSpecs = {
+          name: 'Final-Term Examination Semester 2 (Kiểm tra Cuối học kỳ 2 / Tổng kết năm học)',
+          focus: 'Kiểm tra đánh giá cuối học kỳ 2 và tổng kết năm học: Toàn bộ kiến thức trọng tâm học kỳ 2 kết hợp tổng hợp kiến thức cả năm GDPT 2018.',
+        };
+      } else {
+        examSpecs = {
+          name: 'Final-Term Examination Semester 1 (Kiểm tra Cuối học kỳ 1 / Học kỳ I)',
+          focus: 'Kiểm tra đánh giá cuối học kỳ 1: Bao quát toàn bộ kiến thức trọng tâm của học kỳ 1 theo chuẩn GDPT 2018.',
+        };
+      }
+    }
+
     if (payload.isTopicPractice || payload.topicFocus) {
       examSpecs = {
         name: `Topic Review & Mastery Examination (Đề ôn tập chuyên đề: ${payload.topicFocus || curriculum.topic || 'Chuyên đề trọng tâm'})`,

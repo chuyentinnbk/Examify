@@ -46,10 +46,31 @@ export default function CreateExamView() {
 
   const [level, setLevel] = useState('UPPER_SEC');
   const [grade, setGrade] = useState('Lớp 12');
+  const [semester, setSemester] = useState<'Học kỳ 1' | 'Học kỳ 2'>('Học kỳ 1');
   const [subject, setSubject] = useState('Toán học');
-  const [examType, setExamType] = useState('MID_TERM');
+  const [examType, setExamType] = useState('MID_TERM_1');
   const [duration, setDuration] = useState(90);
   const [questionCount, setQuestionCount] = useState(22);
+
+  const handleExamTypeChange = (newType: string) => {
+    setExamType(newType);
+    if (newType === 'MID_TERM_1' || newType === 'FINAL_TERM_1') {
+      setSemester('Học kỳ 1');
+    } else if (newType === 'MID_TERM_2' || newType === 'FINAL_TERM_2') {
+      setSemester('Học kỳ 2');
+    }
+  };
+
+  const handleSemesterChange = (newSem: 'Học kỳ 1' | 'Học kỳ 2') => {
+    setSemester(newSem);
+    if (newSem === 'Học kỳ 1') {
+      if (examType === 'MID_TERM_2') setExamType('MID_TERM_1');
+      else if (examType === 'FINAL_TERM_2') setExamType('FINAL_TERM_1');
+    } else if (newSem === 'Học kỳ 2') {
+      if (examType === 'MID_TERM_1') setExamType('MID_TERM_2');
+      else if (examType === 'FINAL_TERM_1') setExamType('FINAL_TERM_2');
+    }
+  };
 
   // Phân bổ số câu theo từng phần (Chuẩn Bộ GD&ĐT 2025: 12 TN + 4 Đ/S + 6 TLN + 0 TL = 22 câu)
   const [mcCount, setMcCount] = useState(12);
@@ -178,7 +199,11 @@ export default function CreateExamView() {
     }
   };
 
-  const isOfficialExam = examType === 'MID_TERM' || examType === 'FINAL_TERM' || examType === 'MIN_15' || examType === 'ENTRANCE';
+  const isOfficialExam =
+    examType.startsWith('MID_TERM') ||
+    examType.startsWith('FINAL_TERM') ||
+    examType === 'MIN_15' ||
+    examType === 'ENTRANCE';
 
   // Pedagogical Skills
   const [availableSkills, setAvailableSkills] = useState<SkillOption[]>([]);
@@ -366,15 +391,52 @@ export default function CreateExamView() {
     setIsGenerating(true);
 
     try {
+      const effectiveSemester =
+        examType === 'CUSTOM'
+          ? 'Tùy chỉnh'
+          : examType === 'TOPIC_PRACTICE'
+          ? 'Ôn tập chuyên đề'
+          : semester;
+
       const generatedTitle =
         examType === 'CUSTOM'
           ? `Đề thi Tùy chỉnh - Môn ${subject}`
           : examType === 'TOPIC_PRACTICE'
           ? `Đề ôn tập chuyên đề: ${topicFocus || subject} - ${grade}`
-          : `Đề kiểm tra ${subject} ${grade} - ${examType === 'MID_TERM' ? 'Giữa kì 1' : 'Định kỳ'}`;
+          : examType === 'MID_TERM_1'
+          ? `Đề thi Kiểm tra Giữa học kỳ 1 - Môn ${subject} ${grade} (Chương trình GDPT 2018)`
+          : examType === 'FINAL_TERM_1'
+          ? `Đề thi Kiểm tra Cuối học kỳ 1 - Môn ${subject} ${grade} (Chương trình GDPT 2018)`
+          : examType === 'MID_TERM_2'
+          ? `Đề thi Kiểm tra Giữa học kỳ 2 - Môn ${subject} ${grade} (Chương trình GDPT 2018)`
+          : examType === 'FINAL_TERM_2'
+          ? `Đề thi Kiểm tra Cuối học kỳ 2 - Môn ${subject} ${grade} (Chương trình GDPT 2018)`
+          : examType === 'MIN_15'
+          ? `Đề kiểm tra 15 phút - Môn ${subject} ${grade} (${effectiveSemester})`
+          : examType === 'ENTRANCE'
+          ? `Đề thi Khảo sát chất lượng / Thi thử - Môn ${subject} ${grade}`
+          : `Đề kiểm tra ${subject} ${grade} - ${effectiveSemester}`;
+
+      const generatedSessionTitle =
+        examType === 'MID_TERM_1'
+          ? 'BÀI KIỂM TRA GIỮA HỌC KỲ I'
+          : examType === 'FINAL_TERM_1'
+          ? 'BÀI KIỂM TRA CUỐI HỌC KỲ I'
+          : examType === 'MID_TERM_2'
+          ? 'BÀI KIỂM TRA GIỮA HỌC KỲ II'
+          : examType === 'FINAL_TERM_2'
+          ? 'BÀI KIỂM TRA CUỐI HỌC KỲ II'
+          : examType === 'MIN_15'
+          ? 'BÀI KIỂM TRA THƯỜNG XUYÊN (15 PHÚT)'
+          : examType === 'ENTRANCE'
+          ? 'ĐỀ KHẢO SÁT CHẤT LƯỢNG ĐẦU NĂM'
+          : examType === 'TOPIC_PRACTICE'
+          ? 'BÀI KIỂM TRA ĐỊNH KỲ (1 TIẾT)'
+          : 'KỲ THI KIỂM TRA ĐÁNH GIÁ CHẤT LƯỢNG';
 
       const payload = {
         title: generatedTitle,
+        sessionTitle: generatedSessionTitle,
         curriculum: {
           level:
             examType === 'CUSTOM'
@@ -386,15 +448,17 @@ export default function CreateExamView() {
               : 'Tiểu học',
           grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
           subject,
-          semester:
-            examType === 'CUSTOM'
-              ? 'Tùy chỉnh'
-              : examType === 'TOPIC_PRACTICE'
-              ? 'Ôn tập chuyên đề'
-              : 'Học kỳ 1',
+          semester: effectiveSemester,
           topic: examType === 'TOPIC_PRACTICE' ? topicFocus : undefined,
         },
-        examType: examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE' ? 'MID_TERM' : examType,
+        examType:
+          examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'
+            ? 'MID_TERM'
+            : examType.startsWith('MID_TERM')
+            ? 'MID_TERM'
+            : examType.startsWith('FINAL_TERM')
+            ? 'FINAL_TERM'
+            : examType,
         durationMinutes: duration,
         totalPoints: 10,
         totalQuestions: questionCount,
@@ -595,7 +659,7 @@ export default function CreateExamView() {
               baseTitle: examTitle,
               subject,
               grade,
-              term: examType === 'CUSTOM' ? 'Tùy chỉnh' : 'Học kỳ 1',
+              term: examType === 'CUSTOM' ? 'Tùy chỉnh' : effectiveSemester,
               variantCodes: targetCodes,
               shuffleOrder,
             }),
@@ -620,10 +684,11 @@ export default function CreateExamView() {
             ? 'Tùy chỉnh'
             : examType === 'TOPIC_PRACTICE'
             ? 'Ôn tập chuyên đề'
-            : 'Học kỳ 1',
+            : effectiveSemester,
         year: '2024-2025',
         questionsCount: questions.length,
         duration,
+        sessionTitle: generatedSessionTitle,
         status: 'approved',
         statusLabel:
           examType === 'CUSTOM'
@@ -655,7 +720,7 @@ export default function CreateExamView() {
               ? 'Tùy chỉnh'
               : examType === 'TOPIC_PRACTICE'
               ? 'Ôn tập chuyên đề'
-              : 'Học kỳ 1',
+              : effectiveSemester,
         },
       };
 
@@ -734,7 +799,7 @@ export default function CreateExamView() {
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-700">Cấp học *</label>
@@ -810,6 +875,31 @@ export default function CreateExamView() {
               </div>
 
               <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Học kỳ *</label>
+                  {examType === 'CUSTOM' && (
+                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                  )}
+                  {examType === 'TOPIC_PRACTICE' && (
+                    <span className="text-[10px] text-blue-600 font-bold">(Chuyên đề)</span>
+                  )}
+                </div>
+                <select
+                  disabled={examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'}
+                  value={semester}
+                  onChange={(e) => handleSemesterChange(e.target.value as 'Học kỳ 1' | 'Học kỳ 2')}
+                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                    examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'
+                      ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
+                      : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
+                  }`}
+                >
+                  <option value="Học kỳ 1">Học kỳ 1 (Kỳ I)</option>
+                  <option value="Học kỳ 2">Học kỳ 2 (Kỳ II)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">Môn học *</label>
                 <select
                   value={subject}
@@ -833,15 +923,23 @@ export default function CreateExamView() {
                 <label className="text-xs font-semibold text-slate-700">Loại kỳ thi *</label>
                 <select
                   value={examType}
-                  onChange={(e) => setExamType(e.target.value)}
+                  onChange={(e) => handleExamTypeChange(e.target.value)}
                   className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
                 >
-                  <option value="MID_TERM">Kiểm tra Giữa kỳ</option>
-                  <option value="FINAL_TERM">Kiểm tra Cuối kỳ</option>
-                  <option value="MIN_15">Kiểm tra 15 phút</option>
-                  <option value="ENTRANCE">Khảo sát Đầu vào / Thi thử</option>
-                  <option value="TOPIC_PRACTICE">Đề ôn tập chuyên đề / Luyện tập</option>
-                  <option value="CUSTOM">Tùy chỉnh (Tự do)</option>
+                  <optgroup label="Kỳ thi Học kỳ 1 (Kỳ I)">
+                    <option value="MID_TERM_1">Kiểm tra Giữa học kỳ 1 (Giữa kì 1)</option>
+                    <option value="FINAL_TERM_1">Kiểm tra Cuối học kỳ 1 (Cuối kì 1)</option>
+                  </optgroup>
+                  <optgroup label="Kỳ thi Học kỳ 2 (Kỳ II)">
+                    <option value="MID_TERM_2">Kiểm tra Giữa học kỳ 2 (Giữa kì 2)</option>
+                    <option value="FINAL_TERM_2">Kiểm tra Cuối học kỳ 2 (Cuối kì 2)</option>
+                  </optgroup>
+                  <optgroup label="Định kỳ & Khảo sát khác">
+                    <option value="MIN_15">Kiểm tra thường xuyên (15 phút)</option>
+                    <option value="ENTRANCE">Khảo sát Đầu vào / Thi thử</option>
+                    <option value="TOPIC_PRACTICE">Đề ôn tập chuyên đề / Luyện tập</option>
+                    <option value="CUSTOM">Tùy chỉnh (Tự do)</option>
+                  </optgroup>
                 </select>
               </div>
 

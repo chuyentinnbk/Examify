@@ -73,6 +73,8 @@ export interface GeneratedExamData {
   totalQuestions: number;
   instructions: string[];
   questions: GeneratedQuestion[];
+  sessionTitle?: string;
+  term?: string;
 }
 
 export interface ExamGenerationResult {

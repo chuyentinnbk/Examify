@@ -212,7 +212,7 @@ export default function DashboardView() {
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 block">
-                      {exam.id} • {exam.grade}
+                      {exam.id} • {exam.grade}{exam.term ? ` • ${exam.term}` : ''}
                     </span>
                     <span className="text-xs font-bold text-slate-800">
                       {exam.subject}
