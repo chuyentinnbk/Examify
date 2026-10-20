@@ -84,10 +84,17 @@ export class ExamPromptBuilder {
     }
 
     if (payload.isTopicPractice || payload.topicFocus) {
-      examSpecs = {
-        name: `Topic Review & Mastery Examination (Đề ôn tập chuyên đề: ${payload.topicFocus || curriculum.topic || 'Chuyên đề trọng tâm'})`,
-        focus: `Laser-focused topical evaluation strictly testing ONLY the selected topic: "${payload.topicFocus || curriculum.topic}". Strictly forbidden from including other curriculum chapters or unrelated topics.`,
-      };
+      if (examType === ExamType.MIN_15) {
+        examSpecs = {
+          name: `15-Minute Regular Quiz (Kiểm tra thường xuyên 15 phút: ${payload.topicFocus || curriculum.topic || 'Chủ đề trọng tâm'})`,
+          focus: `Bài kiểm tra 15 phút đánh giá nhanh và chuyên sâu 100% vào đúng bài học/chủ đề: "${payload.topicFocus || curriculum.topic}". 100% câu hỏi bám sát lý thuyết cốt lõi và bài tập cơ bản/thông hiểu của bài học này theo chuẩn GDPT 2018, tuyệt đối không ra ngoài chủ đề.`,
+        };
+      } else {
+        examSpecs = {
+          name: `Topic Review & Mastery Examination (Đề ôn tập chuyên đề: ${payload.topicFocus || curriculum.topic || 'Chuyên đề trọng tâm'})`,
+          focus: `Laser-focused topical evaluation strictly testing ONLY the selected topic: "${payload.topicFocus || curriculum.topic}". Strictly forbidden from including other curriculum chapters or unrelated topics.`,
+        };
+      }
     }
 
     // 1. Sanitize custom teacher instructions with PromptGuard

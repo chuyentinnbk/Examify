@@ -2272,3 +2272,80 @@ export function isQuestionDuplicate(newContent: string, existingList: string[]):
   }
   return false;
 }
+
+const POPULAR_SUBJECT_TOPICS: Record<string, string[]> = {
+  'Toán học': [
+    'Hàm số & Đồ thị',
+    'Khảo sát hàm số & Ứng dụng đạo hàm',
+    'Phương trình & Bất phương trình',
+    'Hệ thức lượng trong tam giác',
+    'Vectơ & Tọa độ',
+    'Hình học không gian',
+    'Nguyên hàm & Tích phân',
+    'Xác suất & Thống kê',
+  ],
+  'Tin học': [
+    'Lập trình Python cơ bản',
+    'Cấu trúc rẽ nhánh & vòng lặp',
+    'Chương trình con & Hàm',
+    'Kiểu dữ liệu danh sách (List) & Xâu',
+    'Thuật toán sắp xếp & Tìm kiếm',
+    'Cơ sở dữ liệu & SQL',
+    'Mạng máy tính & An toàn thông tin',
+  ],
+  'Vật lý': [
+    'Chuyển động cơ học',
+    'Các định luật Newton & Động lực học',
+    'Công & Năng lượng',
+    'Dao động cơ & Con lắc',
+    'Sóng cơ & Sóng âm',
+    'Dòng điện không đổi & Xoay chiều',
+    'Quang hình học',
+  ],
+  'Hóa học': [
+    'Nguyên tử & Bảng tuần hoàn',
+    'Liên kết hóa học & Phản ứng oxi hóa khử',
+    'Dung dịch & Nồng độ',
+    'Kim loại & Phi kim',
+    'Hiđrocacbon',
+    'Este - Lipit',
+    'Cacbohiđrat & Amino axit',
+  ],
+  'Sinh học': [
+    'Tế bào & Phân bào',
+    'Di truyền & Biến dị',
+    'Quy luật Menđen',
+    'Sinh thái học & Môi trường',
+    'Tiến hóa',
+  ],
+  'Tiếng Anh': [
+    'Tenses - Các thì trong tiếng Anh',
+    'Passive Voice - Câu bị động',
+    'Conditional Sentences - Câu điều kiện',
+    'Relative Clauses - Mệnh đề quan hệ',
+    'Reported Speech - Câu gián tiếp',
+    'Prepositions & Phrasal Verbs',
+  ],
+};
+
+/**
+ * Returns distinct curriculum topics available for a specific subject and grade.
+ */
+export function getCurriculumTopics(subject: string, grade?: string): string[] {
+  const parsed = grade ? parseGrade(grade) : null;
+  const filtered = CURRICULUM_QUESTION_BANK.filter((q) => {
+    if (q.subject.toLowerCase() !== subject.toLowerCase()) return false;
+    if (parsed && parsed.gradeNum !== null) {
+      const qParsed = parseGrade(q.grade);
+      return qParsed.gradeNum === parsed.gradeNum;
+    }
+    return true;
+  });
+  const topics = Array.from(new Set(filtered.map((q) => q.topic))).filter(Boolean);
+  if (topics.length > 0) return topics;
+  return POPULAR_SUBJECT_TOPICS[subject] || [
+    'Kiến thức bài học trọng tâm',
+    'Lý thuyết & Bài tập cơ bản',
+    'Vận dụng & Giải bài tập',
+  ];
+}

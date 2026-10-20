@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppStore, ExamItem, ExamQuestion, QuestionType } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import PortalModal from '@/components/common/PortalModal';
-import { isQuestionDuplicate, getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
+import { isQuestionDuplicate, getCurriculumQuestion, extractCleanShortAnswerValue, getCurriculumTopics } from '@/lib/curriculum-questions';
 import {
   normalizeQuestionType,
   calculateMinOneCognitiveCounts,
@@ -56,8 +56,39 @@ export default function CreateExamView() {
     setExamType(newType);
     if (newType === 'MID_TERM_1' || newType === 'FINAL_TERM_1') {
       setSemester('Học kỳ 1');
+      if (examType === 'MIN_15') {
+        setDuration(90);
+        setQuestionCount(22);
+        setMcCount(12);
+        setTfCount(4);
+        setSaCount(6);
+        setEssayCount(0);
+        setMcMatrix({ knowledge: 60, comprehension: 40, application: 0, highApplication: 0 });
+      }
     } else if (newType === 'MID_TERM_2' || newType === 'FINAL_TERM_2') {
       setSemester('Học kỳ 2');
+      if (examType === 'MIN_15') {
+        setDuration(90);
+        setQuestionCount(22);
+        setMcCount(12);
+        setTfCount(4);
+        setSaCount(6);
+        setEssayCount(0);
+        setMcMatrix({ knowledge: 60, comprehension: 40, application: 0, highApplication: 0 });
+      }
+    } else if (newType === 'MIN_15') {
+      setDuration(15);
+      setQuestionCount(10);
+      setMcCount(10);
+      setTfCount(0);
+      setSaCount(0);
+      setEssayCount(0);
+      setMcMatrix({
+        knowledge: 60,
+        comprehension: 40,
+        application: 0,
+        highApplication: 0,
+      });
     }
   };
 
@@ -136,8 +167,13 @@ export default function CreateExamView() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Topic Practice & Topic Focus
+  // Topic Practice & 15-Minute Quiz Topic Focus
   const [topicFocus, setTopicFocus] = useState('');
+  const isTopicSelectionOpen = examType === 'TOPIC_PRACTICE' || examType === 'MIN_15';
+
+  const suggestedTopics = useMemo(() => {
+    return getCurriculumTopics(subject, grade);
+  }, [subject, grade]);
 
   // School Custom Matrix (NBK / Tổ bộ môn)
   const [customMatrixTable, setCustomMatrixTable] = useState('');
@@ -412,7 +448,9 @@ export default function CreateExamView() {
           : examType === 'FINAL_TERM_2'
           ? `Đề thi Kiểm tra Cuối học kỳ 2 - Môn ${subject} ${grade} (Chương trình GDPT 2018)`
           : examType === 'MIN_15'
-          ? `Đề kiểm tra 15 phút - Môn ${subject} ${grade} (${effectiveSemester})`
+          ? (topicFocus
+              ? `Đề kiểm tra 15 phút: ${topicFocus} - Môn ${subject} ${grade}`
+              : `Đề kiểm tra 15 phút - Môn ${subject} ${grade} (${effectiveSemester})`)
           : examType === 'ENTRANCE'
           ? `Đề thi Khảo sát chất lượng / Thi thử - Môn ${subject} ${grade}`
           : `Đề kiểm tra ${subject} ${grade} - ${effectiveSemester}`;
@@ -427,7 +465,7 @@ export default function CreateExamView() {
           : examType === 'FINAL_TERM_2'
           ? 'BÀI KIỂM TRA CUỐI HỌC KỲ II'
           : examType === 'MIN_15'
-          ? 'BÀI KIỂM TRA THƯỜNG XUYÊN (15 PHÚT)'
+          ? (topicFocus ? `BÀI KIỂM TRA 15 PHÚT - ${topicFocus.toUpperCase()}` : 'BÀI KIỂM TRA THƯỜNG XUYÊN (15 PHÚT)')
           : examType === 'ENTRANCE'
           ? 'ĐỀ KHẢO SÁT CHẤT LƯỢNG ĐẦU NĂM'
           : examType === 'TOPIC_PRACTICE'
@@ -449,7 +487,7 @@ export default function CreateExamView() {
           grade: examType === 'CUSTOM' ? 'Tùy chỉnh' : grade,
           subject,
           semester: effectiveSemester,
-          topic: examType === 'TOPIC_PRACTICE' ? topicFocus : undefined,
+          topic: isTopicSelectionOpen ? topicFocus : undefined,
         },
         examType:
           examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'
@@ -476,8 +514,8 @@ export default function CreateExamView() {
         },
         customPrompt: isOfficialExam ? undefined : customPrompt,
         customMatrixTable: customMatrixTable || undefined,
-        topicFocus: examType === 'TOPIC_PRACTICE' ? topicFocus : undefined,
-        isTopicPractice: examType === 'TOPIC_PRACTICE',
+        topicFocus: isTopicSelectionOpen ? topicFocus : undefined,
+        isTopicPractice: examType === 'TOPIC_PRACTICE' || (examType === 'MIN_15' && !!topicFocus),
         sampleExamText: useSampleExam && sampleExamText ? sampleExamText : undefined,
         sampleExamFileName: useSampleExam && sampleExamFileName ? sampleExamFileName : undefined,
         skillIds: selectedSkillIds.length > 0 ? selectedSkillIds : undefined,
@@ -684,6 +722,8 @@ export default function CreateExamView() {
             ? 'Tùy chỉnh'
             : examType === 'TOPIC_PRACTICE'
             ? 'Ôn tập chuyên đề'
+            : examType === 'MIN_15'
+            ? `15 phút (${effectiveSemester})`
             : effectiveSemester,
         year: '2024-2025',
         questionsCount: questions.length,
@@ -695,6 +735,8 @@ export default function CreateExamView() {
             ? 'Tùy chỉnh'
             : examType === 'TOPIC_PRACTICE'
             ? 'Ôn tập'
+            : examType === 'MIN_15'
+            ? '15 Phút'
             : 'Chính thức',
         author: user.name,
         updatedAt: 'Vừa tạo',
@@ -720,6 +762,8 @@ export default function CreateExamView() {
               ? 'Tùy chỉnh'
               : examType === 'TOPIC_PRACTICE'
               ? 'Ôn tập chuyên đề'
+              : examType === 'MIN_15'
+              ? `15 phút (${effectiveSemester})`
               : effectiveSemester,
         },
       };
@@ -1001,29 +1045,80 @@ export default function CreateExamView() {
               </div>
             </div>
 
-            {/* Chuyên đề trọng tâm (Chỉ hiển thị khi chọn Đề ôn tập chuyên đề) */}
-            {examType === 'TOPIC_PRACTICE' && (
-              <div className="mt-3 p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 animate-in fade-in duration-200">
+            {/* Chuyên đề / Chủ đề trọng tâm (Hiển thị khi chọn Đề ôn tập chuyên đề hoặc Kiểm tra 15 phút) */}
+            {isTopicSelectionOpen && (
+              <div className="mt-3 p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2.5 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-blue-600 text-sm">filter_center_focus</span>
                     <label className="text-xs font-bold text-blue-900">
-                      Chuyên đề / Bài học trọng tâm * (Bắt buộc)
+                      {examType === 'MIN_15'
+                        ? 'Chủ đề / Bài học kiểm tra 15 phút *'
+                        : 'Chuyên đề / Bài học trọng tâm *'}
                     </label>
                   </div>
                   <span className="text-[10px] bg-blue-200/80 text-blue-800 font-bold px-2 py-0.5 rounded-full">
-                    Phạm vi chuyên đề đơn
+                    {examType === 'MIN_15' ? 'Kiểm tra thường xuyên' : 'Phạm vi chuyên đề đơn'}
                   </span>
                 </div>
-                <input
-                  type="text"
-                  value={topicFocus}
-                  onChange={(e) => setTopicFocus(e.target.value)}
-                  placeholder="Ví dụ: Định lý sin, côsin trong tam giác | Phương trình bậc hai | Vòng lặp while..."
-                  className="w-full h-9 px-3 text-xs rounded-lg border border-blue-300 bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 placeholder:text-slate-400"
-                />
+
+                {/* Input field */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={topicFocus}
+                    onChange={(e) => setTopicFocus(e.target.value)}
+                    placeholder={
+                      examType === 'MIN_15'
+                        ? 'Chọn chủ đề gợi ý bên dưới hoặc tự nhập (VD: Khảo sát hàm số, Định luật Ôm, Câu lệnh lặp...)'
+                        : 'Chọn chuyên đề gợi ý bên dưới hoặc tự nhập (VD: Định lý sin, côsin trong tam giác, Phương trình bậc hai...)'
+                    }
+                    className="w-full h-9.5 px-3 pr-8 text-xs rounded-lg border border-blue-300 bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 placeholder:text-slate-400"
+                  />
+                  {topicFocus && (
+                    <button
+                      type="button"
+                      onClick={() => setTopicFocus('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      title="Xóa chủ đề đã chọn"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Gợi ý chủ đề nhanh chuẩn GDPT 2018 */}
+                {suggestedTopics.length > 0 && (
+                  <div className="space-y-1.5 pt-0.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                      <span className="material-symbols-outlined text-amber-500 text-[13px]">lightbulb</span>
+                      <span>Gợi ý chủ đề chuẩn GDPT 2018 ({subject} {grade}):</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestedTopics.map((item) => {
+                        const isSelected = topicFocus === item;
+                        return (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setTopicFocus(item)}
+                            className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all text-left flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 font-semibold shadow-xs ring-2 ring-blue-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/70 font-medium'
+                            }`}
+                          >
+                            {isSelected && <span className="material-symbols-outlined text-[11px]">check</span>}
+                            <span>{item}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-[11px] text-blue-700 leading-relaxed">
-                  🎯 <strong>Luật bất khả xâm phạm:</strong> 100% câu hỏi sinh ra sẽ CHỈ tập trung vào chuyên đề này, tuyệt đối không bị lọt kiến thức từ các chương khác!
+                  🎯 <strong>Trọng tâm đánh giá:</strong> 100% câu hỏi sinh ra sẽ CHỈ tập trung vào chủ đề/bài học này, bám sát lý thuyết cốt lõi và bài tập theo chuẩn GDPT 2018!
                 </p>
               </div>
             )}
