@@ -9,6 +9,7 @@ import { AuditLogger } from '@/core/logger/audit-logger';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
 import { AcademicStorage } from '@/core/storage/academic-storage';
+import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
 const GenerateExamSchema = z.object({
   title: z.string().min(3, 'Exam title must be at least 3 characters'),
@@ -289,12 +290,12 @@ export async function POST(req: NextRequest) {
               questionNumber: i + 1,
               type: q.type || 'MULTIPLE_CHOICE',
               cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
-              content: fresh.content,
+              content: normalizeSvgGeometry(fresh.content),
               options: isShortAnswer ? [] : fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
               correctAnswer: isShortAnswer
                 ? extractCleanShortAnswerValue(fresh.options[0]?.text, fresh.explanation, fresh.correctAnswer)
                 : fresh.correctAnswer,
-              explanation: fresh.explanation,
+              explanation: fresh.explanation ? normalizeSvgGeometry(fresh.explanation) : undefined,
               points: q.points || payload.totalPoints / payload.totalQuestions,
             };
 
@@ -336,6 +337,10 @@ export async function POST(req: NextRequest) {
               q.options = q.options.map((opt: string) =>
                 typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt
               );
+            }
+            q.content = typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content;
+            if (q.explanation && typeof q.explanation === 'string') {
+              q.explanation = normalizeSvgGeometry(q.explanation);
             }
             uniqueQuestions.push(q);
           }

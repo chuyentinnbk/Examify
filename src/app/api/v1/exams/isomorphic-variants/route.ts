@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { generateExamVariants, ShuffledVariant } from '@/lib/exam-shuffler';
-import { normalizeQuestionType } from '@/lib/exam-sections';
+import { normalizeQuestionType, normalizeSvgGeometry } from '@/lib/exam-sections';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamQuestion } from '@/lib/store/app-store';
 
@@ -321,11 +321,11 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
           level,
           levelClass,
           topic: q.topic || baseRef.topic || subject,
-          content: q.content,
+          content: normalizeSvgGeometry(q.content),
           options,
           points: baseRef.points || (normType === 'essay' ? 1.5 : normType === 'true_false' ? 1.0 : normType === 'short_answer' ? 0.5 : 0.25),
           correctAnswer: finalAnswer,
-          explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+          explanation: normalizeSvgGeometry(q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'),
         };
       });
 
@@ -337,7 +337,11 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
       {
         code: '101',
         title: `${baseTitle} - Mã đề 101`,
-        questions: baseQuestions,
+        questions: baseQuestions.map((q: any) => ({
+          ...q,
+          content: typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content,
+          explanation: typeof q.explanation === 'string' ? normalizeSvgGeometry(q.explanation) : q.explanation,
+        })),
       },
     ];
 

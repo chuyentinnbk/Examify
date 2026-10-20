@@ -185,10 +185,50 @@ export const EXAM_FORMAT_PRESETS: SectionFormatPreset[] = [
 ];
 
 /**
- * Chuẩn hóa các thuộc tính hình học SVG sinh bởi AI:
- * 1. Chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="...">.
- * 2. Bổ sung viền bảo vệ Text Halo (paint-order: stroke fill) để đường kẻ không đâm xuyên qua chữ số/ký tự.
- * 3. Đưa các thẻ <text> xuống cuối cùng của <svg> để luôn nằm ở lớp trên cùng (Painter's Algorithm).
+ * Tính khoảng cách từ điểm (px, py) đến đoạn thẳng (x1, y1)-(x2, y2)
+ */
+function distToSegment(
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number
+): { dist: number; qx: number; qy: number; t: number } {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return { dist: Math.hypot(px - x1, py - y1), qx: x1, qy: y1, t: 0 };
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const qx = x1 + t * dx;
+  const qy = y1 + t * dy;
+  return { dist: Math.hypot(px - qx, py - qy), qx, qy, t };
+}
+
+/**
+ * Kiểm tra xem điểm (px, py) có nằm trong đa giác hay không (Ray-casting)
+ */
+function pointInPolygon(px: number, py: number, vertices: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const xi = vertices[i].x, yi = vertices[i].y;
+    const xj = vertices[j].x, yj = vertices[j].y;
+    const intersect = ((yi > py) !== (yj > py)) &&
+      (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Chuẩn hóa và tối ưu hóa vị trí hình học SVG sinh bởi AI:
+ * 1. Chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="..."> hợp lệ.
+ * 2. Loại bỏ stroke halo trắng (stroke="white") gây đứt nét/cắt ngang đường kẻ.
+ * 3. Tự động dời nhãn đo độ dài cạnh (70 m, 50 m, 80√2 m, 10 km...) ra ngoài tam giác/đa giác (18-24px),
+ *    giữ đường kẻ liền mạch hoàn toàn chuẩn đề thi quốc gia.
+ * 4. Tự động căn chỉnh nhãn đỉnh (A, B, C...) lệch ngoài đỉnh 18-20px và góc (60°, 45°...) nằm gọn trong góc.
+ * 5. Đưa các thẻ <text> xuống cuối cùng của <svg> theo Painter's Algorithm.
  */
 export function normalizeSvgGeometry(content: string): string {
   if (!content || !content.includes('<svg')) {
@@ -208,15 +248,278 @@ export function normalizeSvgGeometry(content: string): string {
       }
     );
 
-    // 2. Add paint-order text halo to <text> tags if missing
-    fixed = fixed.replace(/<text\b([^>]*?)>/gi, (match, attrs) => {
-      if (!attrs.includes('paint-order')) {
-        return `<text ${attrs.trim()} paint-order="stroke fill" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">`;
+    // 2. Remove ugly legacy stroke halo attributes that cut through lines
+    fixed = fixed.replace(/\s*paint-order=["'][^"']*["']/gi, '');
+    fixed = fixed.replace(/\s*stroke=["']white["']/gi, '');
+    fixed = fixed.replace(/\s*stroke-width=["']3\.5["']/gi, '');
+    fixed = fixed.replace(/\s*stroke-linecap=["']round["']/gi, '');
+    fixed = fixed.replace(/\s*stroke-linejoin=["']round["']/gi, '');
+
+    // 3. Parse Polygons, Polylines & Centroids
+    interface Vertex { x: number; y: number }
+    interface Edge { a: Vertex; b: Vertex; centroid?: Vertex; isPerimeter?: boolean; isDashed?: boolean }
+    interface Polygon { vertices: Vertex[]; centroid: Vertex; edges: Edge[]; isPoly: boolean }
+
+    const polygons: Polygon[] = [];
+    const polyMatches = [...fixed.matchAll(/<(polygon|polyline)\b([^>]*?)>/gi)];
+    polyMatches.forEach((pm) => {
+      const isPoly = pm[1].toLowerCase() === 'polygon';
+      const pMatch = pm[2].match(/points=["']([^"']+)["']/i);
+      if (!pMatch) return;
+      const rawCoords = pMatch[1].trim().split(/[\s,]+/).map(Number);
+      const vertices: Vertex[] = [];
+      let sumX = 0, sumY = 0;
+      for (let i = 0; i < rawCoords.length - 1; i += 2) {
+        vertices.push({ x: rawCoords[i], y: rawCoords[i + 1] });
+        sumX += rawCoords[i];
+        sumY += rawCoords[i + 1];
       }
-      return match;
+      if (vertices.length < 2) return;
+      const centroid: Vertex = { x: sumX / vertices.length, y: sumY / vertices.length };
+      const edges: Edge[] = [];
+      for (let i = 0; i < vertices.length - 1; i++) {
+        edges.push({ a: vertices[i], b: vertices[i + 1], centroid, isPerimeter: true });
+      }
+      if (isPoly && vertices.length >= 3) {
+        edges.push({ a: vertices[vertices.length - 1], b: vertices[0], centroid, isPerimeter: true });
+      }
+      polygons.push({ vertices, centroid, edges, isPoly });
     });
 
-    // 3. Move all <text> elements to the end of the <svg> before </svg> so they render on top of lines
+    // 4. Parse Lines
+    const explicitLines: Edge[] = [];
+    const lineMatches = [...fixed.matchAll(/<line\b([^>]*?)>/gi)];
+    lineMatches.forEach((lm) => {
+      const x1 = lm[1].match(/\bx1=["']([^"']+)["']/i);
+      const y1 = lm[1].match(/\by1=["']([^"']+)["']/i);
+      const x2 = lm[1].match(/\bx2=["']([^"']+)["']/i);
+      const y2 = lm[1].match(/\by2=["']([^"']+)["']/i);
+      if (x1 && y1 && x2 && y2) {
+        const a: Vertex = { x: Number(x1[1]), y: Number(y1[1]) };
+        const b: Vertex = { x: Number(x2[1]), y: Number(y2[1]) };
+        const isDashed = /dash/i.test(lm[1]);
+        let polyCentroid: Vertex | null = null;
+        for (const poly of polygons) {
+          if (poly.isPoly) {
+            polyCentroid = poly.centroid;
+            break;
+          }
+        }
+        explicitLines.push({ a, b, centroid: polyCentroid || undefined, isPerimeter: !isDashed, isDashed });
+      }
+    });
+
+    const allSegments: Edge[] = [];
+    polygons.forEach((p) => allSegments.push(...p.edges));
+    allSegments.push(...explicitLines);
+
+    const perimeterSegments = allSegments.filter((s) => s.isPerimeter);
+
+    const mainPolygon =
+      polygons.find((p) => p.isPoly && p.vertices.length >= 3) ||
+      polygons.find((p) => p.vertices.length >= 3) ||
+      polygons[0];
+    const G: Vertex = mainPolygon ? mainPolygon.centroid : { x: 150, y: 100 };
+
+    const allPoints: Vertex[] = [];
+    if (mainPolygon) allPoints.push(...mainPolygon.vertices);
+    polygons.forEach((p) => allPoints.push(...p.vertices));
+    explicitLines.forEach((l) => {
+      allPoints.push(l.a, l.b);
+    });
+
+    // 5. Shift Text Elements cleanly away from lines
+    fixed = fixed.replace(/<text\b([^>]*?)>([\s\S]*?)<\/text>/gi, (fullMatch, attrs, textContent) => {
+      const xMatch = attrs.match(/\bx=["']([^"']+)["']/i);
+      const yMatch = attrs.match(/\by=["']([^"']+)["']/i);
+      if (!xMatch || !yMatch) return fullMatch;
+
+      let tx = Number(xMatch[1]);
+      let ty = Number(yMatch[1]);
+      const cleanText = textContent.replace(/<[^>]+>/g, '').trim();
+
+      const charW = 7.5;
+      const textW = Math.max(10, cleanText.length * charW);
+      const cx = tx + textW / 2;
+      const cy = ty - 4;
+
+      const isAngle = cleanText.includes('°');
+      const isSingleLetter = /^[A-Z]$/.test(cleanText);
+      const isInternalLabel = /^(h_[a-z]|m_[a-z]|r|R)$/i.test(cleanText);
+
+      if (isSingleLetter) {
+        // Vertex labels (A, B, C...) - push outward along the ray from G
+        let closestPt: Vertex | null = null;
+        let minPtDist = Infinity;
+        for (const p of allPoints) {
+          const d = Math.hypot(cx - p.x, cy - p.y);
+          if (d < minPtDist) {
+            minPtDist = d;
+            closestPt = p;
+          }
+        }
+
+        if (closestPt && minPtDist < 25) {
+          let dx = closestPt.x - G.x;
+          let dy = closestPt.y - G.y;
+          if (Math.abs(dx) < 5 && dy > 0) {
+            dx = 0;
+            dy = 1;
+          }
+          const len = Math.hypot(dx, dy) || 1;
+          const ux = dx / len;
+          const uy = dy / len;
+
+          const targetVOffset = 20;
+          const newCx = closestPt.x + ux * targetVOffset;
+          const newCy = closestPt.y + uy * targetVOffset;
+
+          tx = Math.round(newCx - textW / 2);
+          ty = Math.round(newCy + 4);
+        }
+      } else if (isAngle) {
+        // Angle labels (60°, 45°...) - position inside angle sector along bisector
+        let closestV: Vertex | null = null;
+        let minVDist = Infinity;
+        for (const v of allPoints) {
+          const d = Math.hypot(cx - v.x, cy - v.y);
+          if (d < minVDist) {
+            minVDist = d;
+            closestV = v;
+          }
+        }
+
+        if (closestV) {
+          const adjEdges: { to: Vertex }[] = [];
+          for (const seg of allSegments) {
+            if (Math.hypot(seg.a.x - closestV.x, seg.a.y - closestV.y) < 1) {
+              adjEdges.push({ to: seg.b });
+            } else if (Math.hypot(seg.b.x - closestV.x, seg.b.y - closestV.y) < 1) {
+              adjEdges.push({ to: seg.a });
+            }
+          }
+
+          if (adjEdges.length >= 2) {
+            const v1x = adjEdges[0].to.x - closestV.x;
+            const v1y = adjEdges[0].to.y - closestV.y;
+            const l1 = Math.hypot(v1x, v1y) || 1;
+            const u1x = v1x / l1, u1y = v1y / l1;
+
+            const v2x = adjEdges[1].to.x - closestV.x;
+            const v2y = adjEdges[1].to.y - closestV.y;
+            const l2 = Math.hypot(v2x, v2y) || 1;
+            const u2x = v2x / l2, u2y = v2y / l2;
+
+            let bx = u1x + u2x;
+            let by = u1y + u2y;
+            const blen = Math.hypot(bx, by) || 1;
+            bx /= blen;
+            by /= blen;
+
+            const dot = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
+            const angleRad = Math.acos(dot);
+            const sinHalf = Math.sin(angleRad / 2);
+            const angleDist = Math.max(18, Math.min(50, 16 / Math.max(0.3, sinHalf)));
+
+            const newCx = closestV.x + bx * angleDist;
+            const newCy = closestV.y + by * angleDist;
+
+            tx = Math.round(newCx - textW / 2);
+            ty = Math.round(newCy + 4);
+          } else {
+            const dx = G.x - cx;
+            const dy = G.y - cy;
+            const len = Math.hypot(dx, dy) || 1;
+            tx = Math.round(tx + (dx / len) * 20);
+            ty = Math.round(ty + (dy / len) * 20);
+          }
+        }
+      } else if (isInternalLabel) {
+        // Internal lines (h_a, m_a, r) - keep inside beside dashed line
+        let closestLine: Edge | null = null;
+        let minLDist = Infinity;
+        let closestProj: { qx: number; qy: number } | null = null;
+        for (const l of explicitLines) {
+          const proj = distToSegment(cx, cy, l.a.x, l.a.y, l.b.x, l.b.y);
+          if (proj.dist < minLDist) {
+            minLDist = proj.dist;
+            closestLine = l;
+            closestProj = proj;
+          }
+        }
+        if (closestLine && minLDist < 12 && closestProj) {
+          tx = Math.round(closestProj.qx + 12);
+          ty = Math.round(closestProj.qy + 4);
+        }
+      } else {
+        // Check if this measurement is an internal dashed line measurement (e.g. median in Q15)
+        const isInsideTriangle = mainPolygon && mainPolygon.isPoly && pointInPolygon(cx, cy, mainPolygon.vertices);
+        let dashedLineNear: { line: Edge; proj: { qx: number; qy: number } } | null = null;
+        for (const l of explicitLines) {
+          if (l.isDashed) {
+            const proj = distToSegment(cx, cy, l.a.x, l.a.y, l.b.x, l.b.y);
+            if (proj.dist < 40) {
+              dashedLineNear = { line: l, proj };
+              break;
+            }
+          }
+        }
+
+        if (isInsideTriangle && dashedLineNear) {
+          // Median/altitude measurement - place cleanly to the right of dashed line
+          tx = Math.round(dashedLineNear.proj.qx + 12);
+          ty = Math.round(dashedLineNear.proj.qy + 4);
+        } else {
+          // Outer perimeter edge measurement (70 m, 50 m, 80√2 m, 10 km, a, b, c, 5, 8...)
+          let closestEdge: Edge | null = null;
+          let closestProj: { qx: number; qy: number; t: number } | null = null;
+          let minEDist = Infinity;
+
+          for (const seg of perimeterSegments) {
+            const proj = distToSegment(cx, cy, seg.a.x, seg.a.y, seg.b.x, seg.b.y);
+            if (proj.dist < minEDist) {
+              minEDist = proj.dist;
+              closestEdge = seg;
+              closestProj = proj;
+            }
+          }
+
+          if (closestEdge && minEDist < 24 && closestProj) {
+            const edx = closestEdge.b.x - closestEdge.a.x;
+            const edy = closestEdge.b.y - closestEdge.a.y;
+            const elen = Math.hypot(edx, edy) || 1;
+            let nx = -edy / elen;
+            let ny = edx / elen;
+
+            const segCentroid = closestEdge.centroid || G;
+            const toG_x = closestProj.qx - segCentroid.x;
+            const toG_y = closestProj.qy - segCentroid.y;
+            if (nx * toG_x + ny * toG_y < 0) {
+              nx = -nx;
+              ny = -ny;
+            }
+
+            let t = closestProj.t;
+            t = Math.max(0.2, Math.min(0.8, t));
+            const clampedQx = closestEdge.a.x + t * edx;
+            const clampedQy = closestEdge.a.y + t * edy;
+
+            const targetClearance = Math.max(22, 18 + textW * 0.25);
+            const newCx = clampedQx + nx * targetClearance;
+            const newCy = clampedQy + ny * targetClearance;
+
+            tx = Math.round(newCx - textW / 2);
+            ty = Math.round(newCy + 4);
+          }
+        }
+      }
+
+      let newAttrs = attrs.replace(/\bx=["'][^"']+["']/i, `x="${tx}"`);
+      newAttrs = newAttrs.replace(/\by=["'][^"']+["']/i, `y="${ty}"`);
+      return `<text ${newAttrs.trim()}>${textContent}</text>`;
+    });
+
+    // 6. Move all <text> elements to the end of the <svg> before </svg> (Painter's Algorithm)
     const textMatches: string[] = [];
     const withoutText = fixed.replace(/<text\b[\s\S]*?<\/text>/gi, (m) => {
       textMatches.push(m);

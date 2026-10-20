@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
+import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
 const RegenerateQuestionSchema = z.object({
   subject: z.string().default('Toán học'),
@@ -274,13 +275,13 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
             level: level,
             levelClass,
             topic: currentTopic || `${subject} - ${grade}`,
-            content: parsed.content,
+            content: normalizeSvgGeometry(parsed.content),
             options: formattedOptions,
             points: type === 'essay' ? 1.5 : type === 'true_false' ? 1.0 : type === 'short_answer' ? 0.5 : 0.25,
             correctAnswer: type === 'short_answer'
               ? extractCleanShortAnswerValue(null, parsed.explanation, parsed.correctAnswer)
               : (parsed.correctAnswer || (type === 'essay' ? 'Xem hướng dẫn chấm' : 'A')),
-            explanation: parsed.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+            explanation: normalizeSvgGeometry(parsed.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'),
           };
 
           return apiSuccess(
