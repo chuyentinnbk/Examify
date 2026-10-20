@@ -799,12 +799,15 @@ export default function CreateExamView() {
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {/* 1. Cấp học */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Cấp học *</label>
                   {examType === 'CUSTOM' && (
-                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                    <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/60 leading-none">
+                      Tự do
+                    </span>
                   )}
                 </div>
                 <select
@@ -818,7 +821,7 @@ export default function CreateExamView() {
                     else if (newLevel === 'LOWER_SEC') setGrade('Lớp 9');
                     else if (newLevel === 'PRIMARY') setGrade('Lớp 5');
                   }}
-                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                  className={`w-full h-10 px-3 text-xs rounded-xl border border-slate-200 font-medium transition ${
                     examType === 'CUSTOM'
                       ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
                       : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
@@ -830,18 +833,21 @@ export default function CreateExamView() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
+              {/* 2. Khối lớp */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Khối lớp *</label>
                   {examType === 'CUSTOM' && (
-                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                    <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/60 leading-none">
+                      Tự do
+                    </span>
                   )}
                 </div>
                 <select
                   disabled={examType === 'CUSTOM'}
                   value={grade}
                   onChange={(e) => setGrade(e.target.value)}
-                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                  className={`w-full h-10 px-3 text-xs rounded-xl border border-slate-200 font-medium transition ${
                     examType === 'CUSTOM'
                       ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
                       : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
@@ -874,21 +880,25 @@ export default function CreateExamView() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
+              {/* 3. Học kỳ */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Học kỳ *</label>
-                  {examType === 'CUSTOM' && (
-                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
-                  )}
-                  {examType === 'TOPIC_PRACTICE' && (
-                    <span className="text-[10px] text-blue-600 font-bold">(Chuyên đề)</span>
-                  )}
+                  {examType === 'CUSTOM' ? (
+                    <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/60 leading-none">
+                      Tự do
+                    </span>
+                  ) : examType === 'TOPIC_PRACTICE' ? (
+                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200/60 leading-none">
+                      Chuyên đề
+                    </span>
+                  ) : null}
                 </div>
                 <select
                   disabled={examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'}
                   value={semester}
                   onChange={(e) => handleSemesterChange(e.target.value as 'Học kỳ 1' | 'Học kỳ 2')}
-                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                  className={`w-full h-10 px-3 text-xs rounded-xl border border-slate-200 font-medium transition ${
                     examType === 'CUSTOM' || examType === 'TOPIC_PRACTICE'
                       ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
                       : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
@@ -899,12 +909,15 @@ export default function CreateExamView() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Môn học *</label>
+              {/* 4. Môn học */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between h-5">
+                  <label className="text-xs font-semibold text-slate-700">Môn học *</label>
+                </div>
                 <select
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium transition"
                 >
                   <option value="Toán học">Toán học</option>
                   <option value="Tin học">Tin học</option>
@@ -916,15 +929,16 @@ export default function CreateExamView() {
                   <option value="Địa lý">Địa lý</option>
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Loại kỳ thi *</label>
+              {/* 5. Loại kỳ thi (Chiếm 2 cột = 50% hàng dưới, thẳng hàng hoàn hảo với Cấp học + Khối lớp) */}
+              <div className="space-y-1.5 sm:col-span-2">
+                <div className="flex items-center justify-between h-5">
+                  <label className="text-xs font-semibold text-slate-700">Loại kỳ thi *</label>
+                </div>
                 <select
                   value={examType}
                   onChange={(e) => handleExamTypeChange(e.target.value)}
-                  className="w-full h-9 px-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium transition"
                 >
                   <optgroup label="Kỳ thi Học kỳ 1 (Kỳ I)">
                     <option value="MID_TERM_1">Kiểm tra Giữa học kỳ 1 (Giữa kì 1)</option>
@@ -943,18 +957,21 @@ export default function CreateExamView() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
+              {/* 6. Thời gian làm bài (Chiếm 1 cột = 25% hàng dưới, thẳng hàng hoàn hảo với Học kỳ) */}
+              <div className="space-y-1.5 sm:col-span-1">
+                <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Thời gian làm bài</label>
                   {examType === 'CUSTOM' && (
-                    <span className="text-[10px] text-amber-600 font-bold">(Tự do)</span>
+                    <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/60 leading-none">
+                      Tự do
+                    </span>
                   )}
                 </div>
                 <select
                   disabled={examType === 'CUSTOM'}
                   value={duration}
                   onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                  className={`w-full h-9 px-2 text-xs rounded-xl border border-slate-200 font-medium transition ${
+                  className={`w-full h-10 px-3 text-xs rounded-xl border border-slate-200 font-medium transition ${
                     examType === 'CUSTOM'
                       ? 'bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60'
                       : 'bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500'
@@ -968,15 +985,18 @@ export default function CreateExamView() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Tổng số câu hỏi</label>
+              {/* 7. Tổng số câu hỏi (Chiếm 1 cột = 25% hàng dưới, thẳng hàng hoàn hảo với Môn học) */}
+              <div className="space-y-1.5 sm:col-span-1">
+                <div className="flex items-center justify-between h-5">
+                  <label className="text-xs font-semibold text-slate-700">Tổng số câu hỏi</label>
+                </div>
                 <input
                   type="number"
                   value={questionCount}
                   onChange={(e) => setQuestionCount(parseInt(e.target.value, 10) || 10)}
                   min={5}
                   max={100}
-                  className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium transition"
                 />
               </div>
             </div>
