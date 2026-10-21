@@ -159,11 +159,25 @@ BẠN BẮT BUỘC PHẢI THỰC HIỆN ĐÚNG 100% THEO CHỈ THỊ NÀY (về 
     - Trong "content" (Đề bài): CHỈ nhúng hình vẽ SVG khi bài toán có ngữ cảnh thực tế (chiếc lều, vòm cầu, bể nước...) HOẶC đề bài nói rõ "như hình vẽ bên", "dựa vào hình sau". Với câu hình học thuần túy (như "Cho hình chóp S.ABC..."), KHÔNG vẽ hình vào đề bài để học sinh tự rèn kỹ năng vẽ hình.
     - Trong "explanation" (Lời giải): BẮT BUỘC 100% các câu hình học đều phải có hình vẽ SVG đầy đủ (gồm đường cao, nét đứt nét liền và các điểm phụ dựng thêm) để minh họa rõ ràng các bước chứng minh/tính toán.
   * BẮT BUỘC SỬ DỤNG HỆ TỌA ĐỘ MẪU CHUẨN (GOLDEN COORDINATES TEMPLATES) - TUYỆT ĐỐI CẤM TỰ BỊA TỌA ĐỘ KHIẾN HÌNH BỊ MÉO MÓ:
-    - HÌNH HỘP CHỮ NHẬT / LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK VIỆT NAM):
-      Đáy trên A'B'C'D' (nét liền trên cao): <polygon points="60,60 200,60 250,90 110,90" fill="none" stroke="black" stroke-width="1.5" />
-      Cạnh bên đứng: A'A(60,60 -> 60,150), B'B(200,60 -> 200,150), C'C(250,90 -> 250,180) (nét liền); D'D(110,90 -> 110,180 stroke-dasharray="4,4" nét đứt).
-      Đáy dưới ABCD: AB(60,150 -> 200,150), BC(200,150 -> 250,180) (nét liền); AD(60,150 -> 110,180), CD(250,180 -> 110,180) (nét đứt stroke-dasharray="4,4").
-      Nhãn đỉnh: A'(44,55), B'(204,55), C'(258,92), D'(96,85), A(44,160), B(204,160), C(258,188), D(100,196).
+    - HÌNH HỘP CHỮ NHẬT / LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK HÌNH HỌC KHÔNG GIAN VIỆT NAM):
+      Quy ước: Đỉnh A ở góc trong cùng bên trái (khuất). Đáy dưới ABCD, đáy trên A'B'C'D'.
+      Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="80,50 50,90 190,90 220,50" fill="none" stroke="black" stroke-width="1.5" />
+      3 cạnh bên đứng nhìn thấy (nét liền): B'B(50,90 -> 50,180), C'C(190,90 -> 190,180), D'D(220,50 -> 220,140).
+      2 cạnh đáy dưới nhìn thấy (nét liền): BC(50,180 -> 190,180), CD(190,180 -> 220,140).
+      3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH A BÊN TRONG (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
+      - Cạnh bên đứng A'A: <line x1="80" y1="50" x2="80" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      - Cạnh đáy AB: <line x1="80" y1="140" x2="50" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      - Cạnh đáy AD: <line x1="80" y1="140" x2="220" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      Nhãn đỉnh chuẩn không đè nét: A'(75,40), B'(32,95), C'(198,95), D'(228,48), A(88,136), B(32,190), C(195,195), D(228,145).
+    - HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐÁY TRÊN A'B'C', ĐÁY DƯỚI ABC, ĐỈNH B Ở PHÍA SAU):
+      Đáy trên A'B'C' (tam giác nhìn thấy toàn bộ): <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />
+      2 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,160), C'C(220,60 -> 220,160).
+      1 cạnh đáy dưới nhìn thấy (nét liền): AC(60,160 -> 220,160).
+      3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH B PHÍA SAU (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
+      - Cạnh bên đứng B'B: <line x1="140" y1="40" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      - Cạnh đáy AB: <line x1="60" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      - Cạnh đáy CB: <line x1="220" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+      Nhãn đỉnh: A'(50,52), B'(140,30), C'(228,52), A(44,175), B(146,142), C(228,175).
     - HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY): Đỉnh S(90,35), A(90,130), B(45,175), C(235,175). SA, AB, AC nét đứt; SB, SC, BC nét liền. Nhãn S(88,22), A(72,132), B(28,185), C(245,185).
     - HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY): Đỉnh S(80,35), A(80,130), B(40,175), C(190,175), D(230,130). SA, AB, AD nét đứt; SB, SC, SD, BC, CD nét liền.
     - ĐOẠN VUÔNG GÓC CHUNG a VÀ b: a ngang (40,50 -> 260,50); b xiên (50,165 -> 250,135); đoạn HK (140,50 -> 140,150 thẳng đứng).

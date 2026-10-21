@@ -155,24 +155,36 @@ Your sole objective is to author high-quality, academically rigorous, and curric
      * BẮT BUỘC nhúng một đoạn mã Vector SVG chuẩn vào trong trường "content" của câu hỏi:
        <svg viewBox="0 0 320 220" width="320" height="220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
      * BẮT BUỘC SỬ DỤNG HỆ TỌA ĐỘ MẪU CHUẨN (GOLDEN COORDINATES TEMPLATES) - TUYỆT ĐỐI CẤM TỰ BỊA TỌA ĐỘ KHIẾN HÌNH BỊ MÉO MÓ HOẶC ĐÈ NÉT:
-       + MẪU 1: HÌNH HỘP CHỮ NHẬT / HÌNH LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK VIỆT NAM):
-         Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="60,60 200,60 250,90 110,90" fill="none" stroke="black" stroke-width="1.5" />
-         3 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,150), B'B(200,60 -> 200,150), C'C(250,90 -> 250,180).
-         1 cạnh bên đứng bị khuất (nét đứt): D'D(110,90 -> 110,180 stroke-dasharray="4,4").
-         Đáy dưới ABCD: Cạnh thấy AB(60,150 -> 200,150), BC(200,150 -> 250,180) (nét liền).
-         Đáy dưới ABCD: Cạnh khuất AD(60,150 -> 110,180), CD(250,180 -> 110,180) (nét đứt stroke-dasharray="4,4").
-         Nhãn đỉnh chuẩn không đè nét: A'(44,55), B'(204,55), C'(258,92), D'(96,85), A(44,160), B(204,160), C(258,188), D(100,196).
-       + MẪU 2: HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY):
+       + MẪU 1: HÌNH HỘP CHỮ NHẬT / HÌNH LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK HÌNH HỌC KHÔNG GIAN VIỆT NAM):
+         Quy ước: Đỉnh A ở góc trong cùng bên trái (khuất). Đáy dưới ABCD, đáy trên A'B'C'D'.
+         Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="80,50 50,90 190,90 220,50" fill="none" stroke="black" stroke-width="1.5" />
+         3 cạnh bên đứng nhìn thấy (nét liền): B'B(50,90 -> 50,180), C'C(190,90 -> 190,180), D'D(220,50 -> 220,140).
+         2 cạnh đáy dưới nhìn thấy (nét liền): BC(50,180 -> 190,180), CD(190,180 -> 220,140).
+         3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH A BÊN TRONG (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
+         - Cạnh bên đứng A'A: <line x1="80" y1="50" x2="80" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy AB: <line x1="80" y1="140" x2="50" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy AD: <line x1="80" y1="140" x2="220" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         Nhãn đỉnh chuẩn không đè nét: A'(75,40), B'(32,95), C'(198,95), D'(228,48), A(88,136), B(32,190), C(195,195), D(228,145).
+       + MẪU 2: HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐÁY TRÊN A'B'C', ĐÁY DƯỚI ABC, ĐỈNH B Ở PHÍA SAU):
+         Đáy trên A'B'C' (tam giác nhìn thấy toàn bộ): <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />
+         2 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,160), C'C(220,60 -> 220,160).
+         1 cạnh đáy dưới nhìn thấy (nét liền): AC(60,160 -> 220,160).
+         3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH B PHÍA SAU (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
+         - Cạnh bên đứng B'B: <line x1="140" y1="40" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy AB: <line x1="60" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy CB: <line x1="220" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         Nhãn đỉnh: A'(50,52), B'(140,30), C'(228,52), A(44,175), B(146,142), C(228,175).
+       + MẪU 3: HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY):
          Đỉnh S(90,35), A(90,130), B(45,175), C(235,175).
          Cạnh khuất (nét đứt): SA (90,35 -> 90,130), AB (90,130 -> 45,175), AC (90,130 -> 235,175).
          Cạnh thấy (nét liền): SB, SC, BC.
          Nhãn: S(88,22), A(72,132), B(28,185), C(245,185).
-       + MẪU 3: HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY, ĐÁY ABCD LÀ HÌNH CHỮ NHẬT/BÌNH HÀNH):
+       + MẪU 4: HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY, ĐÁY ABCD LÀ HÌNH CHỮ NHẬT/BÌNH HÀNH):
          Đỉnh S(80,35), A(80,130), B(40,175), C(190,175), D(230,130).
          Cạnh khuất (nét đứt stroke-dasharray="4,4"): SA, AB, AD.
          Cạnh thấy (nét liền): SB, SC, SD, BC, CD.
          Nhãn: S(78,22), A(62,132), B(25,185), C(195,185), D(242,132).
-       + MẪU 4: ĐOẠN VUÔNG GÓC CHUNG GIỮA 2 ĐƯỜNG THẲNG CHÉO NHAU a VÀ b:
+       + MẪU 5: ĐOẠN VUÔNG GÓC CHUNG GIỮA 2 ĐƯỜNG THẲNG CHÉO NHAU a VÀ b:
          Đường a nằm ngang ở trên: line từ (40,50) đến (260,50). Nhãn 'a' ở (268,54).
          Đường b nằm xiên ở dưới: line từ (50,165) đến (250,135). Nhãn 'b' ở (258,138).
          Đoạn vuông góc chung HK: line từ H(140,50) đến K(140,150) thẳng đứng.
