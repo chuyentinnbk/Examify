@@ -42,6 +42,8 @@ export default function EditorView() {
   const [editingQId, setEditingQId] = useState<number | string | null>(null);
   const [includeAnswers, setIncludeAnswers] = useState(true);
   const [regeneratingQId, setRegeneratingQId] = useState<number | string | null>(null);
+  const [targetRegenQuestion, setTargetRegenQuestion] = useState<ExamQuestion | null>(null);
+  const [regenPromptInput, setRegenPromptInput] = useState('');
   const [isRegeneratingExam, setIsRegeneratingExam] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingZip, setIsExportingZip] = useState(false);
@@ -814,7 +816,7 @@ export default function EditorView() {
   };
 
   // Single Question AI Regeneration
-  const handleRegenerateQuestion = async (q: ExamQuestion) => {
+  const handleRegenerateQuestion = async (q: ExamQuestion, directive?: string) => {
     if (!isEditorMode) {
       showToast('Vui lòng bật Chế độ chỉnh sửa để tạo lại câu hỏi bằng AI', 'warning');
       return;
@@ -854,7 +856,8 @@ export default function EditorView() {
           level: q.level,
           type: q.type || 'multiple_choice',
           currentTopic: q.topic && q.topic !== activeExam.subject ? q.topic : examTopic,
-          customPrompt: activeExam.customPrompt || '',
+          customPrompt: directive ? directive : (activeExam.customPrompt || ''),
+          teacherDirective: directive || undefined,
           currentQuestionContent: q.content,
           avoidQuestions: Array.from(
             new Set([...updatedHistory, ...questions.map((item) => item.content).filter(Boolean)])
@@ -932,7 +935,12 @@ export default function EditorView() {
             questionsCount: sorted.length,
           });
         }
-        showToast(`Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI và đồng bộ các mã đề!`, 'success');
+        showToast(
+          directive
+            ? `Đã đổi câu hỏi ${q.order || ''} theo yêu cầu: "${directive.slice(0, 30)}${directive.length > 30 ? '...' : ''}"`
+            : `Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI và đồng bộ các mã đề!`,
+          'success'
+        );
       } else {
         showToast('Không thể tạo lại câu hỏi AI', 'error');
       }
@@ -2051,12 +2059,15 @@ export default function EditorView() {
                     {/* AI Regenerate Single Question */}
                     <button
                       type="button"
-                      onClick={() => handleRegenerateQuestion(q)}
+                      onClick={() => {
+                        setTargetRegenQuestion(q);
+                        setRegenPromptInput('');
+                      }}
                       disabled={isRegenThis}
-                      className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                      className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
                         isRegenThis ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                      title="Tạo lại câu hỏi này bằng AI"
+                      title="Nhập yêu cầu và tạo lại câu hỏi này bằng AI"
                     >
                       <span className={`material-symbols-outlined text-xs text-indigo-600 ${isRegenThis ? 'animate-spin' : ''}`}>
                         {isRegenThis ? 'progress_activity' : 'auto_awesome'}
@@ -3172,6 +3183,110 @@ export default function EditorView() {
               </div>
             </label>
           </div>
+        </div>
+      </PortalModal>
+
+      {/* Modal Nhập Yêu Cầu Đổi Câu Hỏi Bằng AI */}
+      <PortalModal
+        isOpen={Boolean(targetRegenQuestion)}
+        onClose={() => {
+          if (!regeneratingQId) {
+            setTargetRegenQuestion(null);
+            setRegenPromptInput('');
+          }
+        }}
+        title={`Đổi câu hỏi bằng AI ${targetRegenQuestion ? `(Câu ${targetRegenQuestion.order || targetRegenQuestion.id})` : ''}`}
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              disabled={Boolean(regeneratingQId)}
+              onClick={() => {
+                setTargetRegenQuestion(null);
+                setRegenPromptInput('');
+              }}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(regeneratingQId)}
+              onClick={async () => {
+                if (!targetRegenQuestion) return;
+                const qToRegen = targetRegenQuestion;
+                const directive = regenPromptInput.trim();
+                setTargetRegenQuestion(null);
+                await handleRegenerateQuestion(qToRegen, directive);
+              }}
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>Bắt đầu Sinh lại (AI)</span>
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5 text-xs text-slate-700 dark:text-slate-300">
+          {targetRegenQuestion && (
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {getTypeLabel(targetRegenQuestion.type)} • Mức độ: {targetRegenQuestion.level || 'Thông hiểu'}
+                </span>
+                <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">
+                  {targetRegenQuestion.points !== undefined ? `${targetRegenQuestion.points} điểm` : '0.25 điểm'}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-slate-600 dark:text-slate-400 italic">
+                &ldquo;{targetRegenQuestion.content.replace(/<[^>]*>/g, '').slice(0, 150)}...&rdquo;
+              </p>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+              Ý muốn / Yêu cầu cụ thể cho AI (Tùy chọn):
+            </label>
+            <textarea
+              value={regenPromptInput}
+              onChange={(e) => setRegenPromptInput(e.target.value)}
+              placeholder="VD: Đổi sang bài toán ứng dụng thực tế, thay đổi số liệu, đổi sang dạng tìm tiệm cận, nâng độ khó một chút..."
+              rows={3}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none transition-all"
+            />
+          </div>
+
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+              Gợi ý nhanh yêu cầu:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'Đổi sang bài toán thực tế',
+                'Đổi số liệu và giữ nguyên dạng',
+                'Dễ hơn một chút',
+                'Nâng cao độ khó',
+                'Đổi sang dạng khác cùng bài học',
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() =>
+                    setRegenPromptInput((prev) => (prev ? `${prev}, ${chip.toLowerCase()}` : chip))
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[11px] transition-colors cursor-pointer"
+                >
+                  + {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 italic">
+            * Nếu để trống, AI sẽ tự động sinh câu hỏi tương đương mới (cùng bài học, ma trận và mức độ) khác hoàn toàn câu cũ.
+          </p>
         </div>
       </PortalModal>
     </div>

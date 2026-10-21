@@ -15,6 +15,7 @@ const RegenerateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'true_false', 'short_answer', 'essay']).optional(),
   currentTopic: z.string().optional(),
   customPrompt: z.string().max(1500).optional(),
+  teacherDirective: z.string().max(1500).optional(),
   currentQuestionContent: z.string().optional(),
   avoidQuestions: z.array(z.string()).optional(),
   existingQuestions: z.array(z.string()).optional(),
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       type = 'multiple_choice',
       currentTopic,
       customPrompt,
+      teacherDirective,
       currentQuestionContent,
       avoidQuestions = [],
       existingQuestions = [],
@@ -135,8 +137,14 @@ ${typeInstruction}
 - Khối lớp: ${grade}
 - Học kỳ: ${term}
 - Chuyên đề/Chủ đề trọng tâm: ${currentTopic || subject}
-${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${customPrompt}` : ''}
 
+${
+  teacherDirective || customPrompt
+    ? `### CHỈ THỊ ƯU TIÊN CAO NHẤT TỪ GIÁO VIÊN ĐỐI VỚI CÂU HỎI NÀY:
+⚠️ GIÁO VIÊN ĐẶC BIỆT YÊU CẦU: "${teacherDirective || customPrompt}".
+BẠN BẮT BUỘC PHẢI THỰC HIỆN ĐÚNG 100% THEO CHỈ THỊ NÀY (về bài học cụ thể, dạng toán, độ khó, bối cảnh thực tế...). Mọi yêu cầu của giáo viên có hiệu lực ưu tiên cao nhất!\n`
+    : ''
+}
 ### QUY CHUẨN CÂU HỎI VẬN DỤNG & VẬN DỤNG CAO (REAL-WORLD MODELING):
 - Nếu câu hỏi ở cấp độ Vận dụng hoặc Vận dụng cao:
   * TUYỆT ĐỐI NGHIÊM CẤM ra đề bài cộc cằn, thuần túy hình thức toán học ("Cho tam giác có 3 cạnh... tính góc").
@@ -144,8 +152,9 @@ ${customPrompt ? `- Yêu cầu sư phạm chuyên biệt từ giáo viên: ${cus
 
 ### QUY CHUẨN ĐỒ HỌA HÌNH HỌC BẰNG VECTOR SVG:
 - Đối với câu hỏi Hình học (Hình học không gian hoặc hình học phẳng):
-  * BẮT BUỘC nhúng đoạn mã Vector SVG chuẩn vào trong trường "content":
-    <svg viewBox="0 0 300 200" width="300" height="200" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
+  * PHÂN BIỆT ĐỀ BÀI VÀ LỜI GIẢI:
+    - Trong "content" (Đề bài): CHỈ nhúng hình vẽ SVG khi bài toán có ngữ cảnh thực tế (chiếc lều, vòm cầu, bể nước...) HOẶC đề bài nói rõ "như hình vẽ bên", "dựa vào hình sau". Với câu hình học thuần túy (như "Cho hình chóp S.ABC..."), KHÔNG vẽ hình vào đề bài để học sinh tự rèn kỹ năng vẽ hình.
+    - Trong "explanation" (Lời giải): BẮT BUỘC 100% các câu hình học đều phải có hình vẽ SVG đầy đủ (gồm đường cao, nét đứt nét liền và các điểm phụ dựng thêm) để minh họa rõ ràng các bước chứng minh/tính toán.
   * Cạnh nhìn thấy: nét liền (stroke="black" stroke-width="1.5").
   * Cạnh bị khuất, đường cao, đường trung tuyến: nét đứt (stroke="black" stroke-width="1.5" stroke-dasharray="4,4").
   * Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... /> (TUYỆT ĐỐI CẤM dùng points trong thẻ <line>). Vẽ đường gấp khúc/tam giác thì dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
