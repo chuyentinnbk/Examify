@@ -140,7 +140,8 @@ export default function CreateExamView() {
 
   // Kiểm tra tổng câu các phần
   const totalSectionQuestions = mcCount + tfCount + saCount + essayCount;
-  const isSectionCountValid = totalSectionQuestions === questionCount;
+  const isSectionCountValid =
+    totalSectionQuestions === questionCount && questionCount >= 5 && questionCount <= 50;
 
   // Tính toán số câu thực tế từng phần theo thuật toán Min-1
   const mcAlloc = calculateMinOneCognitiveCounts(mcCount, mcMatrix);
@@ -395,6 +396,14 @@ export default function CreateExamView() {
     if (selectedProviderInfo && !selectedProviderInfo.hasKey) {
       showToast(
         `Nhà cung cấp AI "${selectedProviderInfo.name}" chưa có API Key/Token. Vui lòng chọn AI khác hoặc liên hệ Quản trị viên!`,
+        'error'
+      );
+      return;
+    }
+
+    if (questionCount < 5 || questionCount > 50) {
+      showToast(
+        `Số lượng câu hỏi của đề thi phải từ 5 đến 50 câu (hiện tại: ${questionCount} câu) để đảm bảo chất lượng AI và lời giải chi tiết tốt nhất!`,
         'error'
       );
       return;
@@ -1033,13 +1042,27 @@ export default function CreateExamView() {
               <div className="space-y-1.5 sm:col-span-1">
                 <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Tổng số câu hỏi</label>
+                  <span className="text-[10px] text-slate-400 font-semibold">Tối đa 50 câu</span>
                 </div>
                 <input
                   type="number"
-                  value={questionCount}
-                  onChange={(e) => setQuestionCount(parseInt(e.target.value, 10) || 10)}
+                  value={questionCount === 0 ? '' : questionCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setQuestionCount(0);
+                      return;
+                    }
+                    const num = parseInt(val, 10);
+                    if (isNaN(num)) return;
+                    setQuestionCount(Math.min(50, Math.max(0, num)));
+                  }}
+                  onBlur={() => {
+                    if (questionCount < 5) setQuestionCount(5);
+                    else if (questionCount > 50) setQuestionCount(50);
+                  }}
                   min={5}
-                  max={100}
+                  max={50}
                   className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium transition"
                 />
               </div>
@@ -1354,9 +1377,12 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={100}
-                    value={mcCount}
-                    onChange={(e) => setMcCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    max={50}
+                    value={mcCount === 0 ? 0 : mcCount}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value, 10);
+                      setMcCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                    }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
                   <span className="text-xs text-slate-500 font-medium shrink-0">câu</span>
@@ -1372,9 +1398,12 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={100}
-                    value={tfCount}
-                    onChange={(e) => setTfCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    max={50}
+                    value={tfCount === 0 ? 0 : tfCount}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value, 10);
+                      setTfCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                    }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
                   <span className="text-xs text-slate-500 font-medium shrink-0">câu</span>
@@ -1390,9 +1419,12 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={100}
-                    value={saCount}
-                    onChange={(e) => setSaCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    max={50}
+                    value={saCount === 0 ? 0 : saCount}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value, 10);
+                      setSaCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                    }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
                   <span className="text-xs text-slate-500 font-medium shrink-0">câu</span>
@@ -1408,9 +1440,12 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={100}
-                    value={essayCount}
-                    onChange={(e) => setEssayCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    max={50}
+                    value={essayCount === 0 ? 0 : essayCount}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value, 10);
+                      setEssayCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                    }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
                   <span className="text-xs text-slate-500 font-medium shrink-0">câu</span>
@@ -1424,22 +1459,36 @@ export default function CreateExamView() {
                 <div className="flex items-center gap-2 font-medium">
                   <span className="material-symbols-outlined text-base text-rose-600">error</span>
                   <span>
-                    Tổng số câu các phần (<strong>{totalSectionQuestions} câu</strong>) chưa khớp với Tổng số câu đề thi (<strong>{questionCount} câu</strong>).
+                    {totalSectionQuestions > 50 ? (
+                      <>
+                        Tổng các phần đang là <strong>{totalSectionQuestions} câu</strong> (vượt giới hạn an toàn tối đa <strong>50 câu</strong>). Vui lòng giảm bớt để đảm bảo AI duy trì độ sâu và chất lượng lời giải tốt nhất.
+                      </>
+                    ) : questionCount < 5 ? (
+                      <>
+                        Đề thi cần tối thiểu <strong>5 câu</strong> để đảm bảo phân bổ ma trận nhận thức theo chuẩn Bộ GD&ĐT.
+                      </>
+                    ) : (
+                      <>
+                        Tổng số câu các phần (<strong>{totalSectionQuestions} câu</strong>) chưa khớp với Tổng số câu đề thi (<strong>{questionCount} câu</strong>).
+                      </>
+                    )}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setQuestionCount(totalSectionQuestions)}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shrink-0 transition shadow-2xs cursor-pointer"
-                >
-                  Đồng bộ Tổng số câu = {totalSectionQuestions}
-                </button>
+                {totalSectionQuestions <= 50 && totalSectionQuestions >= 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount(totalSectionQuestions)}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shrink-0 transition shadow-2xs cursor-pointer"
+                  >
+                    Đồng bộ Tổng số câu = {totalSectionQuestions}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2 text-xs font-medium">
                 <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
                 <span>
-                  Cấu trúc phân bổ câu hỏi hợp lệ: Đúng {totalSectionQuestions} câu cho 4 phần.
+                  Cấu trúc phân bổ câu hỏi hợp lệ: Đúng {totalSectionQuestions} câu cho 4 phần (Nằm trong vùng an toàn 5 - 50 câu).
                 </span>
               </div>
             )}
@@ -2163,7 +2212,13 @@ export default function CreateExamView() {
               ) : !isSectionCountValid ? (
                 <>
                   <span className="material-symbols-outlined text-base text-amber-300">warning</span>
-                  <span>Chưa khớp số câu các phần ({totalSectionQuestions}/{questionCount})</span>
+                  <span>
+                    {totalSectionQuestions > 50
+                      ? `Vượt quá giới hạn tối đa (${totalSectionQuestions}/50 câu)`
+                      : questionCount < 5
+                      ? `Cần tối thiểu 5 câu (${questionCount}/5 câu)`
+                      : `Chưa khớp số câu các phần (${totalSectionQuestions}/${questionCount})`}
+                  </span>
                 </>
               ) : (
                 <>

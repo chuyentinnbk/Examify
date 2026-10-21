@@ -132,6 +132,23 @@ export async function POST(req: NextRequest) {
 
     const payload = validation.data;
 
+    // Validate that sections sum matches totalQuestions if sectionDistribution is provided
+    if (payload.sectionDistribution) {
+      const dist = payload.sectionDistribution;
+      const sum =
+        (dist.multipleChoice?.count || 0) +
+        (dist.trueFalse?.count || 0) +
+        (dist.shortAnswer?.count || 0) +
+        (dist.essay?.count || 0);
+      if (sum > 0 && sum !== payload.totalQuestions) {
+        return apiError(
+          `Tổng số câu các phần (${sum} câu) không khớp với tổng số câu của đề thi (${payload.totalQuestions} câu).`,
+          422,
+          'Mismatched section question count'
+        );
+      }
+    }
+
     // 1. Concurrency Lock: Prevent multiple concurrent generations from the same teacher
     const lockKey = REDIS_KEYS.EXAM_LOCK(teacherId);
     const acquiredLock = await redis.set(lockKey, 'locked', 'EX', 120, 'NX');

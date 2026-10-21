@@ -170,6 +170,10 @@ Your sole objective is to author high-quality, academically rigorous, and curric
          + Ví dụ tại đỉnh A(100, 120) vuông góc với SA(thẳng đứng) và AC(xiên): dùng <polyline points="100,110 112,114 112,124" fill="none" stroke="black" stroke-width="1" />.
          + TUYỆT ĐỐI KHÔNG vẽ các nét gãy rời rạc, méo mó, xiên lệch hoặc đè lên chữ cái! Nếu không tính được tọa độ góc vuông phối cảnh chuẩn xác, HÃY BỎ QUA ký hiệu vuông góc trên hình vẽ (để giả thiết trong đề bài nêu "$SA \\perp (ABC)$") chứ KHÔNG ĐƯỢC vẽ cẩu thả!`;
 
+    systemPrompt += `\n\n12. DUY TRÌ CHẤT LƯỢNG ĐỒNG ĐỀU TỪ ĐẦU ĐẾN CUỐI (UNIFORM RIGOROUS QUALITY FROM START TO LAST QUESTION):
+- BẮT BUỘC duy trì độ sâu sư phạm, các bước suy luận toán học/logic chi tiết, giải thích cặn kẽ và định dạng công thức LaTeX chuẩn mực ĐỒNG ĐỀU 100% TỪ CÂU ĐẦU TIÊN ĐẾN CÂU CUỐI CÙNG CỦA ĐỀ THI.
+- TUYỆT ĐỐI NGHIÊM CẤM hiện tượng "đuối sức" hoặc làm ẩu về các câu cuối (NGHIÊM CẤM: cắt ngắn lời giải, viết tóm tắt cẩu thả kiểu "Dễ thấy đáp án là...", "Tương tự câu trên...", bỏ qua bước giải thích, hoặc trả về đáp án sơ sài ở những câu gần cuối đề). Mọi câu hỏi dù là câu 1 hay câu 50 đều phải có đầy đủ lời giải sư phạm chi tiết và chuẩn xác tuyệt đối.`;
+
     if (payload.appliedSkills && payload.appliedSkills.length > 0) {
       systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS & STRICT ZERO-DUPLICATION:
 You have been provided with specialized pedagogical skills extracted from official academic materials. You MUST apply the question styles, difficulty tiers, and pedagogical rigor defined in these skills:
@@ -275,6 +279,7 @@ ${gradeDirectives ? `${gradeDirectives}\n` : ''}
 ### EXAM MATRIX & CONSTRAINTS:
 ${matrixSpecs}
 - IMPORTANT: All ${totalQuestions} questions MUST BE COMPLETELY UNIQUE. Do not repeat any questions, numbers, or problem types!
+- CRITICAL QUALITY MANDATE: Maintain identical, high-depth mathematical reasoning, complete derivations, and step-by-step pedagogical explanations evenly from Question 1 to Question ${totalQuestions}. Absolutely forbidden from shortening, rushing, or degrading explanation quality on later questions!
 
 ### REQUIRED JSON SCHEMA SPECIFICATION:
 {
