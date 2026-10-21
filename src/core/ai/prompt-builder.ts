@@ -165,7 +165,7 @@ Your sole objective is to author high-quality, academically rigorous, and curric
          - Cạnh đáy AB: <line x1="80" y1="140" x2="50" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
          - Cạnh đáy AD: <line x1="80" y1="140" x2="220" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
          Nhãn đỉnh chuẩn không đè nét: A'(75,40), B'(32,95), C'(198,95), D'(228,48), A(88,136), B(32,190), C(195,195), D(228,145).
-       + MẪU 2: HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐÁY TRÊN A'B'C', ĐÁY DƯỚI ABC, ĐỈNH B Ở PHÍA SAU):
+       + MẪU 2A: HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐỈNH B Ở PHÍA SAU):
          Đáy trên A'B'C' (tam giác nhìn thấy toàn bộ): <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />
          2 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,160), C'C(220,60 -> 220,160).
          1 cạnh đáy dưới nhìn thấy (nét liền): AC(60,160 -> 220,160).
@@ -174,6 +174,13 @@ Your sole objective is to author high-quality, academically rigorous, and curric
          - Cạnh đáy AB: <line x1="60" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
          - Cạnh đáy CB: <line x1="220" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
          Nhãn đỉnh: A'(50,52), B'(140,30), C'(228,52), A(44,175), B(146,142), C(228,175).
+       + MẪU 2B: HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐỈNH A/A' QUAY RA PHÍA TRƯỚC, B/B' VÀ C/C' Ở PHÍA SAU):
+         Đáy trên A'B'C' (toàn bộ nét liền, BẮT BUỘC KHÉP KÍN 3 CẠNH kể cả cạnh sau B'C'): <polygon points="70,50 140,75 220,50" fill="none" stroke="black" stroke-width="1.5" />
+         3 cạnh bên đứng nhìn thấy (nét liền): B'B(70,50 -> 70,150), A'A(140,75 -> 140,175), C'C(220,50 -> 220,150).
+         2 cạnh đáy dưới nhìn thấy (nét liền): BA(70,150 -> 140,175), AC(140,175 -> 220,150).
+         1 CẠNH ĐÁY DƯỚI KHUẤT PHÍA SAU DUY NHẤT (NÉT ĐỨT): <line x1="70" y1="150" x2="220" y2="150" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         CẢNH BÁO: TUYỆT ĐỐI KHÔNG ĐƯỢC QUÊN CẠNH ĐÁY TRÊN B'C' NẰM NGANG Ở TRÊN CAO (70,50 -> 220,50)! Luôn dùng <polygon points="70,50 140,75 220,50" /> để tự động khép kín cả 3 cạnh đáy trên.
+         Nhãn đỉnh: B'(60,42), A'(148,72), C'(228,42), B(50,155), A(136,195), C(228,155).
        + MẪU 3: HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY):
          Đỉnh S(90,35), A(90,130), B(45,175), C(235,175).
          Cạnh khuất (nét đứt): SA (90,35 -> 90,130), AB (90,130 -> 45,175), AC (90,130 -> 235,175).

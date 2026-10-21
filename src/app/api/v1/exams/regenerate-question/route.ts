@@ -169,15 +169,13 @@ BẠN BẮT BUỘC PHẢI THỰC HIỆN ĐÚNG 100% THEO CHỈ THỊ NÀY (về 
       - Cạnh đáy AB: <line x1="80" y1="140" x2="50" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
       - Cạnh đáy AD: <line x1="80" y1="140" x2="220" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
       Nhãn đỉnh chuẩn không đè nét: A'(75,40), B'(32,95), C'(198,95), D'(228,48), A(88,136), B(32,190), C(195,195), D(228,145).
-    - HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐÁY TRÊN A'B'C', ĐÁY DƯỚI ABC, ĐỈNH B Ở PHÍA SAU):
-      Đáy trên A'B'C' (tam giác nhìn thấy toàn bộ): <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />
-      2 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,160), C'C(220,60 -> 220,160).
-      1 cạnh đáy dưới nhìn thấy (nét liền): AC(60,160 -> 220,160).
-      3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH B PHÍA SAU (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
-      - Cạnh bên đứng B'B: <line x1="140" y1="40" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-      - Cạnh đáy AB: <line x1="60" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-      - Cạnh đáy CB: <line x1="220" y1="160" x2="140" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-      Nhãn đỉnh: A'(50,52), B'(140,30), C'(228,52), A(44,175), B(146,142), C(228,175).
+    - HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐỈNH B Ở PHÍA SAU): Đáy trên A'B'C': <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />. Cạnh bên A'A, C'C nét liền; đáy dưới AC nét liền. Cạnh khuất qua B: B'B, AB, CB nét đứt (stroke-dasharray="4,4").
+    - HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐỈNH A/A' Ở PHÍA TRƯỚC, B/B' VÀ C/C' Ở PHÍA SAU):
+      Đáy trên A'B'C' (BẮT BUỘC KHÉP KÍN 3 CẠNH kể cả cạnh sau B'C'): <polygon points="70,50 140,75 220,50" fill="none" stroke="black" stroke-width="1.5" />.
+      3 cạnh bên đứng nhìn thấy (nét liền): B'B(70,50 -> 70,150), A'A(140,75 -> 140,175), C'C(220,50 -> 220,150).
+      2 cạnh đáy dưới nhìn thấy (nét liền): BA(70,150 -> 140,175), AC(140,175 -> 220,150).
+      1 cạnh đáy dưới khuất sau duy nhất (nét đứt): BC(70,150 -> 220,150 stroke-dasharray="4,4").
+      TUYỆT ĐỐI KHÔNG ĐƯỢC QUÊN CẠNH TRÊN B'C'! Dùng thẻ <polygon points="70,50 140,75 220,50" /> để tự động vẽ cả 3 cạnh đáy trên. Nhãn: B'(60,42), A'(148,72), C'(228,42), B(50,155), A(136,195), C(228,155).
     - HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY): Đỉnh S(90,35), A(90,130), B(45,175), C(235,175). SA, AB, AC nét đứt; SB, SC, BC nét liền. Nhãn S(88,22), A(72,132), B(28,185), C(245,185).
     - HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY): Đỉnh S(80,35), A(80,130), B(40,175), C(190,175), D(230,130). SA, AB, AD nét đứt; SB, SC, SD, BC, CD nét liền.
     - ĐOẠN VUÔNG GÓC CHUNG a VÀ b: a ngang (40,50 -> 260,50); b xiên (50,165 -> 250,135); đoạn HK (140,50 -> 140,150 thẳng đứng).
