@@ -1909,6 +1909,23 @@ export default function EditorView() {
           CÂU HỎI
         </div>
 
+        {questions.length === 0 && (
+          <div className="no-print p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 my-4">
+            <span className="material-symbols-outlined text-4xl text-amber-500 mb-2">warning</span>
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Đề thi này chưa có nội dung câu hỏi</h4>
+            <p className="text-xs text-slate-400 mt-1 mb-4">
+              Bộ đề này có thể đã bị gián đoạn trong phiên làm việc cũ hoặc là bản tạo chưa hoàn tất. Vui lòng quay lại Trang chủ để chọn đề thi đã được AI sinh hoàn chỉnh.
+            </p>
+            <button
+              type="button"
+              onClick={() => setCurrentRoute('#dashboard')}
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              Về Trang chủ / Danh sách đề thi
+            </button>
+          </div>
+        )}
+
         {questions.map((q, qIndex) => {
           const isRegenThis = regeneratingQId === q.id;
           const isEditing = editingQId === q.id;

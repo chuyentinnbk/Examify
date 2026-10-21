@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const whereClause = userRole === 'ADMIN' ? {} : { teacherId: userId };
+    const whereClause: any = {
+      status: { notIn: [ExamStatus.FAILED, ExamStatus.GENERATING] },
+      ...(userRole === 'ADMIN' ? {} : { teacherId: userId }),
+    };
 
     const rawExams = await prisma.exam.findMany({
       where: whereClause,
@@ -170,7 +173,8 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return apiSuccess({ exams }, 'Fetched exams successfully');
+    const validExams = exams.filter((ex) => (ex.questions && ex.questions.length > 0));
+    return apiSuccess({ exams: validExams }, 'Fetched exams successfully');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error fetching exams';
     return apiError(message, 500);
