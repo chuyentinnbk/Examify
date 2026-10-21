@@ -7,6 +7,9 @@ import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curri
 import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
 import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+
 const RegenerateQuestionSchema = z.object({
   subject: z.string().default('Toán học'),
   grade: z.string().default('Lớp 12'),

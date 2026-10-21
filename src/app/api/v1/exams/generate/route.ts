@@ -11,6 +11,9 @@ import { ExamStatus, ExamType } from '@prisma/client';
 import { AcademicStorage } from '@/core/storage/academic-storage';
 import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
+export const maxDuration = 300; // Tối đa 5 phút cho việc AI sinh trọn bộ đề thi (20-50 câu có SVG và lời giải)
+export const dynamic = 'force-dynamic';
+
 const GenerateExamSchema = z.object({
   title: z.string().min(3, 'Exam title must be at least 3 characters'),
   curriculum: z.object({

@@ -7,6 +7,9 @@ import { normalizeQuestionType, normalizeSvgGeometry } from '@/lib/exam-sections
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamQuestion } from '@/lib/store/app-store';
 
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+
 const IsomorphicVariantsSchema = z.object({
   baseQuestions: z.array(z.any()).min(1, 'Base questions are required'),
   baseTitle: z.string().default('Đề thi'),

@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore, ExamItem } from '@/lib/store/app-store';
 import PortalModal from '@/components/common/PortalModal';
 import UserAvatar from '@/components/common/UserAvatar';
 
 export default function DashboardView() {
-  const { exams, user, setCurrentRoute, setActiveExam, deleteExam, showToast } = useAppStore();
+  const { exams, user, setCurrentRoute, setActiveExam, deleteExam, showToast, fetchExams } = useAppStore();
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [previewExam, setPreviewExam] = useState<ExamItem | null>(null);
+
+  useEffect(() => {
+    fetchExams();
+  }, []);
 
   const isMatchCategory = (subject: string, cat: string) => {
     if (cat === 'math') return subject.includes('Toán');

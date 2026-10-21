@@ -544,7 +544,12 @@ export default function CreateExamView() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Máy chủ không thể phản hồi đúng định dạng JSON (${res.status} ${res.statusText || ''})`);
+      }
 
       let questions: ExamQuestion[] = [];
       let examTitle = generatedTitle;
@@ -782,8 +787,12 @@ export default function CreateExamView() {
       showToast('Bộ đề thi AI đã được tạo thành công!', 'success');
       setCurrentRoute('#editor');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showToast(`Không thể sinh đề thi: ${msg}`, 'error');
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      let friendlyMsg = rawMsg;
+      if (rawMsg.includes('NetworkError') || rawMsg.includes('Failed to fetch')) {
+        friendlyMsg = 'Mất kết nối hoặc quá thời gian phản hồi từ máy chủ (Network Timeout). Do bộ đề 22 câu có hình vẽ vector SVG và lời giải chi tiết cần khoảng 60–90 giây, AI có thể đã tạo xong ở nền. Vui lòng vào "Trang chủ / Đề thi" để kiểm tra!';
+      }
+      showToast(`Không thể sinh đề thi: ${friendlyMsg}`, 'error');
     } finally {
       setIsGenerating(false);
     }
