@@ -153,22 +153,40 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 11. QUY CHUẨN ĐỒ HỌA HÌNH HỌC BẰNG VECTOR SVG (GEOMETRIC DIAGRAMS & RIGHT-ANGLE MARKS):
    - Đối với các câu hỏi Hình học (Hình học không gian như hình chóp S.ABC, tứ diện, lăng trụ, nón, trụ; hoặc Hình học phẳng):
      * BẮT BUỘC nhúng một đoạn mã Vector SVG chuẩn vào trong trường "content" của câu hỏi:
-       <svg viewBox="0 0 300 200" width="300" height="200" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
+       <svg viewBox="0 0 320 220" width="320" height="220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
+     * BẮT BUỘC SỬ DỤNG HỆ TỌA ĐỘ MẪU CHUẨN (GOLDEN COORDINATES TEMPLATES) - TUYỆT ĐỐI CẤM TỰ BỊA TỌA ĐỘ KHIẾN HÌNH BỊ MÉO MÓ HOẶC ĐÈ NÉT:
+       + MẪU 1: HÌNH HỘP CHỮ NHẬT / HÌNH LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK VIỆT NAM):
+         Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="60,60 200,60 250,90 110,90" fill="none" stroke="black" stroke-width="1.5" />
+         3 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,150), B'B(200,60 -> 200,150), C'C(250,90 -> 250,180).
+         1 cạnh bên đứng bị khuất (nét đứt): D'D(110,90 -> 110,180 stroke-dasharray="4,4").
+         Đáy dưới ABCD: Cạnh thấy AB(60,150 -> 200,150), BC(200,150 -> 250,180) (nét liền).
+         Đáy dưới ABCD: Cạnh khuất AD(60,150 -> 110,180), CD(250,180 -> 110,180) (nét đứt stroke-dasharray="4,4").
+         Nhãn đỉnh chuẩn không đè nét: A'(44,55), B'(204,55), C'(258,92), D'(96,85), A(44,160), B(204,160), C(258,188), D(100,196).
+       + MẪU 2: HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY):
+         Đỉnh S(90,35), A(90,130), B(45,175), C(235,175).
+         Cạnh khuất (nét đứt): SA (90,35 -> 90,130), AB (90,130 -> 45,175), AC (90,130 -> 235,175).
+         Cạnh thấy (nét liền): SB, SC, BC.
+         Nhãn: S(88,22), A(72,132), B(28,185), C(245,185).
+       + MẪU 3: HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY, ĐÁY ABCD LÀ HÌNH CHỮ NHẬT/BÌNH HÀNH):
+         Đỉnh S(80,35), A(80,130), B(40,175), C(190,175), D(230,130).
+         Cạnh khuất (nét đứt stroke-dasharray="4,4"): SA, AB, AD.
+         Cạnh thấy (nét liền): SB, SC, SD, BC, CD.
+         Nhãn: S(78,22), A(62,132), B(25,185), C(195,185), D(242,132).
+       + MẪU 4: ĐOẠN VUÔNG GÓC CHUNG GIỮA 2 ĐƯỜNG THẲNG CHÉO NHAU a VÀ b:
+         Đường a nằm ngang ở trên: line từ (40,50) đến (260,50). Nhãn 'a' ở (268,54).
+         Đường b nằm xiên ở dưới: line từ (50,165) đến (250,135). Nhãn 'b' ở (258,138).
+         Đoạn vuông góc chung HK: line từ H(140,50) đến K(140,150) thẳng đứng.
+         Nhãn: H(140,38), K(140,172). Ký hiệu vuông góc polyline nhỏ ở H và K.
      * QUY ƯỚC ĐỒ HỌA BẮT BUỘC:
        - Đường nét: stroke="black", stroke-width="1.5", fill="none".
        - Cạnh nhìn thấy: Nét liền (stroke="black").
        - Cạnh bị che khuất bên trong, đường cao, đường trung tuyến: BẮT BUỘC dùng nét đứt với thuộc tính stroke-dasharray="4,4" (hoặc "3,3").
        - Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... />.
-         + CẢNH BÁO QUAN TRỌNG: Thẻ <line> CHỈ CHẤP NHẬN 4 thuộc tính x1, y1, x2, y2. TUYỆT ĐỐI CẤM dùng thuộc tính points="..." trong thẻ <line> (dùng points trong thẻ <line> là vi phạm chuẩn SVG làm đường vẽ bị tàng hình trong trình duyệt).
-         + Nếu vẽ đường gấp khúc, tam giác, đa giác: dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
-       - Nhãn đỉnh (S, A, B, C, D...): Dùng thẻ <text x="..." y="..." font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">S</text>.
-         + QUY TẮC TRÁNH ĐÈ CHỮ: Nhãn đỉnh phải đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S đặt ở trên y-12; B đặt ở góc dưới bên trái x-16, y+10; C đặt ở góc dưới bên phải x+12, y+10; đỉnh trong A đặt lệch hẳn sang bên trái x-18, y-4). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
-         + QUY TẮC ĐẶT NHÃN SỐ LIỆU ĐO CẠNH (ví dụ: '12 km', '20 km', 'a', 'h_a'): BẮT BUỘC dời nhãn lệch hẳn ra khoảng trống bên ngoài đoạn thẳng từ 15-20px (đoạn thẳng phải vẽ liền mạch hoàn toàn, tuyệt đối không đặt toạ độ đè lên thân đoạn thẳng).
-       - KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK) CHUẨN XÁC:
-         + BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), góc vuông phải song song tuyệt đối với 2 cạnh chứa góc vuông đó (theo phép chiếu phối cảnh 3D).
-         + Kích thước góc vuông phải nhỏ gọn (cạnh khoảng 8px đến 10px).
-         + Ví dụ tại đỉnh A(100, 120) vuông góc với SA(thẳng đứng) và AC(xiên): dùng <polyline points="100,110 112,114 112,124" fill="none" stroke="black" stroke-width="1" />.
-         + TUYỆT ĐỐI KHÔNG vẽ các nét gãy rời rạc, méo mó, xiên lệch hoặc đè lên chữ cái! Nếu không tính được tọa độ góc vuông phối cảnh chuẩn xác, HÃY BỎ QUA ký hiệu vuông góc trên hình vẽ (để giả thiết trong đề bài nêu "$SA \\perp (ABC)$") chứ KHÔNG ĐƯỢC vẽ cẩu thả!`;
+         + CẢNH BÁO QUAN TRỌNG: Thẻ <line> CHỈ CHẤP NHẬN 4 thuộc tính x1, y1, x2, y2. TUYỆT ĐỐI CẤM dùng thuộc tính points="..." trong thẻ <line>.
+         + Nếu vẽ đa giác: dùng <polygon points="..." fill="none" />.
+       - Nhãn đỉnh: Dùng thẻ <text x="..." y="..." font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">...</text>.
+         + TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN NHAU HOẶC ĐÈ LÊN ĐƯỜNG THẲNG! Nhãn phải đặt lệch ra ngoài đỉnh ít nhất 12-18px.
+       - KÝ HIỆU VUÔNG GÓC: Dùng thẻ <polyline points="..." fill="none" stroke="black" stroke-width="1" /> song song với 2 cạnh. Nếu không chắc chắn tọa độ thì HÃY BỎ QUA ký hiệu vuông góc, tuyệt đối không vẽ xiên xẹo!`;
 
     systemPrompt += `\n\n12. DUY TRÌ CHẤT LƯỢNG ĐỒNG ĐỀU TỪ ĐẦU ĐẾN CUỐI (UNIFORM RIGOROUS QUALITY FROM START TO LAST QUESTION):
 - BẮT BUỘC duy trì độ sâu sư phạm, các bước suy luận toán học/logic chi tiết, giải thích cặn kẽ và định dạng công thức LaTeX chuẩn mực ĐỒNG ĐỀU 100% TỪ CÂU ĐẦU TIÊN ĐẾN CÂU CUỐI CÙNG CỦA ĐỀ THI.
@@ -517,13 +535,18 @@ ${matrixSpecs}
 
     if (num === 12 || norm.includes('12')) {
       return `
-### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ CHƯƠNG TRÌNH GDPT 2018 - KHỐI LỚP 12:
-1. NỘI DUNG TRỌNG TÂM LỚP 12:
-   - Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số (đơn điệu, cực trị, GTLN-GTNN, tiệm cận).
-   - Hàm số luỹ thừa, hàm số mũ và hàm số logarit; phương trình, bất phương trình mũ - logarit.
-   - Nguyên hàm, tích phân và ứng dụng tính diện tích hình phẳng, thể tích khối tròn xoay.
-   - Phương pháp toạ độ trong không gian Oxyz (mặt phẳng, đường thẳng, mặt cầu).
-   - Số phức (các phép toán số phức, môđun, tập hợp điểm biểu diễn).`;
+### BẮT BUỘC TUÂN THỦ CHUẨN ĐỘ KHÓ CHƯƠNG TRÌNH GDPT 2018 - TOÁN LỚP 12:
+1. ĐỘ SÂU SƯ PHẠM VÀ TÍNH PHÂN HÓA ĐỀ THI LỚP 12:
+   - ĐỐI VỚI CHUYÊN ĐỀ HÌNH HỌC KHÔNG GIAN & KHOẢNG CÁCH (HÌNH CHÓP, LĂNG TRỤ, HỘP CHỮ NHẬT...):
+     * ĐÂY LÀ ĐỀ THI CHO HỌC SINH LỚP 12 (Ôn thi Tốt nghiệp THPT / ĐGNL / ĐGTD), KHÔNG PHẢI LỚP 11!
+     * TUYỆT ĐỐI NGHIÊM CẤM ra các câu hỏi định nghĩa lý thuyết giáo điều, ngô nghê của SGK lớp 11 (CẤM các câu hỏi kiểu: "Đoạn vuông góc chung của hai đường thẳng chéo nhau được định nghĩa bằng đoạn nào?", "Cho đường thẳng song song mặt phẳng thì khoảng cách bằng đoạn nào?").
+     * Ở CẤP ĐỘ NHẬN BIẾT & THÔNG HIỂU CỦA LỚP 12: Phải là bài toán tính toán cụ thể trên các khối hình quen thuộc (hình chóp S.ABC, S.ABCD, lăng trụ, hình lập phương) có kèm số đo tham số $a, a\\sqrt{2}, a\\sqrt{3}$, yêu cầu học sinh tính ra giá trị khoảng cách (ví dụ $d = \\frac{a\\sqrt{3}}{2}$, $d = \\frac{2a}{\\sqrt{5}}$...) hoặc gắn hệ trục tọa độ Oxyz để tính khoảng cách theo công thức tọa độ!
+     * Ở CẤP ĐỘ VẬN DỤNG & VẬN DỤNG CAO: Bài toán mô hình hóa thực tế (khoảng cách giữa hai dây cáp cầu treo, góc quan sát tháp phát sóng, bài toán máy bay bay chéo nhau, tối ưu chi phí nguyên vật liệu xây dựng bể nước/mái che lăng trụ) hoặc cực trị khoảng cách.
+   - CÁC NỘI DUNG TRỌNG TÂM KHÁC CỦA TOÁN 12 (GDPT 2018):
+     * Khảo sát hàm số & Ứng dụng đạo hàm: Tính đơn điệu, cực trị, GTLN-GTNN, tiệm cận (đứng, ngang, xiên), bảng biến thiên và bài toán thực tế tối ưu.
+     * Vectơ và Phương pháp tọa độ trong không gian Oxyz: Hệ trục Oxyz, tọa độ điểm, vectơ, tích có hướng, tích vô hướng, phương trình mặt phẳng, phương trình đường thẳng, phương trình mặt cầu, khoảng cách và góc.
+     * Thống kê: Các số đặc trưng đo xu thế trung tâm và độ phân tán của mẫu số liệu ghép nhóm.
+     * Xác suất: Xác suất có điều kiện, công thức xác suất toàn phần, công thức Bayes.`;
     }
 
     if (num && num >= 6 && num <= 9) {

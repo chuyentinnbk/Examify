@@ -158,10 +158,20 @@ BẠN BẮT BUỘC PHẢI THỰC HIỆN ĐÚNG 100% THEO CHỈ THỊ NÀY (về 
   * PHÂN BIỆT ĐỀ BÀI VÀ LỜI GIẢI:
     - Trong "content" (Đề bài): CHỈ nhúng hình vẽ SVG khi bài toán có ngữ cảnh thực tế (chiếc lều, vòm cầu, bể nước...) HOẶC đề bài nói rõ "như hình vẽ bên", "dựa vào hình sau". Với câu hình học thuần túy (như "Cho hình chóp S.ABC..."), KHÔNG vẽ hình vào đề bài để học sinh tự rèn kỹ năng vẽ hình.
     - Trong "explanation" (Lời giải): BẮT BUỘC 100% các câu hình học đều phải có hình vẽ SVG đầy đủ (gồm đường cao, nét đứt nét liền và các điểm phụ dựng thêm) để minh họa rõ ràng các bước chứng minh/tính toán.
+  * BẮT BUỘC SỬ DỤNG HỆ TỌA ĐỘ MẪU CHUẨN (GOLDEN COORDINATES TEMPLATES) - TUYỆT ĐỐI CẤM TỰ BỊA TỌA ĐỘ KHIẾN HÌNH BỊ MÉO MÓ:
+    - HÌNH HỘP CHỮ NHẬT / LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK VIỆT NAM):
+      Đáy trên A'B'C'D' (nét liền trên cao): <polygon points="60,60 200,60 250,90 110,90" fill="none" stroke="black" stroke-width="1.5" />
+      Cạnh bên đứng: A'A(60,60 -> 60,150), B'B(200,60 -> 200,150), C'C(250,90 -> 250,180) (nét liền); D'D(110,90 -> 110,180 stroke-dasharray="4,4" nét đứt).
+      Đáy dưới ABCD: AB(60,150 -> 200,150), BC(200,150 -> 250,180) (nét liền); AD(60,150 -> 110,180), CD(250,180 -> 110,180) (nét đứt stroke-dasharray="4,4").
+      Nhãn đỉnh: A'(44,55), B'(204,55), C'(258,92), D'(96,85), A(44,160), B(204,160), C(258,188), D(100,196).
+    - HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY): Đỉnh S(90,35), A(90,130), B(45,175), C(235,175). SA, AB, AC nét đứt; SB, SC, BC nét liền. Nhãn S(88,22), A(72,132), B(28,185), C(245,185).
+    - HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY): Đỉnh S(80,35), A(80,130), B(40,175), C(190,175), D(230,130). SA, AB, AD nét đứt; SB, SC, SD, BC, CD nét liền.
+    - ĐOẠN VUÔNG GÓC CHUNG a VÀ b: a ngang (40,50 -> 260,50); b xiên (50,165 -> 250,135); đoạn HK (140,50 -> 140,150 thẳng đứng).
+  * ĐẶC BIỆT ĐỐI VỚI TOÁN LỚP 12: ĐÂY LÀ HỌC SINH LỚP 12 ÔN THI TỐT NGHIỆP / ĐGNL, TUYỆT ĐỐI NGHIÊM CẤM RA CÂU HỎI ĐỊNH NGHĨA LÝ THUYẾT SGK LỚP 11 (CẤM: "Đoạn vuông góc chung được định nghĩa bằng đoạn nào?", "Khoảng cách giữa đường thẳng và mp song song bằng đoạn nào?"). Bắt buộc phải là bài toán tính toán cụ thể có số đo tham số a, a√2, a√3 hoặc gắn tọa độ Oxyz để tính khoảng cách!
   * Cạnh nhìn thấy: nét liền (stroke="black" stroke-width="1.5").
   * Cạnh bị khuất, đường cao, đường trung tuyến: nét đứt (stroke="black" stroke-width="1.5" stroke-dasharray="4,4").
-  * Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... /> (TUYỆT ĐỐI CẤM dùng points trong thẻ <line>). Vẽ đường gấp khúc/tam giác thì dùng <polyline points="..." fill="none" /> hoặc <polygon points="..." fill="none" />.
-  * Nhãn đỉnh (S, A, B, C...): Dùng <text>, đặt lệch ra ngoài đỉnh ít nhất 10-15px (Ví dụ: S ở trên y-12, A lệch trái x-18, y-4, B dưới trái x-16, y+10, C dưới phải x+12, y+10). TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG!
+  * Đoạn thẳng & đường phụ: Dùng thẻ <line x1="..." y1="..." x2="..." y2="..." stroke="black" ... /> (TUYỆT ĐỐI CẤM dùng points trong thẻ <line>). Vẽ đa giác thì dùng <polygon points="..." fill="none" />.
+  * Nhãn đỉnh (S, A, B, C...): Dùng <text>, đặt lệch ra ngoài đỉnh ít nhất 12-18px. TUYỆT ĐỐI KHÔNG ĐỂ CHỮ ĐÈ LÊN ĐƯỜNG THẲNG HOẶC ĐÈ LÊN NHAU!
   * KÝ HIỆU VUÔNG GÓC (RIGHT-ANGLE MARK):
     - BẮT BUỘC dùng 1 thẻ <polyline> liên tục (fill="none" stroke="black" stroke-width="1"), nhỏ gọn khoảng 8-10px, hai cạnh phải song song với 2 cạnh chứa góc vuông theo phối cảnh 3D.
     - TUYỆT ĐỐI KHÔNG vẽ các nét gãy rời rạc, méo mó, xiên lệch hoặc đè lên chữ cái! NẾU KHÔNG TÍNH ĐƯỢC TỌA ĐỘ PHỐI CẢNH CHUẨN XÁC, HÃY BỎ QUA KÝ HIỆU VUÔNG GÓC (để giả thiết trong đề bài nêu "$SA \\perp (ABC)$") chứ KHÔNG ĐƯỢC vẽ cẩu thả!
