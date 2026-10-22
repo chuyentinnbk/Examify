@@ -1,21 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore, ExamItem } from '@/lib/store/app-store';
 import PortalModal from '@/components/common/PortalModal';
 import UserAvatar from '@/components/common/UserAvatar';
 
 export default function DashboardView() {
-  const { exams, user, setCurrentRoute, setActiveExam, deleteExam, showToast } = useAppStore();
+  const { exams, user, setCurrentRoute, setActiveExam, deleteExam, showToast, fetchExams } = useAppStore();
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [previewExam, setPreviewExam] = useState<ExamItem | null>(null);
 
+  useEffect(() => {
+    fetchExams();
+  }, []);
+
+  const isMatchCategory = (subject: string, cat: string) => {
+    if (cat === 'math') return subject.includes('Toán');
+    if (cat === 'natural') return subject.includes('Lý') || subject.includes('Lí') || subject.includes('Hóa') || subject.includes('Sinh') || subject.includes('Tin') || subject.includes('KHTN');
+    if (cat === 'social') return subject.includes('Anh') || subject.includes('Văn') || subject.includes('Sử') || subject.includes('Địa') || subject.includes('Kinh tế');
+    return true;
+  };
+
   const filteredExams = exams.filter((exam) => {
-    let matchesFilter = true;
-    if (filter === 'math') matchesFilter = exam.subject.includes('Toán');
-    else if (filter === 'natural') matchesFilter = exam.subject.includes('Lý') || exam.subject.includes('Hóa') || exam.subject.includes('Sinh') || exam.subject.includes('KHTN');
-    else if (filter === 'social') matchesFilter = exam.subject.includes('Anh') || exam.subject.includes('Văn') || exam.subject.includes('Sử') || exam.subject.includes('Địa');
+    const matchesFilter = filter === 'all' ? true : isMatchCategory(exam.subject, filter);
 
     const matchesSearch =
       search === '' ||
@@ -42,10 +50,14 @@ export default function DashboardView() {
 
   const getSubjectIcon = (subject: string) => {
     if (subject.includes('Toán')) return 'functions';
-    if (subject.includes('Vật lý')) return 'science';
+    if (subject.includes('Vật lý') || subject.includes('Vật lí')) return 'science';
     if (subject.includes('Hóa')) return 'biotech';
     if (subject.includes('Sinh')) return 'psychology';
+    if (subject.includes('Tin')) return 'terminal';
     if (subject.includes('Anh')) return 'translate';
+    if (subject.includes('Sử')) return 'history_edu';
+    if (subject.includes('Địa')) return 'public';
+    if (subject.includes('Kinh tế') || subject.includes('Pháp luật') || subject.includes('GDCD')) return 'gavel';
     return 'menu_book';
   };
 
@@ -142,9 +154,9 @@ export default function DashboardView() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
           {[
             { key: 'all', label: 'Tất cả đề thi', count: exams.length },
-            { key: 'math', label: 'Toán học', count: exams.filter((e) => e.subject.includes('Toán')).length },
-            { key: 'natural', label: 'KHTN / Lý - Hóa - Sinh', count: exams.filter((e) => e.subject.includes('Lý') || e.subject.includes('Hóa') || e.subject.includes('Sinh') || e.subject.includes('KHTN')).length },
-            { key: 'social', label: 'Tiếng Anh & Xã hội', count: exams.filter((e) => e.subject.includes('Anh') || e.subject.includes('Văn') || e.subject.includes('Sử') || e.subject.includes('Địa')).length },
+            { key: 'math', label: 'Toán học', count: exams.filter((e) => isMatchCategory(e.subject, 'math')).length },
+            { key: 'natural', label: 'KHTN / Lý - Hóa - Sinh - Tin', count: exams.filter((e) => isMatchCategory(e.subject, 'natural')).length },
+            { key: 'social', label: 'Tiếng Anh & Xã hội', count: exams.filter((e) => isMatchCategory(e.subject, 'social')).length },
           ].map((pill) => {
             const isActive = filter === pill.key;
             return (
@@ -204,7 +216,7 @@ export default function DashboardView() {
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 block">
-                      {exam.id} • {exam.grade}
+                      {exam.id} • {exam.grade}{exam.term ? ` • ${exam.term}` : ''}
                     </span>
                     <span className="text-xs font-bold text-slate-800">
                       {exam.subject}
@@ -270,7 +282,11 @@ export default function DashboardView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => deleteExam(exam.id)}
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn đề thi "${exam.title}" không?`)) {
+                      deleteExam(exam.id);
+                    }
+                  }}
                   title="Xóa đề"
                   className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                 >

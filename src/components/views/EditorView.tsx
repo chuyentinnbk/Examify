@@ -22,18 +22,28 @@ import {
   getOptionsLayout,
 } from '@/lib/export-exam';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
+import { generateExamVariants } from '@/lib/exam-shuffler';
 
 export default function EditorView() {
-  const { activeExam, updateExam, showToast, setCurrentRoute, user } = useAppStore();
+  const { activeExam, updateExam, showToast, setCurrentRoute, user, token } = useAppStore();
 
   const [title, setTitle] = useState(activeExam?.title || '');
   const [examCode, setExamCode] = useState(() => formatExamCode(activeExam?.id, activeExam?.code));
   const [questions, setQuestions] = useState<ExamQuestion[]>(activeExam?.questions || []);
+  const [variants, setVariants] = useState<any[]>(() => activeExam?.variants || []);
+  const [selectedVariantIdx, setSelectedVariantIdx] = useState(0);
+  const [isShuffleModalOpen, setIsShuffleModalOpen] = useState(false);
+  const [shuffleCodesCount, setShuffleCodesCount] = useState<number>(4);
+  const [shuffleOrderOpt, setShuffleOrderOpt] = useState(true);
+  const [shuffleValuesOpt, setShuffleValuesOpt] = useState(false);
+  const [isGeneratingAiVariants, setIsGeneratingAiVariants] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingQId, setEditingQId] = useState<number | string | null>(null);
   const [includeAnswers, setIncludeAnswers] = useState(true);
   const [regeneratingQId, setRegeneratingQId] = useState<number | string | null>(null);
+  const [targetRegenQuestion, setTargetRegenQuestion] = useState<ExamQuestion | null>(null);
+  const [regenPromptInput, setRegenPromptInput] = useState('');
   const [isRegeneratingExam, setIsRegeneratingExam] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingZip, setIsExportingZip] = useState(false);
@@ -82,6 +92,9 @@ export default function EditorView() {
   useEffect(() => {
     if (activeExam) {
       setTitle(activeExam.title);
+      const incomingVariants = activeExam.variants && activeExam.variants.length > 0 ? activeExam.variants : [];
+      setVariants(incomingVariants);
+      setSelectedVariantIdx(0);
       setQuestions(activeExam.questions || []);
       setExamCode(formatExamCode(activeExam.id, activeExam.code));
       if (activeExam.department) setDepartment(normalizeDepartmentAccents(activeExam.department));
@@ -133,6 +146,112 @@ export default function EditorView() {
     showToast(`Đã đổi tên bài kiểm tra: ${trimmed}`, 'success');
   };
 
+  const handleSelectVariant = (idx: number) => {
+    if (idx === selectedVariantIdx || !variants[idx]) return;
+    const updatedVariants = [...variants];
+    updatedVariants[selectedVariantIdx] = {
+      ...updatedVariants[selectedVariantIdx],
+      code: examCode,
+      questions,
+    };
+    setVariants(updatedVariants);
+    setSelectedVariantIdx(idx);
+    const target = updatedVariants[idx];
+    setExamCode(target.code || String(101 + idx));
+    setQuestions(target.questions || []);
+    showToast(`Đang hiển thị đề thi: Mã đề ${target.code}`, 'info');
+  };
+
+  const handlePerformShuffle = async () => {
+    if (shuffleCodesCount <= 1 && !shuffleOrderOpt && !shuffleValuesOpt) {
+      showToast('Vui lòng chọn ít nhất 2 mã đề hoặc chọn phương thức xáo trộn', 'warning');
+      return;
+    }
+
+    if (shuffleValuesOpt && shuffleCodesCount > 1) {
+      setIsGeneratingAiVariants(true);
+      showToast(`AI đang tiến hành đổi số liệu và tự động giải lại đáp án cho ${shuffleCodesCount} mã đề...`, 'info');
+      try {
+        const targetCodes = Array.from({ length: shuffleCodesCount - 1 }, (_, i) => String(102 + i));
+        const storedToken = token || (typeof window !== 'undefined' ? localStorage.getItem('examify_token') : '');
+        const res = await fetch('/api/v1/exams/isomorphic-variants', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
+          },
+          body: JSON.stringify({
+            baseQuestions: questions,
+            baseTitle: title || activeExam?.title || 'Đề thi',
+            subject: activeExam?.subject || 'Toán học',
+            grade: activeExam?.grade || 'Lớp 12',
+            term: activeExam?.term || 'Học kỳ 1',
+            variantCodes: targetCodes,
+            shuffleOrder: shuffleOrderOpt,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data?.variants) && data.data.variants.length > 0) {
+          const newVariants = data.data.variants;
+          setVariants(newVariants);
+          setSelectedVariantIdx(0);
+          if (newVariants[0]) {
+            setExamCode(newVariants[0].code);
+            setQuestions(newVariants[0].questions);
+          }
+          if (activeExam?.id) {
+            const baseCode = newVariants[0]?.code || '101';
+            const baseQuestions = newVariants[0]?.questions || questions;
+            updateExam(activeExam.id, {
+              code: baseCode,
+              questions: baseQuestions,
+              questionsCount: baseQuestions.length,
+              variants: newVariants,
+            });
+          }
+          setIsShuffleModalOpen(false);
+          showToast(`Đã tạo thành công ${newVariants.length} mã đề đồng dạng bằng AI với số liệu mới và đáp án tự động tính toán lại!`, 'success');
+          return;
+        }
+      } catch (err) {
+        console.warn('AI isomorphic shuffle failed, falling back to safe offline shuffle:', err);
+        showToast('Không thể kết nối AI, hệ thống tự động chuyển sang chế độ xáo thứ tự câu an toàn.', 'warning');
+      } finally {
+        setIsGeneratingAiVariants(false);
+      }
+    }
+
+    // Fast instant offline shuffle
+    const newVariants = generateExamVariants(
+      questions,
+      title || activeExam?.title || 'Đề thi',
+      {
+        codeCount: shuffleCodesCount,
+        shuffleOrder: shuffleOrderOpt,
+        shuffleValues: false,
+        baseCode: 101,
+      }
+    );
+    setVariants(newVariants);
+    setSelectedVariantIdx(0);
+    if (newVariants[0]) {
+      setExamCode(newVariants[0].code);
+      setQuestions(newVariants[0].questions);
+    }
+    if (activeExam?.id) {
+      const baseCode = newVariants[0]?.code || '101';
+      const baseQuestions = newVariants[0]?.questions || questions;
+      updateExam(activeExam.id, {
+        code: baseCode,
+        questions: baseQuestions,
+        questionsCount: baseQuestions.length,
+        variants: newVariants,
+      });
+    }
+    setIsShuffleModalOpen(false);
+    showToast(`Đã tạo thành công ${shuffleCodesCount} mã đề thi (101 - ${100 + shuffleCodesCount})!`, 'success');
+  };
+
   // Click outside listener for dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -149,10 +268,16 @@ export default function EditorView() {
         setIsAddOpen(false);
       }
     }
+    let printRestoreTimeout: NodeJS.Timeout | null = null;
     const handleBeforePrint = () => {
       document.title = '';
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
+      printRestoreTimeout = setTimeout(() => {
+        document.title = 'Examify AI - Hệ Thống Khảo Thí & Tạo Đề Thi Thông Minh';
+      }, 3000);
     };
     const handleAfterPrint = () => {
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
       document.title = 'Examify AI - Hệ Thống Khảo Thí & Tạo Đề Thi Thông Minh';
     };
     window.addEventListener('beforeprint', handleBeforePrint);
@@ -160,6 +285,7 @@ export default function EditorView() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
+      if (printRestoreTimeout) clearTimeout(printRestoreTimeout);
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('beforeprint', handleBeforePrint);
       window.removeEventListener('afterprint', handleAfterPrint);
@@ -317,18 +443,32 @@ export default function EditorView() {
       if (normNewType === 'true_false') {
         const subKeys = ['a', 'b', 'c', 'd'];
 
+        // Helper: Sinh phân bố Đúng / Sai thực tế chuẩn Bộ GD&ĐT (1Đ-3S, 2Đ-2S, hoặc 3Đ-1S; tuyệt đối không 4Đ hay 4S)
+        const generateRealisticTfBooleans = (): boolean[] => {
+          const patterns = [
+            [true, false, false, false],
+            [true, true, false, false],
+            [true, true, false, false],
+            [true, true, true, false],
+          ];
+          const chosen = [...patterns[Math.floor(Math.random() * patterns.length)]];
+          for (let idx = chosen.length - 1; idx > 0; idx--) {
+            const j = Math.floor(Math.random() * (idx + 1));
+            [chosen[idx], chosen[j]] = [chosen[j], chosen[idx]];
+          }
+          return chosen;
+        };
+
         if (oldType === 'multiple_choice') {
           // Map existing 4 options to a, b, c, d without losing their texts
           const existingOpts = (q.options && q.options.length >= 4) ? q.options : backupOptions;
+          const tfBooleans = generateRealisticTfBooleans();
           newOptions = subKeys.map((k, i) => {
             const existing = existingOpts[i];
-            const isTargetCorrect = (q.correctAnswer && existing)
-              ? existing.key.toUpperCase() === q.correctAnswer.trim().toUpperCase()
-              : (existing ? !!existing.isCorrect : false);
             return {
               key: k,
               text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
-              isCorrect: isTargetCorrect,
+              isCorrect: tfBooleans[i],
             };
           });
         } else if (oldType === 'short_answer' || oldType === 'essay') {
@@ -338,20 +478,22 @@ export default function EditorView() {
             newOptions = previousTfOpts.map((o) => ({ ...o, key: o.key.toLowerCase() }));
           } else {
             const ansText = cleanOptionText(q.correctAnswer || backupAnswer);
+            const tfBooleans = generateRealisticTfBooleans();
             newOptions = [
-              { key: 'a', text: ansText && !ansText.includes('Xem') ? `Kết quả của bài toán là $${ansText}$` : 'Mệnh đề khẳng định ý a', isCorrect: true },
-              { key: 'b', text: 'Mệnh đề phủ định của ý a', isCorrect: false },
-              { key: 'c', text: 'Tập xác định của hàm số thỏa mãn yêu cầu bài toán', isCorrect: true },
-              { key: 'd', text: 'Tập nghiệm của phương trình là tập hợp rỗng', isCorrect: false },
+              { key: 'a', text: ansText && !ansText.includes('Xem') ? `Kết quả của bài toán là $${ansText}$` : 'Mệnh đề khẳng định ý a', isCorrect: tfBooleans[0] },
+              { key: 'b', text: 'Mệnh đề phủ định của ý a', isCorrect: tfBooleans[1] },
+              { key: 'c', text: 'Tập xác định của hàm số thỏa mãn yêu cầu bài toán', isCorrect: tfBooleans[2] },
+              { key: 'd', text: 'Tập nghiệm của phương trình là tập hợp rỗng', isCorrect: tfBooleans[3] },
             ];
           }
         } else {
+          const tfBooleans = generateRealisticTfBooleans();
           newOptions = subKeys.map((k, i) => {
             const existing = (q.options || [])[i] || backupOptions[i];
             return {
               key: k,
               text: existing ? cleanOptionText(existing.text) : `Mệnh đề khẳng định ý ${k}`,
-              isCorrect: existing ? !!existing.isCorrect : i % 2 === 0,
+              isCorrect: existing && typeof existing.isCorrect === 'boolean' ? existing.isCorrect : tfBooleans[i],
             };
           });
         }
@@ -498,7 +640,49 @@ export default function EditorView() {
     // Auto-sort into official Ministry of Education sections (Phần I -> Phần II -> Phần III -> Phần IV)
     const sorted = sortQuestionsBySection(updatedQuestions);
     setQuestions(sorted);
-    showToast(`Đã chuyển câu hỏi sang dạng "${getTypeLabel(normNewType)}" và tự động sắp xếp chuẩn Bộ!`, 'success');
+
+    const qIndex = questions.findIndex((q) => q.id === qId);
+    const convertedQuestion = sorted.find((q) => q.id === qId);
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        const vQuestions = (v.questions || []).map((q: ExamQuestion, idx: number) => {
+          if (q.id === qId || (qIndex >= 0 && idx === qIndex)) {
+            return {
+              ...q,
+              type: normNewType,
+              section: normNewType,
+              points: convertedQuestion?.points ?? q.points,
+              options: convertedQuestion?.options ?? q.options,
+              correctAnswer: convertedQuestion?.correctAnswer ?? q.correctAnswer,
+            };
+          }
+          return q;
+        });
+        return {
+          ...v,
+          questions: sortQuestionsBySection(vQuestions),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+
+    showToast(`Đã chuyển câu hỏi sang dạng "${getTypeLabel(normNewType)}" và đồng bộ chuẩn hoá qua tất cả mã đề!`, 'success');
   };
 
   const handleDeleteQuestion = (qId: number | string) => {
@@ -506,10 +690,40 @@ export default function EditorView() {
       showToast('Vui lòng bật Chế độ chỉnh sửa để xóa câu hỏi', 'warning');
       return;
     }
+    const qIndex = questions.findIndex((q) => q.id === qId);
     const remaining = questions.filter((q) => q.id !== qId);
     const sorted = sortQuestionsBySection(remaining);
     setQuestions(sorted);
-    showToast('Đã xóa câu hỏi và cập nhật lại thứ tự đề thi', 'info');
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        let newVariantQuestions = (v.questions || []).filter((q: ExamQuestion) => q.id !== qId);
+        if (newVariantQuestions.length === (v.questions || []).length && qIndex >= 0 && qIndex < (v.questions || []).length) {
+          newVariantQuestions = (v.questions || []).filter((_: ExamQuestion, idx: number) => idx !== qIndex);
+        }
+        return {
+          ...v,
+          questions: sortQuestionsBySection(newVariantQuestions),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+    showToast('Đã xóa câu hỏi và đồng bộ qua tất cả mã đề', 'info');
   };
 
   const handleAddQuestion = (type: QuestionType = 'multiple_choice') => {
@@ -569,11 +783,40 @@ export default function EditorView() {
 
     const sorted = sortQuestionsBySection([...questions, newQ]);
     setQuestions(sorted);
-    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(normType)}) và tự động sắp xếp vào phần tương ứng`, 'success');
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        const clonedNewQ: ExamQuestion = {
+          ...newQ,
+          id: Date.now() + vIdx * 1000 + Math.floor(Math.random() * 500),
+        };
+        return {
+          ...v,
+          questions: sortQuestionsBySection([...v.questions, clonedNewQ]),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+    showToast(`Đã thêm 1 câu hỏi (${getTypeLabel(normType)}) và đồng bộ vào tất cả các mã đề`, 'success');
   };
 
   // Single Question AI Regeneration
-  const handleRegenerateQuestion = async (q: ExamQuestion) => {
+  const handleRegenerateQuestion = async (q: ExamQuestion, directive?: string) => {
     if (!isEditorMode) {
       showToast('Vui lòng bật Chế độ chỉnh sửa để tạo lại câu hỏi bằng AI', 'warning');
       return;
@@ -586,15 +829,39 @@ export default function EditorView() {
         headers['Authorization'] = `Bearer ${storedToken}`;
       }
 
+      let examTopic = activeExam.subject;
+      if (activeExam.curriculumMetadata) {
+        try {
+          const meta = typeof activeExam.curriculumMetadata === 'string'
+            ? JSON.parse(activeExam.curriculumMetadata)
+            : activeExam.curriculumMetadata;
+          if (meta.topic) examTopic = meta.topic;
+          if (meta.lesson) examTopic = `${meta.topic} - ${meta.lesson}`;
+        } catch {
+          // ignore
+        }
+      }
+
+      // Accumulate previous contents for this question slot to prevent bouncing between X and Y
+      const previousVersions = ((q as any)._previousContents || []) as string[];
+      const updatedHistory = Array.from(new Set([...previousVersions, q.content].filter(Boolean)));
+
       const res = await fetch('/api/v1/exams/regenerate-question', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           subject: activeExam.subject,
           grade: activeExam.grade,
+          term: activeExam.term || 'Học kỳ 1',
           level: q.level,
           type: q.type || 'multiple_choice',
-          currentTopic: q.topic || activeExam.subject,
+          currentTopic: q.topic && q.topic !== activeExam.subject ? q.topic : examTopic,
+          customPrompt: directive ? directive : (activeExam.customPrompt || ''),
+          teacherDirective: directive || undefined,
+          currentQuestionContent: q.content,
+          avoidQuestions: Array.from(
+            new Set([...updatedHistory, ...questions.map((item) => item.content).filter(Boolean)])
+          ),
           existingQuestions: questions.map((item) => item.content).filter(Boolean),
         }),
       });
@@ -602,26 +869,78 @@ export default function EditorView() {
       const data = await res.json();
       if (data.success && data.data?.question) {
         const newQ = data.data.question;
-        setQuestions((prev) =>
-          prev.map((item) =>
-            item.id === q.id
-              ? {
-                  ...item,
-                  content: newQ.content,
-                  type: newQ.type || q.type || 'multiple_choice',
-                  options: (newQ.options || []).map((opt: any) => ({
-                    ...opt,
-                    text: cleanOptionText(opt.text),
-                  })),
-                  correctAnswer: newQ.correctAnswer,
-                  explanation: newQ.explanation,
-                  level: newQ.level || item.level,
-                  points: newQ.points || item.points,
-                }
-              : item
-          )
+        const normType = newQ.type || q.type || 'multiple_choice';
+        const updatedList = questions.map((item) =>
+          item.id === q.id
+            ? {
+                ...item,
+                _previousContents: Array.from(new Set([...updatedHistory, newQ.content])),
+                content: newQ.content,
+                type: normType,
+                section: normType,
+                options: (newQ.options || []).map((opt: any) => ({
+                  ...opt,
+                  text: cleanOptionText(opt.text),
+                })),
+                correctAnswer: newQ.correctAnswer,
+                explanation: newQ.explanation,
+                level: newQ.level || item.level,
+                points: newQ.points || item.points,
+              }
+            : item
         );
-        showToast(`Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI`, 'success');
+        const sorted = sortQuestionsBySection(updatedList);
+        setQuestions(sorted);
+
+        const qIndex = questions.findIndex((item) => item.id === q.id);
+        const replacedItem = sorted.find((item) => item.id === q.id);
+
+        if (variants && variants.length > 0) {
+          const updatedVariants = variants.map((v, vIdx) => {
+            if (vIdx === selectedVariantIdx) {
+              return { ...v, questions: sorted };
+            }
+            const vQuestions = (v.questions || []).map((vQ: ExamQuestion, idx: number) => {
+              if (vQ.id === q.id || (qIndex >= 0 && idx === qIndex)) {
+                return {
+                  ...vQ,
+                  content: replacedItem?.content ?? newQ.content,
+                  type: normType,
+                  section: normType,
+                  options: replacedItem?.options ?? newQ.options,
+                  correctAnswer: replacedItem?.correctAnswer ?? newQ.correctAnswer,
+                  explanation: replacedItem?.explanation ?? newQ.explanation,
+                  level: replacedItem?.level ?? newQ.level,
+                  points: replacedItem?.points ?? newQ.points,
+                };
+              }
+              return vQ;
+            });
+            return {
+              ...v,
+              questions: sortQuestionsBySection(vQuestions),
+            };
+          });
+          setVariants(updatedVariants);
+          if (activeExam?.id) {
+            updateExam(activeExam.id, {
+              variants: updatedVariants,
+              questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+              questionsCount: sorted.length,
+            });
+          }
+        } else if (activeExam?.id) {
+          updateExam(activeExam.id, {
+            questions: sorted,
+            questionsCount: sorted.length,
+          });
+        }
+        showToast(
+          directive
+            ? `Đã đổi câu hỏi ${q.order || ''} theo yêu cầu: "${directive.slice(0, 30)}${directive.length > 30 ? '...' : ''}"`
+            : `Đã tạo mới câu hỏi số ${q.order || q.id} bằng AI và đồng bộ các mã đề!`,
+          'success'
+        );
       } else {
         showToast('Không thể tạo lại câu hỏi AI', 'error');
       }
@@ -684,38 +1003,109 @@ export default function EditorView() {
       });
 
       const data = await res.json();
-      if (data.success && data.data?.exam) {
-        const generated = data.data.exam;
-        const newQuestions: ExamQuestion[] = (generated.questions || []).map((q: any, i: number) => ({
-          id: Date.now() + i,
-          order: `Câu ${String(i + 1).padStart(2, '0')}`,
-          level: q.level || 'Thông hiểu',
-          levelClass:
-            q.level === 'Nhận biết'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : q.level === 'Thông hiểu'
-              ? 'bg-blue-50 text-blue-700 border-blue-200'
-              : q.level === 'Vận dụng'
-              ? 'bg-amber-50 text-amber-700 border-amber-200'
-              : 'bg-rose-50 text-rose-700 border-rose-200',
-          topic: activeExam.subject,
-          content: q.content,
-          options: (q.options || []).map((opt: any, optIdx: number) => {
-            const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
-            const optText = typeof opt === 'string' ? opt : opt.text || '';
-            return {
-              key,
-              text: cleanOptionText(optText),
-              isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
-            };
-          }),
-          points: q.points || 0.25,
-          correctAnswer: q.correctAnswer || 'A',
-          explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
-        }));
+      const generated = data.data?.exam || data.data?.examData;
+      if (data.success && generated) {
+        const rawList = generated.questions || [];
+        const newQuestions: ExamQuestion[] = rawList.map((q: any, i: number) => {
+          const rawType = String(q.type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
+          const qType: QuestionType = rawType.includes('true') || rawType.includes('dung')
+            ? 'true_false'
+            : rawType.includes('short') || rawType.includes('ngan')
+            ? 'short_answer'
+            : rawType.includes('essay') || rawType.includes('luan')
+            ? 'essay'
+            : 'multiple_choice';
 
-        setQuestions(newQuestions);
-        showToast(`Đã tạo lại thành công toàn bộ ${newQuestions.length} câu hỏi mới bằng AI!`, 'success');
+          const levelStr = q.level || 'Thông hiểu';
+          let formattedOptions: any[] = [];
+          if (qType === 'true_false') {
+            const subKeys = ['a', 'b', 'c', 'd'];
+            formattedOptions = (q.options || ['Mệnh đề a', 'Mệnh đề b', 'Mệnh đề c', 'Mệnh đề d']).map((opt: any, optIdx: number) => {
+              const key = subKeys[optIdx] || String(optIdx);
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const isCorrect = q.correctAnswer
+                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                : optIdx % 2 === 0;
+              return { key, text: cleanText || textVal, isCorrect };
+            });
+          } else if (qType === 'multiple_choice') {
+            formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
+              const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
+              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
+              const cleanText = textVal.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              return {
+                key,
+                text: cleanText || textVal,
+                isCorrect: (q.correctAnswer || 'A').toUpperCase() === key,
+              };
+            });
+          }
+
+          let finalAnswer = q.correctAnswer || 'A';
+          if (qType === 'short_answer') {
+            finalAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+          } else if (qType === 'essay') {
+            finalAnswer = q.correctAnswer && !q.correctAnswer.includes('Xem') ? q.correctAnswer : 'Xem hướng dẫn chấm';
+          } else if (qType === 'true_false') {
+            finalAnswer = q.correctAnswer || 'a: Đ, b: S, c: Đ, d: S';
+          }
+
+          return {
+            id: Date.now() + i,
+            order: `Câu ${String(i + 1).padStart(2, '0')}`,
+            type: qType,
+            section: qType,
+            level: levelStr,
+            levelClass:
+              levelStr === 'Nhận biết'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : levelStr === 'Thông hiểu'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : levelStr === 'Vận dụng'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200',
+            topic: activeExam.subject,
+            content: q.content,
+            options: formattedOptions,
+            points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
+            correctAnswer: finalAnswer,
+            explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+          };
+        });
+
+        const sorted = sortQuestionsBySection(newQuestions);
+        sorted.forEach((item, idx) => {
+          item.order = `Câu ${String(idx + 1).padStart(2, '0')}`;
+        });
+        setQuestions(sorted);
+
+        let updatedVariants: any[] | undefined = undefined;
+        if (variants && variants.length > 1) {
+          updatedVariants = generateExamVariants(
+            sorted,
+            title || activeExam?.title || 'Đề thi',
+            {
+              codeCount: variants.length,
+              shuffleOrder: true,
+              shuffleValues: false,
+              baseCode: 101,
+            }
+          );
+          setVariants(updatedVariants);
+        } else if (variants && variants.length === 1) {
+          updatedVariants = [{ ...variants[0], questions: sorted }];
+          setVariants(updatedVariants);
+        }
+
+        if (activeExam?.id) {
+          updateExam(activeExam.id, {
+            questions: sorted,
+            questionsCount: sorted.length,
+            variants: updatedVariants,
+          });
+        }
+        showToast(`Đã tạo lại thành công toàn bộ ${sorted.length} câu hỏi mới bằng AI!`, 'success');
       } else {
         showToast(data.message || 'Lỗi khi tạo lại toàn bộ đề thi', 'error');
       }
@@ -727,17 +1117,25 @@ export default function EditorView() {
   };
 
   const handleSave = () => {
+    const updatedVariants = variants.length > 0
+      ? variants.map((v, i) => (i === selectedVariantIdx ? { ...v, code: examCode, questions } : v))
+      : undefined;
+
+    const baseQuestions = updatedVariants && updatedVariants[0] ? updatedVariants[0].questions : questions;
+    const baseCode = updatedVariants && updatedVariants[0] ? updatedVariants[0].code : examCode;
+
     updateExam(activeExam.id, {
       title,
-      code: examCode,
+      code: baseCode,
       department,
       schoolName,
       sessionTitle,
       academicYear,
       sectionTitles,
       sectionDescriptions,
-      questions,
-      questionsCount: questions.length,
+      questions: baseQuestions,
+      questionsCount: baseQuestions.length,
+      variants: updatedVariants,
       updatedAt: 'Vừa lưu',
     });
     showToast('Đã lưu tất cả thay đổi bộ đề thi', 'success');
@@ -755,6 +1153,9 @@ export default function EditorView() {
     sectionDescriptions,
     questions,
     questionsCount: questions.length,
+    variants: variants.length > 0
+      ? variants.map((v, i) => (i === selectedVariantIdx ? { ...v, code: examCode, questions } : v))
+      : undefined,
   };
 
   const handleExportDocx = async () => {
@@ -1193,6 +1594,17 @@ export default function EditorView() {
             </button>
           )}
 
+          {/* Shuffle Exam Variants Button */}
+          <button
+            type="button"
+            onClick={() => setIsShuffleModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+            title="Tạo nhiều mã đề (101, 102, 103, 104...) bằng cách xáo trộn câu hỏi, phương án và số liệu"
+          >
+            <span className="material-symbols-outlined text-sm text-amber-600 dark:text-amber-400">shuffle</span>
+            <span>{variants && variants.length > 1 ? `Trộn đề (${variants.length} mã)` : 'Trộn đề phòng thi'}</span>
+          </button>
+
           {/* Save Button */}
           <button
             type="button"
@@ -1242,6 +1654,50 @@ export default function EditorView() {
             <span className="material-symbols-outlined text-xs">lock</span>
             <span>Khóa / Xong</span>
           </button>
+        </div>
+      )}
+
+      {/* Multi-Code Exam Switcher Tabs */}
+      {variants && variants.length > 1 && (
+        <div className="no-print bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs shrink-0">
+              <span className="material-symbols-outlined text-base">shuffle</span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <span>BỘ MÃ ĐỀ THI TRỘN CHỐNG GIAN LẬN</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">
+                  {variants.length} Mã đề
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Đang xem: <strong>Mã {variants[selectedVariantIdx]?.code || 101 + selectedVariantIdx}</strong>. Nhấp vào các tab dưới để chuyển mã đề cần xem hoặc in ấn riêng.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-stretch sm:self-auto overflow-x-auto">
+            {variants.map((v, idx) => {
+              const isSelected = idx === selectedVariantIdx;
+              return (
+                <button
+                  key={v.code || idx}
+                  type="button"
+                  onClick={() => handleSelectVariant(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 shrink-0 ${
+                    isSelected
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-blue-200/50 dark:border-blue-900/50'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-600 dark:bg-blue-400 animate-pulse' : 'bg-slate-400'}`}></span>
+                  <span>Mã {v.code}</span>
+                  {idx === 0 && <span className="text-[9px] font-sans text-slate-400 font-normal">(Gốc)</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1453,6 +1909,23 @@ export default function EditorView() {
           CÂU HỎI
         </div>
 
+        {questions.length === 0 && (
+          <div className="no-print p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 my-4">
+            <span className="material-symbols-outlined text-4xl text-amber-500 mb-2">warning</span>
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Đề thi này chưa có nội dung câu hỏi</h4>
+            <p className="text-xs text-slate-400 mt-1 mb-4">
+              Bộ đề này có thể đã bị gián đoạn trong phiên làm việc cũ hoặc là bản tạo chưa hoàn tất. Vui lòng quay lại Trang chủ để chọn đề thi đã được AI sinh hoàn chỉnh.
+            </p>
+            <button
+              type="button"
+              onClick={() => setCurrentRoute('#dashboard')}
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              Về Trang chủ / Danh sách đề thi
+            </button>
+          </div>
+        )}
+
         {questions.map((q, qIndex) => {
           const isRegenThis = regeneratingQId === q.id;
           const isEditing = editingQId === q.id;
@@ -1603,12 +2076,15 @@ export default function EditorView() {
                     {/* AI Regenerate Single Question */}
                     <button
                       type="button"
-                      onClick={() => handleRegenerateQuestion(q)}
+                      onClick={() => {
+                        setTargetRegenQuestion(q);
+                        setRegenPromptInput('');
+                      }}
                       disabled={isRegenThis}
-                      className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                      className={`px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
                         isRegenThis ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                      title="Tạo lại câu hỏi này bằng AI"
+                      title="Nhập yêu cầu và tạo lại câu hỏi này bằng AI"
                     >
                       <span className={`material-symbols-outlined text-xs text-indigo-600 ${isRegenThis ? 'animate-spin' : ''}`}>
                         {isRegenThis ? 'progress_activity' : 'auto_awesome'}
@@ -1888,7 +2364,10 @@ export default function EditorView() {
                     <strong className="font-bold text-blue-600 dark:text-blue-400 mr-2 text-sm md:text-base">
                       Câu {qIndex + 1}.
                     </strong>
-                    <MathText content={q.content} inline />
+                    <MathText
+                      content={q.content}
+                      inline={!q.content?.includes('```') && !q.content?.includes('\n')}
+                    />
                   </div>
 
                   {/* 1. TRẮC NGHIỆM 4 LỰA CHỌN */}
@@ -2612,6 +3091,219 @@ export default function EditorView() {
               ✅ <strong>Số trang:</strong> Hệ thống đã tự động tích hợp số trang chuẩn Bộ GD&ĐT (<em>Trang 1 / 2</em>) vào góc dưới của đề. Bỏ tích ô trên sẽ xóa sạch link web và ngày giờ mà <strong>vẫn giữ nguyên số trang</strong>!
             </div>
           </div>
+        </div>
+      </PortalModal>
+
+      {/* Modal Cấu hình Trộn Đề Phòng Thi */}
+      <PortalModal
+        isOpen={isShuffleModalOpen}
+        onClose={() => setIsShuffleModalOpen(false)}
+        title="Trộn đề thi phòng thi (Nhiều mã đề)"
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setIsShuffleModalOpen(false)}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={isGeneratingAiVariants}
+              onClick={handlePerformShuffle}
+              className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            >
+              {isGeneratingAiVariants ? (
+                <>
+                  <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  <span>AI đang giải lại đáp án...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">shuffle</span>
+                  <span>Tạo các mã đề</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs text-slate-700 dark:text-slate-300">
+          <p className="text-slate-500 leading-relaxed">
+            Hệ thống sẽ giữ nguyên ma trận và các phần (I, II, III, IV), đồng thời tạo ra các biến thể đề thi độc lập để phát cho thí sinh trong phòng thi nhằm chống gian lận.
+          </p>
+
+          <div className="space-y-2">
+            <label className="font-bold text-slate-800 dark:text-slate-200 block">
+              Số lượng mã đề cần tạo:
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[1, 2, 4, 8].map((cnt) => (
+                <button
+                  key={cnt}
+                  type="button"
+                  onClick={() => setShuffleCodesCount(cnt)}
+                  className={`py-2 rounded-xl font-bold font-mono text-xs border transition-all ${
+                    shuffleCodesCount === cnt
+                      ? 'bg-amber-500 border-amber-600 text-white shadow-xs ring-2 ring-amber-300 dark:ring-amber-800'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {cnt} mã
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Các mã đề tạo ra sẽ có số hiệu: {Array.from({ length: shuffleCodesCount }, (_, i) => 101 + i).join(', ')}
+            </p>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+            <label className="font-bold text-slate-800 dark:text-slate-200 block">
+              Tùy chọn xáo trộn độc lập:
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={shuffleOrderOpt}
+                onChange={(e) => setShuffleOrderOpt(e.target.checked)}
+                className="mt-0.5 rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
+              />
+              <div>
+                <div className="font-bold text-slate-800 dark:text-slate-200">
+                  Xáo thứ tự câu hỏi & phương án A, B, C, D
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Đảo vị trí câu hỏi trong từng phần và tráo thứ tự phương án trắc nghiệm, tự động cập nhật lại đáp án đúng.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={shuffleValuesOpt}
+                onChange={(e) => setShuffleValuesOpt(e.target.checked)}
+                className="mt-0.5 rounded text-amber-500 focus:ring-amber-400 w-4 h-4"
+              />
+              <div>
+                <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <span>Đổi thông số số liệu bằng AI (Tự động giải & tính lại đáp án)</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">AI Tương đương</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  AI giữ nguyên dạng bài từng câu của đề gốc, tạo bộ số liệu mới và tự động tính toán lại 100% đáp án đúng, phương án sai và lời giải chi tiết cho từng mã đề. Đồng bộ 1-1 ma trận giữa các mã đề!
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </PortalModal>
+
+      {/* Modal Nhập Yêu Cầu Đổi Câu Hỏi Bằng AI */}
+      <PortalModal
+        isOpen={Boolean(targetRegenQuestion)}
+        onClose={() => {
+          if (!regeneratingQId) {
+            setTargetRegenQuestion(null);
+            setRegenPromptInput('');
+          }
+        }}
+        title={`Đổi câu hỏi bằng AI ${targetRegenQuestion ? `(Câu ${targetRegenQuestion.order || targetRegenQuestion.id})` : ''}`}
+        maxWidth="max-w-md"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              type="button"
+              disabled={Boolean(regeneratingQId)}
+              onClick={() => {
+                setTargetRegenQuestion(null);
+                setRegenPromptInput('');
+              }}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(regeneratingQId)}
+              onClick={async () => {
+                if (!targetRegenQuestion) return;
+                const qToRegen = targetRegenQuestion;
+                const directive = regenPromptInput.trim();
+                setTargetRegenQuestion(null);
+                await handleRegenerateQuestion(qToRegen, directive);
+              }}
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>Bắt đầu Sinh lại (AI)</span>
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5 text-xs text-slate-700 dark:text-slate-300">
+          {targetRegenQuestion && (
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {getTypeLabel(targetRegenQuestion.type)} • Mức độ: {targetRegenQuestion.level || 'Thông hiểu'}
+                </span>
+                <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">
+                  {targetRegenQuestion.points !== undefined ? `${targetRegenQuestion.points} điểm` : '0.25 điểm'}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-slate-600 dark:text-slate-400 italic">
+                &ldquo;{targetRegenQuestion.content.replace(/<[^>]*>/g, '').slice(0, 150)}...&rdquo;
+              </p>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+              Ý muốn / Yêu cầu cụ thể cho AI (Tùy chọn):
+            </label>
+            <textarea
+              value={regenPromptInput}
+              onChange={(e) => setRegenPromptInput(e.target.value)}
+              placeholder="VD: Đổi sang bài toán ứng dụng thực tế, thay đổi số liệu, đổi sang dạng tìm tiệm cận, nâng độ khó một chút..."
+              rows={3}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none transition-all"
+            />
+          </div>
+
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+              Gợi ý nhanh yêu cầu:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                'Đổi sang bài toán thực tế',
+                'Đổi số liệu và giữ nguyên dạng',
+                'Dễ hơn một chút',
+                'Nâng cao độ khó',
+                'Đổi sang dạng khác cùng bài học',
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() =>
+                    setRegenPromptInput((prev) => (prev ? `${prev}, ${chip.toLowerCase()}` : chip))
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[11px] transition-colors cursor-pointer"
+                >
+                  + {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 italic">
+            * Nếu để trống, AI sẽ tự động sinh câu hỏi tương đương mới (cùng bài học, ma trận và mức độ) khác hoàn toàn câu cũ.
+          </p>
         </div>
       </PortalModal>
     </div>

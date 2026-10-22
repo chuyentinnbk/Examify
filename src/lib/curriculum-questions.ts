@@ -34,6 +34,9 @@ export function parseGrade(gradeStr: string): ParsedGrade {
   if (str.includes('tiểu học') || str.includes('primary')) return { gradeNum: 1, levelCategory: 'PRIMARY', displayName: 'Tiểu học' };
   if (str.includes('thcs') || str.includes('trung học cơ sở') || str.includes('secondary')) return { gradeNum: 8, levelCategory: 'LOWER_SEC', displayName: 'THCS' };
   if (str.includes('thpt') || str.includes('cấp 3') || str.includes('high')) return { gradeNum: 10, levelCategory: 'UPPER_SEC', displayName: 'THPT' };
+  if (str.includes('tùy chỉnh') || str.includes('custom') || str.includes('tự do') || str.includes('chuyên')) {
+    return { gradeNum: null, levelCategory: 'OTHER', displayName: 'Tùy chỉnh' };
+  }
 
   return { gradeNum: null, levelCategory: 'OTHER', displayName: gradeStr };
 }
@@ -628,7 +631,7 @@ export const CURRICULUM_QUESTION_BANK: CurriculumQuestionTemplate[] = [
   },
 
   // ==========================================
-  // --- TIN HỌC ---
+  // --- TIN HỌC - LỚP 12 (GDPT 2018: CSDL, SQL, MẠNG & AI) ---
   // ==========================================
   {
     subject: 'Tin học',
@@ -648,17 +651,329 @@ export const CURRICULUM_QUESTION_BANK: CurriculumQuestionTemplate[] = [
   {
     subject: 'Tin học',
     grade: 'Lớp 12',
-    level: 'Thông hiểu',
-    topic: 'Lập trình & Giải thuật',
-    content: 'Độ phức tạp thời gian trung bình của thuật toán Tìm kiếm Nhị phân (Binary Search) trên mảng đã sắp xếp gồm n phần tử là:',
+    level: 'Nhận biết',
+    topic: 'Khóa trong CSDL Quan hệ',
+    content: 'Trong cơ sở dữ liệu quan hệ, thuộc tính hoặc tập thuộc tính dùng để phân biệt duy nhất từng bản ghi trong bảng và không được phép chứa giá trị rỗng (NULL) được gọi là:',
     options: [
-      { key: 'A', text: 'O(log n)', isCorrect: true },
-      { key: 'B', text: 'O(n)', isCorrect: false },
-      { key: 'C', text: 'O(n²)', isCorrect: false },
-      { key: 'D', text: 'O(1)', isCorrect: false },
+      { key: 'A', text: 'Khóa chính (Primary Key)', isCorrect: true },
+      { key: 'B', text: 'Khóa ngoại (Foreign Key)', isCorrect: false },
+      { key: 'C', text: 'Chỉ mục (Index)', isCorrect: false },
+      { key: 'D', text: 'Khóa phụ (Secondary Key)', isCorrect: false },
     ],
     correctAnswer: 'A',
-    explanation: 'Sau mỗi bước so sánh, không gian tìm kiếm giảm đi một nửa, do đó số bước thực hiện tối đa là log2(n), tức O(log n).',
+    explanation: 'Khóa chính (Primary Key) xác định tính duy nhất của mỗi bản ghi trong bảng và tuân thủ ràng buộc thực thể (Entity Integrity), không nhận giá trị NULL.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 12',
+    level: 'Thông hiểu',
+    topic: 'Ngôn ngữ Truy vấn SQL',
+    content: 'Trong câu lệnh SQL chuẩn, mệnh đề nào sau đây được sử dụng để chỉ định điều kiện lọc các bản ghi cần lấy ra từ bảng dữ liệu?',
+    options: [
+      { key: 'A', text: 'WHERE', isCorrect: true },
+      { key: 'B', text: 'FROM', isCorrect: false },
+      { key: 'C', text: 'ORDER BY', isCorrect: false },
+      { key: 'D', text: 'GROUP BY', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Mệnh đề WHERE được dùng để chỉ định điều kiện lọc bản ghi (ví dụ: WHERE DiemTB >= 8.0).',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 12',
+    level: 'Thông hiểu',
+    topic: 'Mạng máy tính & Internet',
+    content: 'Hệ thống phân giải tên miền (DNS - Domain Name System) trên Internet có vai trò chủ yếu là gì?',
+    options: [
+      { key: 'A', text: 'Chuyển đổi tên miền dạng ký tự dễ nhớ sang địa chỉ IP dạng số', isCorrect: true },
+      { key: 'B', text: 'Định tuyến các gói tin giữa các mạng cục bộ LAN', isCorrect: false },
+      { key: 'C', text: 'Cung cấp năng lượng điện cho các thiết bị mạng switch và router', isCorrect: false },
+      { key: 'D', text: 'Mã hóa tự động nội dung trang web khi truyền trên mạng', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Dịch vụ DNS có chức năng ánh xạ tên miền dễ nhớ (ví dụ: moet.gov.vn) thành địa chỉ IP số học (ví dụ: 103.x.x.x) để máy tính kết nối.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 12',
+    level: 'Vận dụng',
+    topic: 'Truy vấn Dữ liệu SQL',
+    content: 'Cho bảng `HOC_SINH` gồm các trường `MaHS`, `HoTen`, `DiemTB`. Để lấy họ tên và điểm trung bình của những học sinh có điểm trung bình từ 8.0 trở lên, đồng thời sắp xếp giảm dần theo điểm trung bình, câu lệnh SQL nào sau đây là đúng?',
+    options: [
+      { key: 'A', text: 'SELECT HoTen, DiemTB FROM HOC_SINH WHERE DiemTB >= 8.0 ORDER BY DiemTB DESC;', isCorrect: true },
+      { key: 'B', text: 'SELECT HoTen, DiemTB FROM HOC_SINH WHERE DiemTB > 8.0 SORT BY DiemTB ASC;', isCorrect: false },
+      { key: 'C', text: 'GET HoTen, DiemTB IN HOC_SINH FILTER DiemTB >= 8.0 ORDER BY DiemTB;', isCorrect: false },
+      { key: 'D', text: 'SELECT ALL FROM HOC_SINH WHERE DiemTB = 8.0 ORDER BY DESC;', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Cú pháp chuẩn SQL: SELECT các cột FROM tên_bảng WHERE điều_kiện ORDER BY tên_cột DESC (giảm dần).',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 12',
+    level: 'Vận dụng cao',
+    topic: 'Thiết kế CSDL Quan hệ & Khóa ngoại',
+    content: 'Trong CSDL quản lý học sinh, có bảng `LOP_HOC` (`MaLop`, `TenLop`) với `MaLop` là khóa chính, và bảng `HOC_SINH` (`MaHS`, `HoTen`, `MaLop`) với `MaHS` là khóa chính. Mối quan hệ giữa bảng `LOP_HOC` và bảng `HOC_SINH` được liên kết thông qua trường nào đóng vai trò gì?',
+    options: [
+      { key: 'A', text: 'Trường `MaLop` trong bảng `HOC_SINH` đóng vai trò là Khóa ngoại (Foreign Key) tham chiếu tới `MaLop` của bảng `LOP_HOC`', isCorrect: true },
+      { key: 'B', text: 'Trường `MaHS` trong bảng `LOP_HOC` đóng vai trò là Khóa chính', isCorrect: false },
+      { key: 'C', text: 'Cả hai bảng đều không có khóa ngoại vì có chung tên trường `MaLop`', isCorrect: false },
+      { key: 'D', text: 'Trường `TenLop` là khóa ngoại của bảng `HOC_SINH`', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Mỗi học sinh thuộc một lớp học, do đó trường `MaLop` trong bảng `HOC_SINH` là khóa ngoại tham chiếu đến khóa chính `MaLop` của bảng `LOP_HOC` (quan hệ 1-nhiều).',
+  },
+
+  // ==========================================
+  // --- TIN HỌC - LỚP 11 (GDPT 2018: PYTHON HÀM, XÂU, TỆP, TÌM KIẾM & SẮP XẾP) ---
+  // ==========================================
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Nhận biết',
+    topic: 'Cú pháp Lập trình & Kiểu dữ liệu',
+    content: 'Trong ngôn ngữ lập trình Python, kiểu dữ liệu nào sau đây là kiểu dữ liệu bất biến (immutable)?',
+    options: [
+      { key: 'A', text: 'tuple', isCorrect: true },
+      { key: 'B', text: 'list', isCorrect: false },
+      { key: 'C', text: 'dict', isCorrect: false },
+      { key: 'D', text: 'set', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Tuple và chuỗi string trong Python là các đối tượng bất biến (immutable), không thể thay đổi giá trị sau khi khởi tạo.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Nhận biết',
+    topic: 'Chương trình con & Hàm trong Python',
+    content: 'Trong ngôn ngữ lập trình Python, từ khóa nào sau đây được sử dụng để bắt đầu khai báo một hàm?',
+    options: [
+      { key: 'A', text: 'def', isCorrect: true },
+      { key: 'B', text: 'function', isCorrect: false },
+      { key: 'C', text: 'func', isCorrect: false },
+      { key: 'D', text: 'void', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Python sử dụng từ khóa `def` để định nghĩa một hàm (Function): `def ten_ham(tham_so):`.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Thông hiểu',
+    topic: 'Xử lý Xâu Ký tự (String Slicing)',
+    content: 'Cho xâu ký tự trong Python `s = "TINHOC11"`. Kết quả của biểu thức cắt lát `s[3:6]` là:',
+    options: [
+      { key: 'A', text: '"HOC"', isCorrect: true },
+      { key: 'B', text: '"INH"', isCorrect: false },
+      { key: 'C', text: '"HOC1"', isCorrect: false },
+      { key: 'D', text: '"NHO"', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Cắt lát `s[3:6]` lấy các ký tự từ chỉ số 3 đến chỉ số 5 (bỏ chỉ số 6): vị trí 3 là \'H\', 4 là \'O\', 5 là \'C\', thu được chuỗi "HOC".',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Thông hiểu',
+    topic: 'Thao tác với Tệp Văn bản',
+    content: 'Trong Python, để mở tệp tin văn bản `dulieu.txt` với mục đích chỉ đọc dữ liệu, chế độ mở tệp nào sau đây là chính xác?',
+    options: [
+      { key: 'A', text: 'f = open("dulieu.txt", "r")', isCorrect: true },
+      { key: 'B', text: 'f = open("dulieu.txt", "w")', isCorrect: false },
+      { key: 'C', text: 'f = open("dulieu.txt", "a")', isCorrect: false },
+      { key: 'D', text: 'f = open("dulieu.txt", "x")', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Chế độ "r" (read) là chế độ mặc định dùng để đọc dữ liệu từ tệp tin văn bản có sẵn.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Vận dụng',
+    topic: 'Thuật toán Tìm kiếm Tuần tự (Linear Search)',
+    content: 'Cho hàm Python tìm kiếm một giá trị $k$ trong danh sách $A$:\n```python\ndef tim_kiem(A, k):\n    for i in range(len(A)):\n        if A[i] == k:\n            return i\n    return -1\n```\nKhi gọi `tim_kiem([12, 45, 23, 67, 89], 23)`, giá trị trả về của hàm là bao nhiêu?',
+    options: [
+      { key: 'A', text: '2', isCorrect: true },
+      { key: 'B', text: '3', isCorrect: false },
+      { key: 'C', text: '23', isCorrect: false },
+      { key: 'D', text: '-1', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Giá trị 23 xuất hiện tại chỉ số i = 2 trong danh sách (A[0] = 12, A[1] = 45, A[2] = 23). Hàm lập tức trả về chỉ số 2.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 11',
+    level: 'Vận dụng cao',
+    topic: 'Thuật toán Sắp xếp Cơ bản (Bubble Sort)',
+    content: 'Cho dãy số $A = [5, 1, 4, 2, 8]$. Áp dụng thuật toán sắp xếp nổi bọt (Bubble Sort) tăng dần, sau lượt duyệt so sánh đổi chỗ các cặp liền kề đầu tiên (từ trái sang phải), dãy số trở thành:',
+    options: [
+      { key: 'A', text: '[1, 4, 2, 5, 8]', isCorrect: true },
+      { key: 'B', text: '[1, 2, 4, 5, 8]', isCorrect: false },
+      { key: 'C', text: '[5, 1, 2, 4, 8]', isCorrect: false },
+      { key: 'D', text: '[1, 5, 4, 2, 8]', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Các bước đổi chỗ ở lượt 1: (5,1)->[1,5,4,2,8], (5,4)->[1,4,5,2,8], (5,2)->[1,4,2,5,8], (5,8) không đổi -> Dãy kết thúc lượt 1 là [1, 4, 2, 5, 8].',
+  },
+
+  // ==========================================
+  // --- TIN HỌC - LỚP 10 (GDPT 2018: PYTHON CƠ BẢN & HỆ THỐNG) ---
+  // ==========================================
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Nhận biết',
+    topic: 'Biểu diễn Dữ liệu & Kiểu dữ liệu Python',
+    content: 'Trong ngôn ngữ lập trình Python, kết quả của câu lệnh `type(2025)` trả về kiểu dữ liệu nào?',
+    options: [
+      { key: 'A', text: "<class 'int'>", isCorrect: true },
+      { key: 'B', text: "<class 'float'>", isCorrect: false },
+      { key: 'C', text: "<class 'str'>", isCorrect: false },
+      { key: 'D', text: "<class 'bool'>", isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Số nguyên 2025 thuộc kiểu dữ liệu `int` trong Python.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Nhận biết',
+    topic: 'Toán tử Số học trong Python',
+    content: 'Trong Python, phép toán nào sau đây được sử dụng để lấy phần dư của phép chia hai số nguyên?',
+    options: [
+      { key: 'A', text: '%', isCorrect: true },
+      { key: 'B', text: '//', isCorrect: false },
+      { key: 'C', text: '/', isCorrect: false },
+      { key: 'D', text: '**', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Toán tử `%` chia lấy dư (Modulus), toán tử `//` chia lấy phần nguyên, toán tử `/` chia thực, toán tử `**` lũy thừa.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Thông hiểu',
+    topic: 'Hệ nhị phân & Biểu diễn thông tin',
+    content: 'Số nhị phân $10110_2$ khi chuyển sang hệ thập phân (hệ 10) có giá trị bằng bao nhiêu?',
+    options: [
+      { key: 'A', text: '22', isCorrect: true },
+      { key: 'B', text: '20', isCorrect: false },
+      { key: 'C', text: '24', isCorrect: false },
+      { key: 'D', text: '26', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: '$10110_2 = 1 \\times 2^4 + 0 \\times 2^3 + 1 \\times 2^2 + 1 \\times 2^1 + 0 \\times 2^0 = 16 + 0 + 4 + 2 + 0 = 22$.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Thông hiểu',
+    topic: 'Cấu trúc Lặp for & Hàm range()',
+    content: 'Đoạn mã Python sau in ra màn hình giá trị nào?\n```python\ns = 0\nfor i in range(1, 5):\n    s += i\nprint(s)\n```',
+    options: [
+      { key: 'A', text: '10', isCorrect: true },
+      { key: 'B', text: '15', isCorrect: false },
+      { key: 'C', text: '4', isCorrect: false },
+      { key: 'D', text: '5', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: '`range(1, 5)` lặp với các giá trị i = 1, 2, 3, 4. Tổng s = 1 + 2 + 3 + 4 = 10.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Vận dụng',
+    topic: 'Cấu trúc Rẽ nhánh & Danh sách',
+    content: 'Cho danh sách số nguyên `a = [3, 8, 5, 12, 7, 10]`. Đoạn mã Python nào sau đây đếm chính xác số lượng các phần tử là số chẵn trong danh sách `a`?',
+    options: [
+      { key: 'A', text: 'dem = 0\nfor x in a:\n    if x % 2 == 0:\n        dem += 1', isCorrect: true },
+      { key: 'B', text: 'dem = 0\nfor x in a:\n    if x % 2 != 0:\n        dem += 1', isCorrect: false },
+      { key: 'C', text: 'dem = 0\nfor x in a:\n    if x // 2 == 0:\n        dem += 1', isCorrect: false },
+      { key: 'D', text: 'dem = len(a) % 2', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Một số là số chẵn khi chia cho 2 dư 0 (`x % 2 == 0`). Đoạn mã duyệt qua từng phần tử và tăng biến đếm khi điều kiện thỏa mãn.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Lớp 10',
+    level: 'Vận dụng cao',
+    topic: 'Thuật toán Cơ bản trên Mảng (Tìm Max)',
+    content: 'Cho danh sách các số thực khác rỗng `ds`. Thuật toán tìm giá trị lớn nhất trong danh sách với một lượt duyệt tuần tự có cấu trúc đúng nhất là:',
+    options: [
+      { key: 'A', text: 'max_val = ds[0]\nfor x in ds:\n    if x > max_val:\n        max_val = x', isCorrect: true },
+      { key: 'B', text: 'max_val = 0\nfor x in ds:\n    if x < max_val:\n        max_val = x', isCorrect: false },
+      { key: 'C', text: 'max_val = ds[-1]\nfor x in ds:\n    max_val = x', isCorrect: false },
+      { key: 'D', text: 'max_val = sum(ds) / len(ds)', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Gán phần tử đầu tiên làm giá trị lớn nhất tạm thời `max_val = ds[0]`, sau đó duyệt qua toàn bộ danh sách, nếu gặp phần tử nào lớn hơn thì cập nhật `max_val`.',
+  },
+
+  // ==========================================
+  // --- TIN HỌC - TÙY CHỈNH / CHUYÊN ĐỀ HSG / THUẬT TOÁN CP ---
+  // ==========================================
+  {
+    subject: 'Tin học',
+    grade: 'Tùy chỉnh',
+    level: 'Nhận biết',
+    topic: 'Độ phức tạp Thuật toán',
+    content: 'Độ phức tạp thời gian trung bình của thuật toán Tìm kiếm Nhị phân (Binary Search) trên mảng đã sắp xếp gồm $n$ phần tử là:',
+    options: [
+      { key: 'A', text: '$O(\\log n)$', isCorrect: true },
+      { key: 'B', text: '$O(n)$', isCorrect: false },
+      { key: 'C', text: '$O(n^2)$', isCorrect: false },
+      { key: 'D', text: '$O(1)$', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Sau mỗi bước so sánh, không gian tìm kiếm giảm đi một nửa, do đó số bước thực hiện tối đa là $\\log_2(n)$, tức $O(\\log n)$.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Tùy chỉnh',
+    level: 'Thông hiểu',
+    topic: 'Thuật toán Quy hoạch động & Tìm kiếm Nhị phân (LIS)',
+    content: 'Cho bài toán dãy con tăng dài nhất (LIS) gồm $n$ phần tử ($n \\le 10^5$). Cách tiếp cận tối ưu kết hợp Tìm kiếm Nhị phân (dùng mảng đuôi và `std::lower_bound`) đạt độ phức tạp nào?',
+    options: [
+      { key: 'A', text: '$O(n \\log n)$', isCorrect: true },
+      { key: 'B', text: '$O(n^2)$', isCorrect: false },
+      { key: 'C', text: '$O(2^n)$', isCorrect: false },
+      { key: 'D', text: '$O(n^3)$', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Dùng mảng đuôi nhỏ nhất kết hợp hàm std::lower_bound (Binary Search) cho phép tìm vị trí chèn trong $O(\\log n)$, tổng thời gian là $O(n \\log n)$.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Tùy chỉnh',
+    level: 'Vận dụng',
+    topic: 'Cấu trúc dữ liệu Nâng cao (Fenwick Tree & Segment Tree)',
+    content: 'Để giải quyết bài toán cập nhật giá trị một phần tử (point update) và truy vấn tổng một đoạn $[L, R]$ bất kỳ trên mảng $n$ phần tử với thời gian $O(\\log n)$ cho mỗi thao tác, cấu trúc dữ liệu nào sau đây là phù hợp nhất?',
+    options: [
+      { key: 'A', text: 'Cây Fenwick (Binary Indexed Tree) hoặc Segment Tree', isCorrect: true },
+      { key: 'B', text: 'Hàng đợi hai đầu (Deque)', isCorrect: false },
+      { key: 'C', text: 'Mảng cộng dồn tĩnh (Prefix Sum array thông thường)', isCorrect: false },
+      { key: 'D', text: 'Ngăn xếp đơn điệu (Monotonic Stack)', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Cây Fenwick Tree (BIT) hoặc Segment Tree hỗ trợ cả point update và range sum query đều trong $O(\\log n)$.',
+  },
+  {
+    subject: 'Tin học',
+    grade: 'Tùy chỉnh',
+    level: 'Vận dụng cao',
+    topic: 'Thuật toán Nâng cao & Cấu trúc Dữ liệu (Đếm Nghịch Thế)',
+    content: 'Để đếm số cặp nghịch thế $(i, j)$ thoả mãn $i < j$ và $a_i > a_j$ trên mảng $n$ phần tử ($n \\le 2 \\times 10^5$), kỹ thuật nào sau đây cho độ phức tạp tối ưu nhất $O(n \\log n)$?',
+    options: [
+      { key: 'A', text: 'Rời rạc hóa (nén tọa độ) kết hợp Cây Fenwick (BIT) hoặc biến đổi Merge Sort', isCorrect: true },
+      { key: 'B', text: 'Duyệt vét cạn 2 vòng lặp lồng nhau $O(n^2)$', isCorrect: false },
+      { key: 'C', text: 'Sử dụng thuật toán Floyd-Warshall trên ma trận kề', isCorrect: false },
+      { key: 'D', text: 'Dùng bảng băm thông thường không sắp xếp trong $O(n)$', isCorrect: false },
+    ],
+    correctAnswer: 'A',
+    explanation: 'Nén toạ độ mảng và duyệt qua từng phần tử kết hợp cập nhật & truy vấn Fenwick Tree (BIT) hoặc biến đổi quá trình Merge Sort đều giải quyết bài toán đếm nghịch thế trong $O(n \\log n)$.',
   },
 
   // ==========================================
@@ -1458,6 +1773,188 @@ function generateProceduralQuestion(
   }
 
   // ----------------------------------------------------
+  // --- TIN HỌC ---
+  // ----------------------------------------------------
+  if (subject.includes('Tin')) {
+    const isCustom = parsed.displayName === 'Tùy chỉnh' ||
+                     grade.toLowerCase().includes('tùy chỉnh') ||
+                     grade.toLowerCase().includes('custom') ||
+                     grade.toLowerCase().includes('tự do');
+
+    if (isCustom) {
+      const customTinProcedural = [
+        {
+          topic: 'Tin học - Cấu trúc dữ liệu Nâng cao (Segment Tree / BIT)',
+          content: `Để thực hiện cập nhật giá trị một phần tử (point update) và truy vấn giá trị nhỏ nhất trên đoạn $[L, R]$ (range minimum query) trên mảng gồm $N$ phần tử ($N = ${numA * 10000}$), cấu trúc dữ liệu Segment Tree cho độ phức tạp thời gian mỗi thao tác là:`,
+          options: [
+            { key: 'A', text: '$O(\\log N)$', isCorrect: true },
+            { key: 'B', text: '$O(N)$', isCorrect: false },
+            { key: 'C', text: '$O(1)$', isCorrect: false },
+            { key: 'D', text: '$O(N^2)$', isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Cây phân đoạn (Segment Tree) chia đôi không gian mỗi bước theo dạng cây nhị phân, độ cao cây là $\\lceil \\log_2 N \\rceil$, do đó các thao tác point update và RMQ đều có độ phức tạp thời gian là $O(\\log N)$.`,
+        },
+        {
+          topic: 'Tin học - Thuật toán Quy hoạch động (LIS)',
+          content: `Trong bài toán Dãy con tăng dài nhất (LIS) kích thước $N = ${numB * 1000}$, khi sử dụng mảng phụ tail lưu phần tử kết thúc nhỏ nhất và hàm \`std::lower_bound\` để tìm kiếm nhị phân, số phép so sánh tối đa cho toàn bộ mảng là khoảng:`,
+          options: [
+            { key: 'A', text: `$O(N \\log N)$`, isCorrect: true },
+            { key: 'B', text: `$O(N^2)$`, isCorrect: false },
+            { key: 'C', text: `$O(N)$`, isCorrect: false },
+            { key: 'D', text: `$O(2^N)$`, isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Mỗi phần tử trong $N$ phần tử được tìm vị trí chèn bằng tìm kiếm nhị phân mất $O(\\log N)$, do đó tổng độ phức tạp thuật toán là $O(N \\log N)$.`,
+        },
+      ];
+      const pick = customTinProcedural[index % customTinProcedural.length];
+      return {
+        id: Date.now() + index + Math.floor(Math.random() * 10000),
+        order: `Câu ${String(index + 1).padStart(2, '0')}`,
+        level: level as any,
+        levelClass: 'bg-purple-50 text-purple-700 border-purple-200',
+        topic: pick.topic,
+        content: pick.content,
+        options: pick.options,
+        points: 0.25,
+        correctAnswer: pick.correctAnswer,
+        explanation: pick.explanation,
+      };
+    }
+
+    if (parsed.gradeNum === 10) {
+      const grade10TinProcedural = [
+        {
+          content: `Trong ngôn ngữ lập trình Python, đoạn mã sau sẽ in ra giá trị nào ra màn hình?\n\`\`\`python\ntong = 0\nfor i in range(1, ${numA + 2}):\n    tong += i\nprint(tong)\n\`\`\``,
+          options: [
+            { key: 'A', text: `${((numA + 1) * (numA + 2)) / 2}`, isCorrect: true },
+            { key: 'B', text: `${((numA) * (numA + 1)) / 2}`, isCorrect: false },
+            { key: 'C', text: `${numA + 2}`, isCorrect: false },
+            { key: 'D', text: `${numA * 2}`, isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Hàm range(1, ${numA + 2}) sinh dãy số từ 1 đến ${numA + 1}. Tổng các số từ 1 đến ${numA + 1} bằng: 1 + 2 + ... + ${numA + 1} = ${((numA + 1) * (numA + 2)) / 2}.`,
+        },
+        {
+          content: `Trong Python, phép chia lấy dư của phép toán $${numA * 10 + 7} \\% ${numA + 2}$ có kết quả là:`,
+          options: [
+            { key: 'A', text: `${(numA * 10 + 7) % (numA + 2)}`, isCorrect: true },
+            { key: 'B', text: `${Math.floor((numA * 10 + 7) / (numA + 2))}`, isCorrect: false },
+            { key: 'C', text: `${numA + 2}`, isCorrect: false },
+            { key: 'D', text: '0', isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Toán tử % trong Python dùng để chia lấy phần dư: ${numA * 10 + 7} chia cho ${numA + 2} dư ${(numA * 10 + 7) % (numA + 2)}.`,
+        },
+      ];
+      const pick = grade10TinProcedural[index % grade10TinProcedural.length];
+      return {
+        id: Date.now() + index + Math.floor(Math.random() * 10000),
+        order: `Câu ${String(index + 1).padStart(2, '0')}`,
+        level: level as any,
+        levelClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        topic: `${subject} - Lớp 10`,
+        content: pick.content,
+        options: pick.options,
+        points: 0.25,
+        correctAnswer: pick.correctAnswer,
+        explanation: pick.explanation,
+      };
+    }
+
+    if (parsed.gradeNum === 11) {
+      const grade11TinProcedural = [
+        {
+          content: `Trong ngôn ngữ lập trình Python, cho xâu ký tự \`s = "EXAMIFY_LEARNING"\`. Kết quả của biểu thức cắt lát \`s[0:7]\` là:`,
+          options: [
+            { key: 'A', text: `"EXAMIFY"`, isCorrect: true },
+            { key: 'B', text: `"EXAMIF"`, isCorrect: false },
+            { key: 'C', text: `"XAMIFY"`, isCorrect: false },
+            { key: 'D', text: `"EXAMIFY_"`, isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Cú pháp cắt lát s[start:stop] lấy các ký tự từ vị trí start (0) đến stop - 1 (6), trả về "EXAMIFY".`,
+        },
+        {
+          content: `Trong chương trình Tin học 11 GDPT 2018, câu lệnh nào sau đây được sử dụng để mở tệp văn bản \`data.txt\` ở chế độ đọc dữ liệu?`,
+          options: [
+            { key: 'A', text: `f = open('data.txt', 'r')`, isCorrect: true },
+            { key: 'B', text: `f = open('data.txt', 'w')`, isCorrect: false },
+            { key: 'C', text: `f = open('data.txt', 'a')`, isCorrect: false },
+            { key: 'D', text: `f = read('data.txt')`, isCorrect: false },
+          ],
+          correctAnswer: 'A',
+          explanation: `Chế độ 'r' (read) được sử dụng để mở tệp văn bản hiện có nhằm mục đích đọc dữ liệu.`,
+        },
+      ];
+      const pick = grade11TinProcedural[index % grade11TinProcedural.length];
+      return {
+        id: Date.now() + index + Math.floor(Math.random() * 10000),
+        order: `Câu ${String(index + 1).padStart(2, '0')}`,
+        level: level as any,
+        levelClass: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+        topic: `${subject} - Lớp 11`,
+        content: pick.content,
+        options: pick.options,
+        points: 0.25,
+        correctAnswer: pick.correctAnswer,
+        explanation: pick.explanation,
+      };
+    }
+
+    // Lớp 12 Tin học GDPT 2018
+    const grade12TinProcedural = [
+      {
+        content: `Trong hệ quản trị cơ sở dữ liệu quan hệ (RDBMS), mệnh đề nào trong câu lệnh SQL được dùng để lọc và chỉ chọn ra các bản ghi thỏa mãn điều kiện nhất định?`,
+        options: [
+          { key: 'A', text: 'WHERE', isCorrect: true },
+          { key: 'B', text: 'FROM', isCorrect: false },
+          { key: 'C', text: 'ORDER BY', isCorrect: false },
+          { key: 'D', text: 'GROUP BY', isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: 'Mệnh đề WHERE được dùng để chỉ định tiêu chuẩn, điều kiện lọc các bản ghi từ bảng dữ liệu.',
+      },
+      {
+        content: `Trong mô hình cơ sở dữ liệu quan hệ, thuộc tính hoặc tập thuộc tính dùng để xác định duy nhất mỗi hàng (bản ghi) trong bảng được gọi là:`,
+        options: [
+          { key: 'A', text: 'Khóa chính (Primary Key)', isCorrect: true },
+          { key: 'B', text: 'Khóa ngoại (Foreign Key)', isCorrect: false },
+          { key: 'C', text: 'Chỉ mục (Index)', isCorrect: false },
+          { key: 'D', text: 'Khóa phụ (Secondary Key)', isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: 'Khóa chính (Primary Key) đảm bảo tính toàn vẹn thực thể, xác định duy nhất từng bản ghi và không được nhận giá trị NULL.',
+      },
+      {
+        content: `Hệ thống phân giải tên miền (DNS - Domain Name System) trong mạng Internet đóng vai trò chính là:`,
+        options: [
+          { key: 'A', text: 'Chuyển đổi tên miền dạng ký tự dễ nhớ sang địa chỉ IP dạng số', isCorrect: true },
+          { key: 'B', text: 'Định tuyến các gói tin trên mạng WAN', isCorrect: false },
+          { key: 'C', text: 'Cung cấp năng lượng cho thiết bị mạng', isCorrect: false },
+          { key: 'D', text: 'Mã hóa dữ liệu truyền tải trên giao thức HTTPS', isCorrect: false },
+        ],
+        correctAnswer: 'A',
+        explanation: 'Dịch vụ DNS có nhiệm vụ ánh xạ (phân giải) tên miền (như www.edu.vn) thành địa chỉ IP tương ứng (như 192.168.1.1).',
+      },
+    ];
+    const pick = grade12TinProcedural[index % grade12TinProcedural.length];
+    return {
+      id: Date.now() + index + Math.floor(Math.random() * 10000),
+      order: `Câu ${String(index + 1).padStart(2, '0')}`,
+      level: level as any,
+      levelClass: 'bg-blue-50 text-blue-700 border-blue-200',
+      topic: `${subject} - Lớp 12`,
+      content: pick.content,
+      options: pick.options,
+      points: 0.25,
+      correctAnswer: pick.correctAnswer,
+      explanation: pick.explanation,
+    };
+  }
+
+  // ----------------------------------------------------
   // --- GENERIC ACADEMIC FALLBACK VARIATION ---
   // ----------------------------------------------------
   return {
@@ -1568,18 +2065,37 @@ export function getCurriculumQuestion(
     (q) => q.subject.toLowerCase() === subject.toLowerCase()
   );
 
-  // 2. Strict grade matching first (exact grade e.g. "Lớp 10")
-  let gradeMatches = subjectMatches.filter((q) => {
-    const qParsed = parseGrade(q.grade);
-    return qParsed.gradeNum === parsed.gradeNum;
-  });
+  const isCustomGrade =
+    parsed.displayName === 'Tùy chỉnh' ||
+    grade.toLowerCase().includes('tùy chỉnh') ||
+    grade.toLowerCase().includes('custom') ||
+    grade.toLowerCase().includes('tự do');
 
-  // If no exact grade match found in bank, match by educational level category (UPPER_SEC, LOWER_SEC, PRIMARY)
-  if (gradeMatches.length === 0) {
+  let gradeMatches: CurriculumQuestionTemplate[] = [];
+
+  if (isCustomGrade) {
+    // For custom exams, prioritize questions tagged with 'Tùy chỉnh', 'Custom', or 'Chuyên'
+    gradeMatches = subjectMatches.filter((q) => {
+      const qLower = q.grade.toLowerCase();
+      return qLower.includes('tùy chỉnh') || qLower.includes('custom') || qLower.includes('chuyên');
+    });
+    if (gradeMatches.length === 0) {
+      gradeMatches = subjectMatches;
+    }
+  } else {
+    // Standard high school / lower sec / primary: strictly match gradeNum AND explicitly exclude 'Tùy chỉnh'
     gradeMatches = subjectMatches.filter((q) => {
       const qParsed = parseGrade(q.grade);
-      return qParsed.levelCategory === parsed.levelCategory;
+      return qParsed.gradeNum === parsed.gradeNum && !q.grade.toLowerCase().includes('tùy chỉnh');
     });
+
+    // If no exact grade match found in bank, match by educational level category (UPPER_SEC, LOWER_SEC, PRIMARY)
+    if (gradeMatches.length === 0) {
+      gradeMatches = subjectMatches.filter((q) => {
+        const qParsed = parseGrade(q.grade);
+        return qParsed.levelCategory === parsed.levelCategory && !q.grade.toLowerCase().includes('tùy chỉnh');
+      });
+    }
   }
 
   // 3. Filter out questions that have already been used in this exam
@@ -1630,12 +2146,21 @@ export function getCurriculumQuestion(
     } else if (isTF) {
       points = 1.0;
       const subKeys = ['a', 'b', 'c', 'd'];
+      const patterns = [
+        [true, false, true, false],
+        [true, true, false, false],
+        [false, true, true, false],
+        [true, false, false, true],
+        [true, true, true, false],
+        [false, true, true, true],
+      ];
+      const tfBooleans = patterns[(seedIndex + Math.floor(Math.random() * patterns.length)) % patterns.length];
       options = subKeys.map((k, i) => {
         const opt = template.options[i];
         return {
           key: k,
           text: opt ? opt.text.replace(/^[A-D][\.\:\)]\s+/i, '') : `Mệnh đề khẳng định ý ${k}`,
-          isCorrect: opt ? opt.key.toUpperCase() === template.correctAnswer.toUpperCase() : i % 2 === 0,
+          isCorrect: tfBooleans[i],
         };
       });
       correctAnswer = options.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
@@ -1663,8 +2188,8 @@ export function getCurriculumQuestion(
     };
   }
 
-  // If all bank items for this grade/subject are used, generate procedural grade-aligned variation
-  return generateProceduralQuestion(subject, grade, level, seedIndex);
+  // If all bank items for this grade/subject are used, generate procedural grade-aligned variation with random seed
+  return generateProceduralQuestion(subject, grade, level, seedIndex + Math.floor(Math.random() * 1000) + 1);
 }
 
 
@@ -1746,4 +2271,81 @@ export function isQuestionDuplicate(newContent: string, existingList: string[]):
     }
   }
   return false;
+}
+
+const POPULAR_SUBJECT_TOPICS: Record<string, string[]> = {
+  'Toán học': [
+    'Hàm số & Đồ thị',
+    'Khảo sát hàm số & Ứng dụng đạo hàm',
+    'Phương trình & Bất phương trình',
+    'Hệ thức lượng trong tam giác',
+    'Vectơ & Tọa độ',
+    'Hình học không gian',
+    'Nguyên hàm & Tích phân',
+    'Xác suất & Thống kê',
+  ],
+  'Tin học': [
+    'Lập trình Python cơ bản',
+    'Cấu trúc rẽ nhánh & vòng lặp',
+    'Chương trình con & Hàm',
+    'Kiểu dữ liệu danh sách (List) & Xâu',
+    'Thuật toán sắp xếp & Tìm kiếm',
+    'Cơ sở dữ liệu & SQL',
+    'Mạng máy tính & An toàn thông tin',
+  ],
+  'Vật lý': [
+    'Chuyển động cơ học',
+    'Các định luật Newton & Động lực học',
+    'Công & Năng lượng',
+    'Dao động cơ & Con lắc',
+    'Sóng cơ & Sóng âm',
+    'Dòng điện không đổi & Xoay chiều',
+    'Quang hình học',
+  ],
+  'Hóa học': [
+    'Nguyên tử & Bảng tuần hoàn',
+    'Liên kết hóa học & Phản ứng oxi hóa khử',
+    'Dung dịch & Nồng độ',
+    'Kim loại & Phi kim',
+    'Hiđrocacbon',
+    'Este - Lipit',
+    'Cacbohiđrat & Amino axit',
+  ],
+  'Sinh học': [
+    'Tế bào & Phân bào',
+    'Di truyền & Biến dị',
+    'Quy luật Menđen',
+    'Sinh thái học & Môi trường',
+    'Tiến hóa',
+  ],
+  'Tiếng Anh': [
+    'Tenses - Các thì trong tiếng Anh',
+    'Passive Voice - Câu bị động',
+    'Conditional Sentences - Câu điều kiện',
+    'Relative Clauses - Mệnh đề quan hệ',
+    'Reported Speech - Câu gián tiếp',
+    'Prepositions & Phrasal Verbs',
+  ],
+};
+
+/**
+ * Returns distinct curriculum topics available for a specific subject and grade.
+ */
+export function getCurriculumTopics(subject: string, grade?: string): string[] {
+  const parsed = grade ? parseGrade(grade) : null;
+  const filtered = CURRICULUM_QUESTION_BANK.filter((q) => {
+    if (q.subject.toLowerCase() !== subject.toLowerCase()) return false;
+    if (parsed && parsed.gradeNum !== null) {
+      const qParsed = parseGrade(q.grade);
+      return qParsed.gradeNum === parsed.gradeNum;
+    }
+    return true;
+  });
+  const topics = Array.from(new Set(filtered.map((q) => q.topic))).filter(Boolean);
+  if (topics.length > 0) return topics;
+  return POPULAR_SUBJECT_TOPICS[subject] || [
+    'Kiến thức bài học trọng tâm',
+    'Lý thuyết & Bài tập cơ bản',
+    'Vận dụng & Giải bài tập',
+  ];
 }

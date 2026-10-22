@@ -59,6 +59,9 @@ export interface ExamItem {
   schoolName?: string;
   questions?: ExamQuestion[];
   appliedSkills?: Array<{ id: string; title: string }>;
+  customPrompt?: string;
+  curriculumMetadata?: any;
+  variants?: any[];
 }
 
 /**
@@ -223,6 +226,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             duration: exam.duration,
             status: exam.status,
             matrix: exam.matrix,
+            department: exam.department,
+            schoolName: exam.schoolName,
+            sessionTitle: exam.sessionTitle,
+            academicYear: exam.academicYear,
+            sectionTitles: exam.sectionTitles,
+            sectionDescriptions: exam.sectionDescriptions,
+            code: exam.code,
+            variants: exam.variants,
             questions: exam.questions || [],
           }),
         });

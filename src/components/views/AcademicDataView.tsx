@@ -1718,7 +1718,7 @@ export default function AcademicDataView() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Loại tài liệu</label>
                 <select
@@ -1758,6 +1758,19 @@ export default function AcademicDataView() {
                       {g}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Học kỳ</label>
+                <select
+                  value={newDocSemester}
+                  onChange={(e) => setNewDocSemester(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                >
+                  <option value="Học kỳ 1">Học kỳ 1</option>
+                  <option value="Học kỳ 2">Học kỳ 2</option>
+                  <option value="Cả năm">Cả năm</option>
                 </select>
               </div>
 
@@ -2111,7 +2124,7 @@ export default function AcademicDataView() {
               </div>
 
               {/* Tùy chọn nguồn tài liệu */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Môn học</label>
                   <select
@@ -2135,6 +2148,19 @@ export default function AcademicDataView() {
                     {gradesList.map((g) => (
                       <option key={g} value={g}>{g}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Học kỳ</label>
+                  <select
+                    value={newDocSemester}
+                    onChange={(e) => setNewDocSemester(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                  >
+                    <option value="Học kỳ 1">Học kỳ 1</option>
+                    <option value="Học kỳ 2">Học kỳ 2</option>
+                    <option value="Cả năm">Cả năm</option>
                   </select>
                 </div>
 

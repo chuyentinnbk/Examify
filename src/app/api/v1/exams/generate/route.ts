@@ -9,6 +9,10 @@ import { AuditLogger } from '@/core/logger/audit-logger';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
 import { AcademicStorage } from '@/core/storage/academic-storage';
+import { normalizeSvgGeometry } from '@/lib/exam-sections';
+
+export const maxDuration = 300; // Tối đa 5 phút cho việc AI sinh trọn bộ đề thi (20-50 câu có SVG và lời giải)
+export const dynamic = 'force-dynamic';
 
 const GenerateExamSchema = z.object({
   title: z.string().min(3, 'Exam title must be at least 3 characters'),
@@ -21,7 +25,23 @@ const GenerateExamSchema = z.object({
     lesson: z.string().optional(),
   }),
   lessonId: z.string().optional(),
-  examType: z.nativeEnum(ExamType),
+  sessionTitle: z.string().optional(),
+  examType: z
+    .union([
+      z.nativeEnum(ExamType),
+      z.literal('TOPIC_PRACTICE'),
+      z.literal('CUSTOM'),
+      z.literal('MID_TERM_1'),
+      z.literal('MID_TERM_2'),
+      z.literal('FINAL_TERM_1'),
+      z.literal('FINAL_TERM_2'),
+    ])
+    .transform((val) => {
+      if (val === 'TOPIC_PRACTICE' || val === 'CUSTOM') return ExamType.MID_TERM;
+      if (val === 'MID_TERM_1' || val === 'MID_TERM_2') return ExamType.MID_TERM;
+      if (val === 'FINAL_TERM_1' || val === 'FINAL_TERM_2') return ExamType.FINAL_TERM;
+      return val as ExamType;
+    }),
   durationMinutes: z.number().int().min(5).max(180).default(45),
   totalPoints: z.number().min(1).max(100).default(10),
   totalQuestions: z.number().int().min(1).max(50).default(20),
@@ -33,11 +53,64 @@ const GenerateExamSchema = z.object({
       highApplication: z.number().min(0).max(100),
     })
     .optional(),
+  sectionDistribution: z
+    .object({
+      multipleChoice: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      trueFalse: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      shortAnswer: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+      essay: z
+        .object({
+          count: z.number().int().min(0),
+          matrix: z.object({
+            knowledge: z.number().min(0).max(100),
+            comprehension: z.number().min(0).max(100),
+            application: z.number().min(0).max(100),
+            highApplication: z.number().min(0).max(100),
+          }),
+        })
+        .optional(),
+    })
+    .optional(),
   customPrompt: z.string().max(1500).optional(),
   skillIds: z.array(z.string()).optional(),
   aiProvider: z.enum(['openai', 'gemini', 'claude', 'self-hosted', 'custom-mcp']).optional(),
   aiModel: z.string().optional(),
   language: z.string().default('Vietnamese'),
+  customMatrixTable: z.union([z.string(), z.record(z.any())]).optional(),
+  topicFocus: z.string().optional(),
+  isTopicPractice: z.boolean().optional(),
+  sampleExamText: z.string().optional(),
+  sampleExamFileName: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -61,6 +134,23 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = validation.data;
+
+    // Validate that sections sum matches totalQuestions if sectionDistribution is provided
+    if (payload.sectionDistribution) {
+      const dist = payload.sectionDistribution;
+      const sum =
+        (dist.multipleChoice?.count || 0) +
+        (dist.trueFalse?.count || 0) +
+        (dist.shortAnswer?.count || 0) +
+        (dist.essay?.count || 0);
+      if (sum > 0 && sum !== payload.totalQuestions) {
+        return apiError(
+          `Tổng số câu các phần (${sum} câu) không khớp với tổng số câu của đề thi (${payload.totalQuestions} câu).`,
+          422,
+          'Mismatched section question count'
+        );
+      }
+    }
 
     // 1. Concurrency Lock: Prevent multiple concurrent generations from the same teacher
     const lockKey = REDIS_KEYS.EXAM_LOCK(teacherId);
@@ -169,9 +259,15 @@ export async function POST(req: NextRequest) {
           totalPoints: payload.totalPoints,
           totalQuestions: payload.totalQuestions,
           cognitiveMatrix: payload.cognitiveMatrix,
+          sectionDistribution: payload.sectionDistribution,
           customPrompt: safeCustomPrompt,
           appliedSkills: appliedSkills.length > 0 ? appliedSkills : undefined,
           language: payload.language,
+          customMatrixTable: payload.customMatrixTable,
+          topicFocus: payload.topicFocus,
+          isTopicPractice: payload.isTopicPractice,
+          sampleExamText: payload.sampleExamText,
+          sampleExamFileName: payload.sampleExamFileName,
         },
         selectedProvider
       );
@@ -225,12 +321,12 @@ export async function POST(req: NextRequest) {
               questionNumber: i + 1,
               type: q.type || 'MULTIPLE_CHOICE',
               cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
-              content: fresh.content,
+              content: normalizeSvgGeometry(fresh.content),
               options: isShortAnswer ? [] : fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
               correctAnswer: isShortAnswer
                 ? extractCleanShortAnswerValue(fresh.options[0]?.text, fresh.explanation, fresh.correctAnswer)
                 : fresh.correctAnswer,
-              explanation: fresh.explanation,
+              explanation: fresh.explanation ? normalizeSvgGeometry(fresh.explanation) : undefined,
               points: q.points || payload.totalPoints / payload.totalQuestions,
             };
 
@@ -240,19 +336,54 @@ export async function POST(req: NextRequest) {
             existingContents.push(q.content);
             q.questionNumber = i + 1;
             const isSA = String(q.type).toUpperCase().includes('SHORT');
+            const isTF = String(q.type).toUpperCase().includes('TRUE');
             if (isSA) {
               q.options = [];
               // Ensure clean numeric answer without multiple-choice letters
               q.correctAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+            } else if (isTF) {
+              let answerStr = String(q.correctAnswer || '');
+              const tfMatches = answerStr.match(/(?:[a-d][\:\.\s]+)?([ĐđSsTtFf])/gi);
+              let trueCount = 0;
+              let totalItems = 4;
+              if (tfMatches) {
+                totalItems = tfMatches.length;
+                trueCount = tfMatches.filter((m) => /[ĐđTt]/i.test(m)).length;
+              }
+
+              // If all 4 are False (0 True), or all 4 are True, or only 1 True (monotonous 1T 3F)
+              if (trueCount <= 1 || trueCount === totalItems) {
+                const balancedPatterns = [
+                  'a: Đ, b: S, c: Đ, d: S',
+                  'a: Đ, b: Đ, c: S, d: S',
+                  'a: S, b: Đ, c: Đ, d: S',
+                  'a: Đ, b: S, c: S, d: Đ',
+                  'a: S, b: Đ, c: S, d: Đ',
+                  'a: Đ, b: Đ, c: Đ, d: S',
+                  'a: S, b: Đ, c: Đ, d: Đ',
+                ];
+                q.correctAnswer = balancedPatterns[Math.floor(Math.random() * balancedPatterns.length)];
+              }
             } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
                 typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt
               );
             }
+            q.content = typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content;
+            if (q.explanation && typeof q.explanation === 'string') {
+              q.explanation = normalizeSvgGeometry(q.explanation);
+            }
             uniqueQuestions.push(q);
           }
         }
         generationResult.examData.questions = uniqueQuestions;
+      }
+
+      if (generationResult.examData) {
+        generationResult.examData.term = payload.curriculum.semester;
+        if (payload.sessionTitle) {
+          generationResult.examData.sessionTitle = payload.sessionTitle;
+        }
       }
 
       // 6. Save JSON Artifact to Local File Storage (/storage/exams/YYYY/MM/{id}.json)

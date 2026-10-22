@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const whereClause = userRole === 'ADMIN' ? {} : { teacherId: userId };
+    const whereClause: any = {
+      status: { notIn: [ExamStatus.FAILED, ExamStatus.GENERATING] },
+      ...(userRole === 'ADMIN' ? {} : { teacherId: userId }),
+    };
 
     const rawExams = await prisma.exam.findMany({
       where: whereClause,
@@ -165,11 +168,13 @@ export async function GET(req: NextRequest) {
         updatedAt: new Date(e.updatedAt).toLocaleDateString('vi-VN'),
         matrix: cognitiveMatrix,
         isAiGenerated: !!e.aiProvider,
+        variants: structuredMeta?.variants || undefined,
         questions,
       };
     });
 
-    return apiSuccess({ exams }, 'Fetched exams successfully');
+    const validExams = exams.filter((ex) => (ex.questions && ex.questions.length > 0));
+    return apiSuccess({ exams: validExams }, 'Fetched exams successfully');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error fetching exams';
     return apiError(message, 500);
@@ -199,6 +204,7 @@ const CreateManualExamSchema = z.object({
       veryHard: z.number().default(10),
     })
     .optional(),
+  variants: z.array(z.any()).optional(),
   questions: z.array(z.any()).default([]),
 });
 
@@ -243,6 +249,7 @@ export async function POST(req: NextRequest) {
       academicYear: data.academicYear,
       sectionTitles: data.sectionTitles,
       sectionDescriptions: data.sectionDescriptions,
+      variants: data.variants || undefined,
       questions: data.questions,
     });
 

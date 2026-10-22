@@ -32,14 +32,18 @@ export class EdgeRateLimiter {
 
     // Filter out timestamps older than the sliding window
     timestamps = timestamps.filter((t) => t > windowStart);
-    timestamps.push(now);
+
+    // Cap timestamps array to avoid unbounded memory growth under rapid spam
+    if (timestamps.length < config.maxRequests + 5) {
+      timestamps.push(now);
+    }
 
     edgeRequestLogs.set(key, timestamps);
 
     // Periodic cleanup of stale keys
-    if (edgeRequestLogs.size > 5000) {
+    if (edgeRequestLogs.size > 2000) {
       for (const [k, ts] of edgeRequestLogs.entries()) {
-        if (ts.every((t) => t <= windowStart)) {
+        if (ts.length === 0 || ts.every((t) => t <= windowStart)) {
           edgeRequestLogs.delete(k);
         }
       }

@@ -369,4 +369,13 @@ body {
   color: #000000 !important;
 }
 
+/* ==============================================================================
+ * Geometric SVG Diagrams - Crisp Rendering & User Selection Protection
+ * Lines are continuous and solid; labels sit cleanly in the margin
+ * ============================================================================== */
+.exam-geo-svg text {
+  user-select: none;
+}
+
+
 

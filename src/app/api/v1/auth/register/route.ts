@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       userAgent,
     });
 
-    return apiSuccess(
+    const response = apiSuccess(
       {
         token: session.token,
         user: {
@@ -135,6 +135,15 @@ export async function POST(req: NextRequest) {
       },
       'Đăng ký tài khoản giáo viên thành công!'
     );
+
+    response.cookies.set('examify_token', session.token, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error) {
     console.error('Registration error:', error);
     return apiError(

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import prisma from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus } from '@prisma/client';
+import { normalizeSvgGeometry } from '@/lib/exam-sections';
 
 export async function PUT(
   req: NextRequest,
@@ -52,7 +53,11 @@ export async function PUT(
 
     if (body.questions) {
       updateData.totalQuestions = body.questions.length;
-      newStructured.questions = body.questions;
+      newStructured.questions = body.questions.map((q: any) => ({
+        ...q,
+        content: typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content,
+        explanation: typeof q.explanation === 'string' ? normalizeSvgGeometry(q.explanation) : q.explanation,
+      }));
     }
     if (body.department !== undefined) newStructured.department = body.department;
     if (body.schoolName !== undefined) newStructured.schoolName = body.schoolName;
@@ -61,6 +66,20 @@ export async function PUT(
     if (body.sectionTitles !== undefined) newStructured.sectionTitles = body.sectionTitles;
     if (body.sectionDescriptions !== undefined) newStructured.sectionDescriptions = body.sectionDescriptions;
     if (body.code !== undefined) newStructured.code = body.code;
+    if (body.variants !== undefined) {
+      newStructured.variants = Array.isArray(body.variants)
+        ? body.variants.map((v: any) => ({
+            ...v,
+            questions: Array.isArray(v.questions)
+              ? v.questions.map((q: any) => ({
+                  ...q,
+                  content: typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content,
+                  explanation: typeof q.explanation === 'string' ? normalizeSvgGeometry(q.explanation) : q.explanation,
+                }))
+              : v.questions,
+          }))
+        : body.variants;
+    }
 
     updateData.structuredJson = JSON.stringify(newStructured);
 
