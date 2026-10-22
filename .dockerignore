@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+*.local
+.env
+.env*.local
+.env.production
+storage/exams/*
+!storage/exams/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+README.md
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

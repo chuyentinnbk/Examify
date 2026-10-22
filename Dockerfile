@@ -12,6 +12,9 @@ RUN npm install
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV DATABASE_URL="mysql://examify_user:examify_password@localhost:3306/examify_db"
+ENV JWT_SECRET="production_build_placeholder_secret_key_32chars"
+ENV NEXT_PUBLIC_APP_URL="http://localhost:3000"
 RUN npx prisma generate
 RUN npm run build
 

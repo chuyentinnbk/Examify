@@ -1,0 +1,210 @@
+name: Examify CI/CD - Automated Production Build
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+    branches:
+      - main
+  issues:
+    types:
+      - opened
+      - labeled
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_ENV: production
+  DATABASE_URL: "mysql://examify_ci:ci_password@127.0.0.1:3306/examify_db"
+  JWT_SECRET: "ci_production_build_placeholder_secret_key_32chars"
+  NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+  REDIS_URL: "redis://127.0.0.1:6379"
+  SKIP_ENV_VALIDATION: "true"
+
+jobs:
+  # ============================================================================
+  # Job 1: Quality Assurance & Security Verification
+  # ============================================================================
+  quality-check:
+    name: 🛡️ Code Quality & Security Tests
+    # Only skip if a pull request was closed without being merged
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 🟢 Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 📦 Install Node Dependencies
+        run: npm ci
+
+      - name: ⚙️ Generate Prisma Client
+        run: npx prisma generate
+
+      - name: 🔍 TypeScript Type Check
+        run: npx tsc --noEmit
+
+      - name: 🧪 Run Security Unit Tests (Prompt Injection Guard)
+        run: npm run test:security
+
+  # ============================================================================
+  # Job 2: Automated Production Build
+  # ============================================================================
+  build-production:
+    name: 🚀 Production Build (Next.js)
+    needs: quality-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 🟢 Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🗄️ Restore Next.js Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.[jt]s', '**/*.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: ⚙️ Generate Prisma Client
+        run: npx prisma generate
+
+      - name: 🏗️ Execute Production Build
+        run: npm run build
+
+      - name: 📤 Archive Production Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: examify-production-build-${{ github.sha }}
+          path: |
+            .next/
+            public/
+            prisma/
+            package.json
+          retention-days: 7
+
+  # ============================================================================
+  # Job 3: Docker Production Container Validation
+  # Triggered on push to main or when PR is merged into main
+  # ============================================================================
+  docker-validation:
+    name: 🐳 Docker Production Build
+    needs: build-production
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build Docker Production Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: examify:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # Job 4: Build Summary & Status Reporting
+  # ============================================================================
+  summary:
+    name: 📋 Build Summary Report
+    needs: [quality-check, build-production]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📝 Generate GitHub Step Summary
+        run: |
+          STATUS="${{ needs.build-production.result }}"
+          if [ "$STATUS" = "success" ]; then
+            EMOJI="✅"
+            STATUS_TEXT="SUCCESSFUL"
+          else
+            EMOJI="❌"
+            STATUS_TEXT="FAILED"
+          fi
+
+          EVENT_NAME="${{ github.event_name }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+              TRIGGER_DESC="Merged Pull Request #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+            else
+              TRIGGER_DESC="Pull Request #${{ github.event.pull_request.number }} (${{ github.event.action }}): ${{ github.event.pull_request.title }}"
+            fi
+          elif [ "$EVENT_NAME" = "push" ]; then
+            TRIGGER_DESC="Push to branch \`${{ github.ref_name }}\`"
+          elif [ "$EVENT_NAME" = "issues" ]; then
+            TRIGGER_DESC="Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}"
+          else
+            TRIGGER_DESC="Manual trigger (${{ github.event_name }})"
+          fi
+
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          # $EMOJI Examify Production Build Report: $STATUS_TEXT
+
+          | Metric | Value |
+          |---|---|
+          | **Event** | $TRIGGER_DESC |
+          | **Commit** | \`${{ github.sha }}\` |
+          | **Actor** | @${{ github.actor }} |
+          | **Branch** | \`${{ github.ref_name }}\` |
+          | **Quality & Security Tests** | ${{ needs.quality-check.result }} |
+          | **Production Build** | ${{ needs.build-production.result }} |
+
+          ---
+          *Automated by Examify CI/CD Engine*
+          EOF
+          sed -i "s/\$EMOJI/$EMOJI/g" $GITHUB_STEP_SUMMARY
+          sed -i "s/\$STATUS_TEXT/$STATUS_TEXT/g" $GITHUB_STEP_SUMMARY
+          sed -i "s/\$TRIGGER_DESC/$TRIGGER_DESC/g" $GITHUB_STEP_SUMMARY
