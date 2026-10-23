@@ -2272,13 +2272,21 @@ export default function EditorView() {
                       <label className="text-xs font-bold text-purple-900 dark:text-purple-300 block">
                         Đáp số / Kết quả ngắn:
                       </label>
-                      <input
-                        type="text"
-                        value={q.correctAnswer || ''}
-                        onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                        placeholder="Ví dụ: 12, -3.5, hoặc 4/3..."
-                        className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                      />
+                      <div className="relative flex items-center w-full">
+                        <input
+                          type="text"
+                          value={q.correctAnswer || ''}
+                          onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
+                          placeholder="Ví dụ: 12, -3.5, hoặc a^3\sqrt{3}/12..."
+                          className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        />
+                        {q.correctAnswer && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 max-w-[45%] truncate px-2 py-0.5 bg-purple-100/90 dark:bg-purple-900/60 rounded border border-purple-200 dark:border-purple-800 text-xs font-bold text-purple-800 dark:text-purple-300 pointer-events-none flex items-center gap-1 shadow-sm">
+                            <span className="text-[10px] text-purple-400 select-none">=</span>
+                            <MathText content={q.correctAnswer} inline />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -2545,21 +2553,30 @@ export default function EditorView() {
                           </label>
                           <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số hoặc biểu thức ngắn</span>
                         </div>
-                        <input
-                          type="text"
-                          value={q.correctAnswer || ''}
-                          readOnly={!isEditorMode}
-                          disabled={!isEditorMode}
-                          onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                          placeholder={isEditorMode ? "Ví dụ: 12, -3.5, hoặc 4/3..." : "Chưa có đáp số"}
-                          className={`w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 ${
-                            isEditorMode ? 'focus:ring-2 focus:ring-purple-500 focus:outline-none' : 'cursor-default opacity-90'
-                          }`}
-                        />
-                        {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\') || /[\^_\/]/.test(q.correctAnswer)) && (
-                          <div className="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-md border border-purple-200/80 dark:border-purple-900/40 text-xs flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Hiển thị công thức:</span>
-                            <MathText content={q.correctAnswer.includes('$') ? q.correctAnswer : `$${q.correctAnswer}$`} inline />
+                        {isEditorMode ? (
+                          <div className="relative flex items-center w-full">
+                            <input
+                              type="text"
+                              value={q.correctAnswer || ''}
+                              onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
+                              placeholder="Ví dụ: 12, -3.5, hoặc a^3\sqrt{3}/12..."
+                              className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                            />
+                            {q.correctAnswer && (
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 max-w-[45%] truncate px-2 py-0.5 bg-purple-100/90 dark:bg-purple-900/60 rounded border border-purple-200 dark:border-purple-800 text-xs font-bold text-purple-800 dark:text-purple-300 pointer-events-none flex items-center gap-1 shadow-sm">
+                                <span className="text-[10px] text-purple-400 select-none">=</span>
+                                <MathText content={q.correctAnswer} inline />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3.5 py-2.5 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">Đáp số:</span>
+                            {q.correctAnswer ? (
+                              <MathText content={q.correctAnswer} inline />
+                            ) : (
+                              <span className="text-slate-400 italic font-normal">Chưa có đáp số</span>
+                            )}
                           </div>
                         )}
                       </div>
