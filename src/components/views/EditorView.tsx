@@ -2556,10 +2556,10 @@ export default function EditorView() {
                             isEditorMode ? 'focus:ring-2 focus:ring-purple-500 focus:outline-none' : 'cursor-default opacity-90'
                           }`}
                         />
-                        {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) && (
+                        {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\') || /[\^_\/]/.test(q.correctAnswer)) && (
                           <div className="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 rounded-md border border-purple-200/80 dark:border-purple-900/40 text-xs flex items-center gap-2">
                             <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Hiển thị công thức:</span>
-                            <MathText content={q.correctAnswer} inline />
+                            <MathText content={q.correctAnswer.includes('$') ? q.correctAnswer : `$${q.correctAnswer}$`} inline />
                           </div>
                         )}
                       </div>
@@ -2744,8 +2744,8 @@ export default function EditorView() {
                       }`}
                       title={q.correctAnswer}
                     >
-                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) ? (
-                        <MathText content={q.correctAnswer} inline />
+                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\') || /[\^_\/]/.test(q.correctAnswer)) ? (
+                        <MathText content={q.correctAnswer.includes('$') ? q.correctAnswer : `$${q.correctAnswer}$`} inline />
                       ) : (
                         q.correctAnswer || '---'
                       )}
@@ -2767,8 +2767,8 @@ export default function EditorView() {
                   <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                     <span>Câu {idx + 1}:</span>
                     <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900 font-mono">
-                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\')) ? (
-                        <MathText content={q.correctAnswer} inline />
+                      {q.correctAnswer && (q.correctAnswer.includes('$') || q.correctAnswer.includes('\\') || /[\^_\/]/.test(q.correctAnswer)) ? (
+                        <MathText content={q.correctAnswer.includes('$') ? q.correctAnswer : `$${q.correctAnswer}$`} inline />
                       ) : (
                         q.correctAnswer || '---'
                       )}

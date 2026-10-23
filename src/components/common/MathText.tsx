@@ -84,11 +84,20 @@ function escapeHtml(str: string): string {
  */
 function renderCellContent(cellText: string): string {
   if (!cellText) return '';
-  if (!cellText.includes('$')) {
-    return escapeHtml(cellText);
+  let text = cellText.trim();
+  if (!text.includes('$')) {
+    // If text contains LaTeX commands, arrows, infinity, or common math symbols/variables
+    if (
+      /\\[a-zA-Z]+|[+\-]\s*\\infty|\\nearrow|\\searrow|\^|_/.test(text) ||
+      /^(x|y|f\(x\)|f'\(x\)|f''\(x\)|y'|y''|0|\+|-)$/.test(text)
+    ) {
+      text = `$${text}$`;
+    } else {
+      return escapeHtml(text);
+    }
   }
   const mathRegex = /(\$\$[\s\S]*?\$\$|\$(?:\\.|[^\$\\])+\$)/g;
-  const parts = cellText.split(mathRegex);
+  const parts = text.split(mathRegex);
   return parts
     .map((part) => {
       if (!part) return '';
@@ -126,10 +135,17 @@ export default function MathText({ content, className = '', inline = false }: Ma
   const renderedHtml = useMemo(() => {
     if (!content) return '';
 
-    // Step 0: Extract and tokenise Vector SVG diagrams (<svg ...>...</svg>)
+    let preprocessed = content;
+
+    // Step 0: If inline/short formula without $ but contains LaTeX commands or operators, auto-wrap in $
+    if (inline && !preprocessed.includes('$') && (preprocessed.includes('\\') || /[\^_\/]/.test(preprocessed))) {
+      preprocessed = `$${preprocessed.trim()}$`;
+    }
+
+    // Step 0.1: Extract and tokenise Vector SVG diagrams (<svg ...>...</svg>)
     const svgBlocks: string[] = [];
     const svgRegex = /<svg\b[^>]*>[\s\S]*?<\/svg>/gi;
-    let preprocessed = content.replace(svgRegex, (match) => {
+    preprocessed = preprocessed.replace(svgRegex, (match) => {
       const token = `__SVG_BLOCK_${svgBlocks.length}__`;
       svgBlocks.push(match);
       return token;
@@ -148,12 +164,12 @@ export default function MathText({ content, className = '', inline = false }: Ma
       return token;
     });
 
-    // Step 1.5: Extract and tokenise Markdown tables
+    // Step 1.5: Extract and tokenise Markdown tables (supporting both piped and unpiped tables)
     const tableBlocks: string[] = [];
-    const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+    const tableRegex = /(?:^[ \t]*\|?[^\n|]+\|[^\n]+\r?\n)(?:^[ \t]*\|?(?:\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?[ \t]*(?:\r?\n|$))(?:^[ \t]*\|?[^\n|]+\|[^\n]+(?:\r?\n|$))*/gm;
 
     preprocessed = preprocessed.replace(tableRegex, (tableBlock) => {
-      const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim());
+      const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) return tableBlock;
 
       const parseRow = (line: string) => {
@@ -173,14 +189,14 @@ export default function MathText({ content, className = '', inline = false }: Ma
         const cells = parseRow(line);
         const bg = rIdx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/60 dark:bg-slate-800/40';
         rowsHtml += `<tr class="${bg}">` +
-          cells.map((c) => `<td class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 select-text">${renderCellContent(c)}</td>`).join('') +
+          cells.map((c) => `<td class="border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-center text-slate-700 dark:text-slate-300 select-text">${renderCellContent(c)}</td>`).join('') +
           `</tr>`;
       });
       rowsHtml += `</tbody>`;
 
       const tableBoxHtml = `
 <div class="my-2.5 overflow-x-auto rounded-lg border border-slate-300 dark:border-slate-700 shadow-sm print:shadow-none print:border-black print:my-1.5 not-italic">
-  <table class="w-full border-collapse text-xs not-italic text-left">${rowsHtml}</table>
+  <table class="w-full border-collapse text-xs not-italic text-center">${rowsHtml}</table>
 </div>
 `.trim();
 
