@@ -328,6 +328,11 @@ export function normalizeSvgGeometry(content: string): string {
       allPoints.push(l.a, l.b);
     });
 
+    const is3DDiagram =
+      fixed.includes('dasharray') ||
+      fixed.includes('stroke-dash') ||
+      /['’′]/.test(fixed);
+
     // 5. Shift Text Elements cleanly away from lines
     fixed = fixed.replace(/<text\b([^>]*?)>([\s\S]*?)<\/text>/gi, (fullMatch, attrs, textContent) => {
       const xMatch = attrs.match(/\bx=["']([^"']+)["']/i);
@@ -344,10 +349,13 @@ export function normalizeSvgGeometry(content: string): string {
       const cy = ty - 4;
 
       const isAngle = cleanText.includes('°');
-      const isSingleLetter = /^[A-Z]$/.test(cleanText);
+      const isVertexLabel = /^[A-Z]['’′_0-9]?$/i.test(cleanText) || /^[A-Z][0-9]$/i.test(cleanText) || /^[A-Z]_[0-9a-z]$/i.test(cleanText);
       const isInternalLabel = /^(h_[a-z]|m_[a-z]|r|R)$/i.test(cleanText);
 
-      if (isSingleLetter) {
+      if (is3DDiagram) {
+        // In 3D geometry diagrams, 3D perspective projection coordinates are already calculated.
+        // We preserve tx and ty to prevent centroid ray corruption or edge snapping.
+      } else if (isVertexLabel) {
         // Vertex labels (A, B, C...) - push outward along the ray from G
         let closestPt: Vertex | null = null;
         let minPtDist = Infinity;

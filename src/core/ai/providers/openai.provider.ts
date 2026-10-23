@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { ExamPromptBuilder } from '../prompt-builder';
 import { KeyPoolManager } from '../key-pool';
+import { parseAiJson } from '@/lib/utils';
 
 export class OpenAIProvider implements IAIProvider {
   public readonly providerName = 'openai';
@@ -76,12 +77,7 @@ export class OpenAIProvider implements IAIProvider {
         });
 
         const rawContent = completion.choices[0]?.message?.content || '';
-        const cleanJson = rawContent
-          .replace(/^```(?:json)?\s*/i, '')
-          .replace(/\s*```$/i, '')
-          .trim();
-
-        const examData = JSON.parse(cleanJson) as GeneratedExamData;
+        const examData = parseAiJson(rawContent) as GeneratedExamData;
         this.keyPool.markSuccess(activeKey);
 
         return {

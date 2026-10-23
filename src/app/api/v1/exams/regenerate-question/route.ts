@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { AIFactory, SupportedAIProvider } from '@/core/ai/ai-factory';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { apiError, apiSuccess } from '@/lib/utils';
+import { apiError, apiSuccess, parseAiJson } from '@/lib/utils';
 import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
 import { normalizeSvgGeometry } from '@/lib/exam-sections';
@@ -235,8 +235,7 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
         }
 
         const text = result.response.text();
-        const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-        const parsed = JSON.parse(clean);
+        const parsed = parseAiJson(text);
 
         if (parsed.content) {
           const levelClass =
@@ -268,24 +267,6 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
             while (opts.length < 4) {
               const k = subKeys[opts.length] || 'a';
               opts.push({ key: k, text: `Khẳng định ý ${k}`, isCorrect: false });
-            }
-
-            const trueCount = opts.filter((o: any) => o.isCorrect).length;
-            // Prevent 1T-3F monotony: if AI produced 0, 4, or only 1 True, balance into realistic 2T-2F or 3T-1F
-            if (trueCount === 0 || trueCount === 4 || trueCount === 1) {
-              const patterns = [
-                [true, false, true, false],
-                [true, true, false, false],
-                [false, true, true, false],
-                [true, false, false, true],
-                [true, true, true, false],
-                [false, true, true, true],
-              ];
-              const chosen = patterns[Math.floor(Math.random() * patterns.length)];
-              opts = opts.map((o: any, idx: number) => ({
-                ...o,
-                isCorrect: chosen[idx] ?? (idx % 2 === 0),
-              }));
             }
 
             parsed.correctAnswer = opts.map((o: any) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');

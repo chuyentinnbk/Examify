@@ -7,6 +7,7 @@ import {
 } from '../types';
 import { ExamPromptBuilder } from '../prompt-builder';
 import { KeyPoolManager } from '../key-pool';
+import { parseAiJson } from '@/lib/utils';
 
 export class ClaudeProvider implements IAIProvider {
   public readonly providerName = 'claude';
@@ -117,15 +118,7 @@ export class ClaudeProvider implements IAIProvider {
           throw new Error('Claude returned an empty response body');
         }
 
-        // Parse JSON response cleanly
-        let cleanJson = content.trim();
-        if (cleanJson.startsWith('```json')) {
-          cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanJson.startsWith('```')) {
-          cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-
-        const parsedData = JSON.parse(cleanJson) as GeneratedExamData;
+        const parsedData = parseAiJson(content) as GeneratedExamData;
 
         this.keyPool.markSuccess(activeKey);
         return {

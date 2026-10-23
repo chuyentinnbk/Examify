@@ -7,6 +7,7 @@ import {
   ProviderConfig,
 } from '../types';
 import { ExamPromptBuilder } from '../prompt-builder';
+import { parseAiJson } from '@/lib/utils';
 
 export class SelfHostedProvider implements IAIProvider {
   public readonly providerName = 'self-hosted';
@@ -61,13 +62,7 @@ export class SelfHostedProvider implements IAIProvider {
 
       const rawContent = completion.choices[0]?.message?.content || '';
 
-      // Clean response in case markdown formatting wrapper was returned
-      const cleanJson = rawContent
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      const examData = JSON.parse(cleanJson) as GeneratedExamData;
+      const examData = parseAiJson(rawContent) as GeneratedExamData;
 
       return {
         success: true,

@@ -1982,13 +1982,21 @@ export function extractCleanShortAnswerValue(
   explanation?: string | null,
   rawAnswer?: string | null
 ): string {
+  const sanitizeShortVal = (val: string): string => {
+    let clean = val.trim();
+    clean = clean.replace(/^(?:đáp án|đáp số|kết quả|giá trị)\s*(?:là|bằng|=|:)?\s*/i, '').trim();
+    clean = clean.replace(/^\$+|\$+$/g, '').trim();
+    clean = clean.replace(/^[a-zA-Z_](?:\([a-zA-Z0-9_]+\))?\s*[:=]\s*/, '').trim();
+    clean = clean.replace(/\\(?:d)?frac\{([^{}]+)\}\{([^{}]+)\}/g, '$1/$2');
+    clean = clean.replace(/-\s*([0-9]+)\/([0-9]+)/g, '-$1/$2');
+    return clean.trim();
+  };
+
   // 1. If rawAnswer is already a valid concise answer and NOT just a single letter A-D or True/False label
   if (rawAnswer && typeof rawAnswer === 'string') {
     const trimmed = rawAnswer.trim();
     if (!/^[A-Da-d]$/.test(trimmed) && !trimmed.includes(':') && !trimmed.toLowerCase().includes('xem')) {
-      let clean = trimmed.replace(/^\$+|\$+$/g, '').trim();
-      clean = clean.replace(/^[a-zA-Z_]\s*[:=]\s*/, '');
-      clean = clean.replace(/^(?:đáp số|kết quả|giá trị)\s*[:=]?\s*/i, '');
+      const clean = sanitizeShortVal(trimmed);
       if (clean && !/^[A-Da-d]$/.test(clean)) {
         return clean;
       }
@@ -2000,13 +2008,7 @@ export function extractCleanShortAnswerValue(
     let clean = optionText.trim();
     // Strip leading "A. ", "B. ", "(A) ", "a) "
     clean = clean.replace(/^(\(?[A-Da-d]\)[\.\:\-\s]+|[A-Da-d][\.\:\)]\s+)/i, '').trim();
-    // Strip outer $...$
-    clean = clean.replace(/^\$+|\$+$/g, '').trim();
-    // Strip variable prefix like "x = 5", "m = -2", "y = 3", "f(x) = 0", "S = "
-    clean = clean.replace(/^[a-zA-Z_](?:\([a-zA-Z0-9_]+\))?\s*[:=]\s*/, '');
-    // Strip leading phrases like "Đáp án là", "Kết quả là"
-    clean = clean.replace(/^(?:đáp án|đáp số|kết quả|giá trị)\s*(?:là|bằng|=|:)?\s*/i, '');
-
+    clean = sanitizeShortVal(clean);
     if (clean && !/^[A-Da-d]$/.test(clean)) {
       return clean;
     }
@@ -2014,27 +2016,27 @@ export function extractCleanShortAnswerValue(
 
   // 3. Search explanation for mathematical conclusion
   if (explanation && typeof explanation === 'string') {
-    // Pattern 1: Explicit answer statement like "Đáp số: 15" or "Kết quả: -4"
-    const p1 = explanation.match(/(?:đáp số|kết quả|đáp án)\s*[:=]\s*\$?([+-]?\d+(?:[\.,/]\d+)?|\{[^\}]+\}|\([^\)]+\))\$?/i);
-    if (p1 && p1[1]) return p1[1].trim();
+    // Pattern 1: Explicit answer statement like "Đáp số: 15", "Đáp số: \frac{3}{4}", "Kết quả: \sqrt{2}"
+    const p1 = explanation.match(/(?:đáp số|kết quả|đáp án)\s*[:=]\s*\$?([+-]?(?:\\(?:d)?frac\{[^{}]+\}\{[^{}]+\}|\d+(?:[\.,/]\d+)?|\\sqrt\{[^{}]+\}|\{[^\}]+\}|\([^\)]+\)))/i);
+    if (p1 && p1[1]) return sanitizeShortVal(p1[1]);
 
     // Pattern 2: "Vậy... bằng/là X" or "Do đó... bằng/là X"
-    const p2 = explanation.match(/(?:vậy|do đó|suy ra|kết luận)\s+[^,\.\n]*?\s+(?:là|bằng|=|đạt giá trị)\s*\$?([+-]?\d+(?:[\.,/]\d+)?|\{[^\}]+\}|\([^\)]+\))\$?/i);
-    if (p2 && p2[1]) return p2[1].trim();
+    const p2 = explanation.match(/(?:vậy|do đó|suy ra|kết luận)\s+[^,\.\n]*?\s+(?:là|bằng|=|đạt giá trị)\s*\$?([+-]?(?:\\(?:d)?frac\{[^{}]+\}\{[^{}]+\}|\d+(?:[\.,/]\d+)?|\\sqrt\{[^{}]+\}|\{[^\}]+\}|\([^\)]+\)))/i);
+    if (p2 && p2[1]) return sanitizeShortVal(p2[1]);
 
-    // Pattern 3: Last formula equality like "= 15" or "bằng 15" at end of explanation
-    const matches = [...explanation.matchAll(/(?:=|bằng|là)\s*\$?([+-]?\d+(?:[\.,/]\d+)?)\$?(?:\s*[\.\,\n]|$)/gi)];
+    // Pattern 3: Last formula equality like "= 15", "= \frac{3}{4}" at end of explanation
+    const matches = [...explanation.matchAll(/(?:=|bằng|là)\s*\$?([+-]?(?:\\(?:d)?frac\{[^{}]+\}\{[^{}]+\}|\d+(?:[\.,/]\d+)?))\$?(?:\s*[\.\,\n]|$)/gi)];
     if (matches.length > 0) {
-      return matches[matches.length - 1][1].trim();
+      return sanitizeShortVal(matches[matches.length - 1][1]);
     }
   }
 
   // 4. Fallback if optionText had non-empty text
   if (optionText && !/^[A-Da-d]$/.test(optionText.trim())) {
-    return optionText.trim().replace(/^\$+|\$+$/g, '');
+    return sanitizeShortVal(optionText);
   }
 
-  return rawAnswer && !/^[A-Da-d]$/.test(rawAnswer.trim()) ? rawAnswer.trim() : '';
+  return rawAnswer && !/^[A-Da-d]$/.test(rawAnswer.trim()) ? sanitizeShortVal(rawAnswer) : '';
 }
 
 /**

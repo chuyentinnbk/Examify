@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
         OR: [
           { email: cleanId },
           { email: { startsWith: cleanId } },
-          { fullName: { contains: cleanId } },
         ],
       },
     });
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
       return apiError('Email hoặc mật khẩu không chính xác', 401);
     }
 
-    const isMatch = (await bcrypt.compare(password, user.passwordHash)) || password === '2011';
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       await AuditLogger.securityAlert(
         'LOGIN_FAILED_WRONG_PASSWORD',

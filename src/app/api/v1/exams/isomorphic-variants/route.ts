@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { apiError, apiSuccess } from '@/lib/utils';
+import { apiError, apiSuccess, parseAiJson } from '@/lib/utils';
 import { generateExamVariants, ShuffledVariant } from '@/lib/exam-shuffler';
 import { normalizeQuestionType, normalizeSvgGeometry } from '@/lib/exam-sections';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
@@ -79,20 +79,6 @@ function normalizeTfOptions(options: any[], correctAnswer?: string): { options: 
   while (opts.length < 4) {
     const k = subKeys[opts.length] || 'a';
     opts.push({ key: k, text: `Mệnh đề ${k}`, isCorrect: opts.length % 2 === 0 });
-  }
-
-  // Ensure realistic true/false balance
-  const trueCount = opts.filter((o) => o.isCorrect).length;
-  if (trueCount === 0 || trueCount === 4 || trueCount === 1) {
-    const patterns = [
-      [true, false, true, false],
-      [true, true, false, false],
-      [false, true, true, false],
-      [true, true, true, false],
-      [false, true, true, true],
-    ];
-    const chosen = patterns[Math.floor(Math.random() * patterns.length)];
-    opts = opts.map((o, idx) => ({ ...o, isCorrect: chosen[idx] ?? false }));
   }
 
   const ansStr = opts.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
@@ -276,8 +262,7 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
         throw lastErr || new Error('All fallback models failed to generate content');
       }
 
-      const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsedArray = JSON.parse(clean);
+      const parsedArray = parseAiJson(text);
 
       if (!Array.isArray(parsedArray) || parsedArray.length === 0) {
         throw new Error('AI output is not a valid question array');

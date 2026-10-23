@@ -4,26 +4,14 @@ import {
   ExtractedLessonData,
   ParsedDocumentPayload,
 } from '@/core/storage/academic-storage';
+import { parseAiJson } from '@/lib/utils';
 
 export class AcademicParser {
   /**
-   * Cleans AI JSON output by stripping markdown fences.
+   * Cleans AI JSON output and parses robustly using parseAiJson.
    */
   private static extractJson(rawText: string): any {
-    let clean = rawText.trim();
-    if (clean.startsWith('```')) {
-      clean = clean.replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
-    }
-    try {
-      return JSON.parse(clean);
-    } catch {
-      const firstBrace = clean.indexOf('{');
-      const lastBrace = clean.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        return JSON.parse(clean.substring(firstBrace, lastBrace + 1));
-      }
-      throw new Error('AI output is not valid JSON');
-    }
+    return parseAiJson(rawText);
   }
 
   /**

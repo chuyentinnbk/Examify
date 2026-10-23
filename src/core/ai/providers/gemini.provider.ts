@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { ExamPromptBuilder } from '../prompt-builder';
 import { KeyPoolManager } from '../key-pool';
+import { parseAiJson } from '@/lib/utils';
 
 export class GeminiProvider implements IAIProvider {
   public readonly providerName = 'gemini';
@@ -76,13 +77,7 @@ export class GeminiProvider implements IAIProvider {
         const result = await model.generateContent(userPrompt);
         const rawResponse = result.response.text();
 
-        // Clean response markdown fences if returned
-        const cleanJson = rawResponse
-          .replace(/^```(?:json)?\s*/i, '')
-          .replace(/\s*```$/i, '')
-          .trim();
-
-        const examData = JSON.parse(cleanJson) as GeneratedExamData;
+        const examData = parseAiJson(rawResponse) as GeneratedExamData;
 
         // Mark key as healthy
         this.keyPool.markSuccess(activeKey);

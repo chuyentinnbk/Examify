@@ -12,6 +12,7 @@ import {
   WidthType,
   Footer,
   PageNumber,
+  ImageRun,
 } from 'docx';
 import JSZip from 'jszip';
 import { ExamItem, ExamQuestion, formatExamCode } from '@/lib/store/app-store';
@@ -86,7 +87,7 @@ export function cleanMathForDoc(text: string): string {
   let res = text;
 
   // Strip raw SVG XML blocks into a clean note so Word document doesn't get flooded with XML code
-  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n[Hình vẽ minh họa: Vui lòng xem trên bản in PDF hoặc giao diện web]\n');
+  res = res.replace(/<svg\b[\s\S]*?<\/svg>/gi, '\n[Hình vẽ minh họa]\n');
 
   // Convert LaTeX fractions: \frac{a}{b} -> (a)/(b)
   res = res.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1)/($2)');
@@ -331,54 +332,212 @@ function renderTextAndTablesToDocx(
 }
 
 /**
- * Renders question content into formatted docx elements,
- * supporting regular text, highlighted code blocks, and structured tables.
+ * Converts an SVG XML string into a PNG buffer suitable for docx ImageRun.
+ * Uses an offscreen HTMLCanvasElement in the browser.
  */
-function renderQuestionContentToDocx(qNum: number, rawContent: string): (Paragraph | Table)[] {
-  const elements: (Paragraph | Table)[] = [];
-  const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+async function svgToPngBuffer(
+  svgString: string
+): Promise<{ data: Uint8Array; width: number; height: number } | null> {
+  if (typeof window === 'undefined') return null;
 
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  const isFirstPartRef = { value: true };
+  return new Promise((resolve) => {
+    try {
+      const vbMatch = svgString.match(/viewBox=["']([0-9.\s-]+)["']/i);
+      let nativeW = 340;
+      let nativeH = 220;
+      if (vbMatch) {
+        const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
+        if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
+          nativeW = parts[2];
+          nativeH = parts[3];
+        }
+      } else {
+        const wMatch = svgString.match(/\bwidth=["']([0-9.]+)["']/i);
+        const hMatch = svgString.match(/\bheight=["']([0-9.]+)["']/i);
+        if (wMatch && hMatch) {
+          nativeW = Number(wMatch[1]) || 340;
+          nativeH = Number(hMatch[1]) || 220;
+        }
+      }
 
-  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
-    const textBefore = rawContent.slice(lastIndex, match.index);
-    if (textBefore || isFirstPartRef.value) {
-      elements.push(...renderTextAndTablesToDocx(textBefore, isFirstPartRef, qNum));
+      // Constrain display dimensions inside Word page (max width 400px)
+      const maxDisplayW = 400;
+      const scale = Math.min(1, maxDisplayW / nativeW);
+      const displayW = Math.round(nativeW * scale);
+      const displayH = Math.round(nativeH * scale);
+
+      let cleanSvg = svgString;
+      if (!cleanSvg.includes('xmlns=')) {
+        cleanSvg = cleanSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+
+      const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = nativeW * 2;
+          canvas.height = nativeH * 2;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            URL.revokeObjectURL(url);
+            resolve(null);
+            return;
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          canvas.toBlob((pngBlob) => {
+            URL.revokeObjectURL(url);
+            if (!pngBlob) {
+              resolve(null);
+              return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const arrayBuffer = reader.result as ArrayBuffer;
+              resolve({
+                data: new Uint8Array(arrayBuffer),
+                width: displayW,
+                height: displayH,
+              });
+            };
+            reader.readAsArrayBuffer(pngBlob);
+          }, 'image/png');
+        } catch {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+
+      img.src = url;
+    } catch {
+      resolve(null);
     }
+  });
+}
 
-    const code = match[1].replace(/\r\n/g, '\n').trimEnd();
-    const codeLines = code.split('\n');
-    elements.push(
-      new Paragraph({
-        children: codeLines.map((line, lineIdx) =>
-          new TextRun({
-            text: line,
-            font: 'Consolas',
-            size: 20,
-            color: '1E293B',
-            break: lineIdx > 0 ? 1 : 0,
-          })
-        ),
-        shading: { fill: 'F1F5F9' },
-        indent: { left: 400, right: 400 },
-        spacing: { before: 80, after: 80 },
-        border: {
-          left: { style: BorderStyle.SINGLE, size: 12, color: '3B82F6' },
-          top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
-          bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
-          right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
-        },
-      })
-    );
+/**
+ * Renders question content into formatted docx elements,
+ * supporting regular text, highlighted code blocks, structured tables, and embedded SVG images.
+ */
+async function renderQuestionContentToDocx(
+  qNum: number,
+  rawContent: string
+): Promise<(Paragraph | Table)[]> {
+  const elements: (Paragraph | Table)[] = [];
 
-    lastIndex = match.index + match[0].length;
+  // Split content by SVG blocks
+  const svgRegex = /<svg\b[\s\S]*?<\/svg>/gi;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+  const chunks: { type: 'text' | 'svg'; text: string }[] = [];
+
+  while ((match = svgRegex.exec(rawContent)) !== null) {
+    if (match.index > lastIdx) {
+      chunks.push({ type: 'text', text: rawContent.slice(lastIdx, match.index) });
+    }
+    chunks.push({ type: 'svg', text: match[0] });
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < rawContent.length) {
+    chunks.push({ type: 'text', text: rawContent.slice(lastIdx) });
+  }
+  if (chunks.length === 0) {
+    chunks.push({ type: 'text', text: rawContent });
   }
 
-  const textAfter = rawContent.slice(lastIndex);
-  if (textAfter || isFirstPartRef.value) {
-    elements.push(...renderTextAndTablesToDocx(textAfter, isFirstPartRef, qNum));
+  const isFirstPartRef = { value: true };
+
+  for (const chunk of chunks) {
+    if (chunk.type === 'svg') {
+      const pngInfo = await svgToPngBuffer(chunk.text);
+      if (pngInfo) {
+        elements.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 120, after: 120 },
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: pngInfo.data,
+                transformation: {
+                  width: pngInfo.width,
+                  height: pngInfo.height,
+                },
+              }),
+            ],
+          })
+        );
+      } else {
+        elements.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 80, after: 80 },
+            children: [
+              new TextRun({
+                text: '[Hình vẽ minh họa]',
+                italics: true,
+                size: 20,
+                color: '64748B',
+              }),
+            ],
+          })
+        );
+      }
+    } else {
+      const textChunk = chunk.text;
+      const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+      let lastCodeIdx = 0;
+      let codeMatch: RegExpExecArray | null;
+
+      while ((codeMatch = codeBlockRegex.exec(textChunk)) !== null) {
+        const textBefore = textChunk.slice(lastCodeIdx, codeMatch.index);
+        if (textBefore || isFirstPartRef.value) {
+          elements.push(...renderTextAndTablesToDocx(textBefore, isFirstPartRef, qNum));
+        }
+
+        const code = codeMatch[1].replace(/\r\n/g, '\n').trimEnd();
+        const codeLines = code.split('\n');
+        elements.push(
+          new Paragraph({
+            children: codeLines.map((line, lineIdx) =>
+              new TextRun({
+                text: line,
+                font: 'Consolas',
+                size: 20,
+                color: '1E293B',
+                break: lineIdx > 0 ? 1 : 0,
+              })
+            ),
+            shading: { fill: 'F1F5F9' },
+            indent: { left: 400, right: 400 },
+            spacing: { before: 80, after: 80 },
+            border: {
+              left: { style: BorderStyle.SINGLE, size: 12, color: '3B82F6' },
+              top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+              right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+            },
+          })
+        );
+
+        lastCodeIdx = codeMatch.index + codeMatch[0].length;
+      }
+
+      const textAfter = textChunk.slice(lastCodeIdx);
+      if (textAfter || isFirstPartRef.value) {
+        elements.push(...renderTextAndTablesToDocx(textAfter, isFirstPartRef, qNum));
+      }
+    }
   }
 
   return elements;
@@ -563,7 +722,8 @@ export async function generateDocxBlob(
 
   // 3. Question Items List with Sections
   let currentSectionKey = '';
-  questions.forEach((q, idx) => {
+  for (let idx = 0; idx < questions.length; idx++) {
+    const q = questions[idx];
     const normType = normalizeQuestionType(q.type);
     const sectionKey = q.section || normType;
     if (sectionKey !== currentSectionKey) {
@@ -594,7 +754,7 @@ export async function generateDocxBlob(
     }
 
     // Question Title & Content (chuẩn đề thi: Câu 1. nội dung, hỗ trợ khối mã nguồn code block)
-    const contentParagraphs = renderQuestionContentToDocx(idx + 1, q.content || '');
+    const contentParagraphs = await renderQuestionContentToDocx(idx + 1, q.content || '');
     contentParagraphs.forEach((p) => docChildren.push(p));
 
     // 1. Loại: Đúng / Sai (Bảng 4 cột chuẩn Bộ GD&ĐT: STT, Mệnh đề, Đúng, Sai)
@@ -918,7 +1078,7 @@ export async function generateDocxBlob(
         );
       }
     }
-  });
+  }
 
   // Footer Marker
   docChildren.push(

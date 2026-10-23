@@ -14,6 +14,7 @@ import {
   ExtractedConcept,
 } from '@/core/storage/academic-storage';
 import { AcademicDocType, ParseStatus } from '@prisma/client';
+import { parseAiJson } from '@/lib/utils';
 
 export interface AgentStepProgress {
   step: 'INIT' | 'PLANNING' | 'DIGITIZING' | 'SYNTHESIZING' | 'COMPLETED' | 'ERROR';
@@ -28,20 +29,7 @@ export interface AgentStepProgress {
 
 export class AcademicAgent {
   private static extractJson(rawText: string): any {
-    let clean = rawText.trim();
-    if (clean.startsWith('```')) {
-      clean = clean.replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
-    }
-    try {
-      return JSON.parse(clean);
-    } catch {
-      const firstBrace = clean.indexOf('{');
-      const lastBrace = clean.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        return JSON.parse(clean.substring(firstBrace, lastBrace + 1));
-      }
-      throw new Error('Không thể phân tích dữ liệu JSON từ AI');
-    }
+    return parseAiJson(rawText);
   }
 
   /**
