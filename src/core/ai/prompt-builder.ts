@@ -155,16 +155,16 @@ Your sole objective is to author high-quality, academically rigorous, and curric
      * BẮT BUỘC nhúng một đoạn mã Vector SVG chuẩn vào trong trường "content" của câu hỏi:
        <svg viewBox="0 0 320 220" width="320" height="220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg"> ... </svg>
      * BẮT BUỘC SỬ DỤNG HỆ TỌA ĐỘ MẪU CHUẨN (GOLDEN COORDINATES TEMPLATES) - TUYỆT ĐỐI CẤM TỰ BỊA TỌA ĐỘ KHIẾN HÌNH BỊ MÉO MÓ HOẶC ĐÈ NÉT:
-       + MẪU 1: HÌNH HỘP CHỮ NHẬT / HÌNH LẬP PHƯƠNG ABCD.A'B'C'D' (CHUẨN SGK HÌNH HỌC KHÔNG GIAN VIỆT NAM):
-         Quy ước: Đỉnh A ở góc trong cùng bên trái (khuất). Đáy dưới ABCD, đáy trên A'B'C'D'.
-         Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="80,50 50,90 190,90 220,50" fill="none" stroke="black" stroke-width="1.5" />
-         3 cạnh bên đứng nhìn thấy (nét liền): B'B(50,90 -> 50,180), C'C(190,90 -> 190,180), D'D(220,50 -> 220,140).
-         2 cạnh đáy dưới nhìn thấy (nét liền): BC(50,180 -> 190,180), CD(190,180 -> 220,140).
+       + MẪU 1: HÌNH LẬP PHƯƠNG / HÌNH HỘP CHỮ NHẬT ABCD.A'B'C'D' (CHUẨN TỈ LỆ VÀNG SGK VIỆT NAM):
+         Quy ước: Đỉnh A ở góc trong cùng bên trái (khuất). Đáy dưới ABCD, đáy trên A'B'C'D'. Tỉ lệ cân đối hoàn mỹ (Rộng 130, Cao 115, Nghiêng 40px ở 45°):
+         Đáy trên A'B'C'D' (toàn bộ nét liền ở trên cao): <polygon points="90,40 50,80 180,80 220,40" fill="none" stroke="black" stroke-width="1.5" />
+         3 cạnh bên đứng nhìn thấy (nét liền): B'B(50,80 -> 50,195), C'C(180,80 -> 180,195), D'D(220,40 -> 220,155).
+         2 cạnh đáy dưới nhìn thấy (nét liền): BC(50,195 -> 180,195), CD(180,195 -> 220,155).
          3 CẠNH KHUẤT DUY NHẤT ĐI QUA ĐỈNH A BÊN TRONG (BẮT BUỘC NÉT ĐỨT stroke-dasharray="4,4"):
-         - Cạnh bên đứng A'A: <line x1="80" y1="50" x2="80" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-         - Cạnh đáy AB: <line x1="80" y1="140" x2="50" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-         - Cạnh đáy AD: <line x1="80" y1="140" x2="220" y2="140" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
-         Nhãn đỉnh chuẩn không đè nét: A'(75,40), B'(32,95), C'(198,95), D'(228,48), A(88,136), B(32,190), C(195,195), D(228,145).
+         - Cạnh bên đứng A'A: <line x1="90" y1="40" x2="90" y2="155" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy AB: <line x1="90" y1="155" x2="50" y2="195" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         - Cạnh đáy AD: <line x1="90" y1="155" x2="220" y2="155" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+         Nhãn đỉnh chuẩn tuyệt đối ngoài mép không đè nét: A'(86,28), B'(30,78), C'(188,78), D'(228,38), A(98,150), B(30,204), C(186,204), D(228,160).
        + MẪU 2A: HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C' (ĐỈNH B Ở PHÍA SAU):
          Đáy trên A'B'C' (tam giác nhìn thấy toàn bộ): <polygon points="60,60 140,40 220,60" fill="none" stroke="black" stroke-width="1.5" />
          2 cạnh bên đứng nhìn thấy (nét liền): A'A(60,60 -> 60,160), C'C(220,60 -> 220,160).

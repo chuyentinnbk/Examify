@@ -1,3 +1,5 @@
+import { autoCanonicalizeGeometrySvg } from './geometry-templates';
+
 /**
  * Danh sách gợi ý tên Kỳ thi / Bài kiểm tra chuẩn
  */
@@ -235,7 +237,15 @@ export function normalizeSvgGeometry(content: string): string {
     return content;
   }
 
-  return content.replace(/<svg\b([\s\S]*?)<\/svg>/gi, (svgBlock) => {
+  // Tự động nắn và chuẩn hóa các hình học chuẩn (lập phương, chóp, nón, lăng trụ)
+  const canonicalized = autoCanonicalizeGeometrySvg(content);
+
+  return canonicalized.replace(/<svg\b([\s\S]*?)<\/svg>/gi, (svgBlock) => {
+    // Nếu là hình mẫu chuẩn (Canonical Golden SVG), giữ nguyên 100% tọa độ vàng
+    if (svgBlock.includes('data-canonical-geo=')) {
+      return svgBlock;
+    }
+
     // 1. Fix malformed <line points="...">
     let fixed = svgBlock.replace(
       /<line\b([^>]*?)\bpoints=["']([^"']+)["']([^>]*?)(\/?>)/gi,
