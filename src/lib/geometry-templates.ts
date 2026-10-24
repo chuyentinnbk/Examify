@@ -73,6 +73,54 @@ export function buildCubeSvg(labels: Record<string, string> = {}): string {
 }
 
 /**
+ * 1B. HÌNH HỘP CHỮ NHẬT (RECTANGULAR CUBOID / BOX) ABCD.A'B'C'D'
+ * Phép chiếu trục đo xiên chuẩn SGK Việt Nam:
+ * - Đáy hình chữ nhật nằm ngang dài hơn chiều sâu, chiều cao tương ứng tạo khối hộp chữ nhật rõ rệt.
+ * - Phân biệt hoàn toàn với hình lập phương vuông vức.
+ */
+export function buildRectangularBoxSvg(labels: Record<string, string> = {}): string {
+  const l = {
+    A_prime: labels["A'"] || "A'",
+    B_prime: labels["B'"] || "B'",
+    C_prime: labels["C'"] || "C'",
+    D_prime: labels["D'"] || "D'",
+    A: labels['A'] || 'A',
+    B: labels['B'] || 'B',
+    C: labels['C'] || 'C',
+    D: labels['D'] || 'D',
+  };
+
+  return `<svg viewBox="0 0 320 230" width="320" height="230" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg" data-canonical-geo="rectangular_box">
+  <!-- Đáy trên A'B'C'D' (toàn bộ nét liền, hình chữ nhật phối cảnh) -->
+  <polygon points="85,40 40,75 205,75 250,40" fill="none" stroke="black" stroke-width="1.5" />
+  
+  <!-- 3 Cạnh bên nhìn thấy (nét liền) -->
+  <line x1="40" y1="75" x2="40" y2="190" stroke="black" stroke-width="1.5" />
+  <line x1="205" y1="75" x2="205" y2="190" stroke="black" stroke-width="1.5" />
+  <line x1="250" y1="40" x2="250" y2="155" stroke="black" stroke-width="1.5" />
+  
+  <!-- 2 Cạnh đáy dưới nhìn thấy (nét liền) -->
+  <line x1="40" y1="190" x2="205" y2="190" stroke="black" stroke-width="1.5" />
+  <line x1="205" y1="190" x2="250" y2="155" stroke="black" stroke-width="1.5" />
+  
+  <!-- 3 Cạnh khuất đi qua đỉnh A (nét đứt) -->
+  <line x1="85" y1="40" x2="85" y2="155" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="85" y1="155" x2="40" y2="190" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="85" y1="155" x2="250" y2="155" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Nhãn đỉnh đặt chuẩn vị trí, không đè nét -->
+  <text x="80" y="28" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.A_prime}</text>
+  <text x="22" y="75" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.B_prime}</text>
+  <text x="214" y="75" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.C_prime}</text>
+  <text x="258" y="38" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.D_prime}</text>
+  <text x="94" y="150" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.A}</text>
+  <text x="22" y="198" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.B}</text>
+  <text x="212" y="198" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.C}</text>
+  <text x="258" y="160" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.D}</text>
+</svg>`;
+}
+
+/**
  * 2. HÌNH CHÓP S.ABCD (SA VUÔNG GÓC ĐÁY)
  */
 export function buildPyramidQuadSaPerpSvg(labels: Record<string, string> = {}): string {
@@ -213,7 +261,11 @@ export function buildConeSvg(labels: Record<string, string> = {}): string {
  */
 export function detectCanonicalGeometryType(text: string): GeometryShapeType | null {
   const norm = text.toLowerCase();
-  if (norm.includes('lập phương') || norm.includes('hình hộp')) {
+  // 1. Phân biệt rõ ràng Hình hộp chữ nhật vs Hình lập phương
+  if (norm.includes('hộp chữ nhật') || norm.includes('hhcn') || (norm.includes('hình hộp') && !norm.includes('lập phương'))) {
+    return 'rectangular_box';
+  }
+  if (norm.includes('lập phương') || norm.includes('hlp') || norm.includes('khối lập phương')) {
     return 'cube';
   }
   if (text.includes("A'") && text.includes("B'") && text.includes("C'") && text.includes("D'") &&
@@ -221,7 +273,7 @@ export function detectCanonicalGeometryType(text: string): GeometryShapeType | n
       (text.includes('>B<') || text.includes('> B <') || text.includes('B</text>')) &&
       (text.includes('>C<') || text.includes('> C <') || text.includes('C</text>')) &&
       (text.includes('>D<') || text.includes('> D <') || text.includes('D</text>'))) {
-    return 'cube';
+    return norm.includes('hộp') ? 'rectangular_box' : 'cube';
   }
   if (text.includes("A'") && text.includes("B'") && text.includes("C'") && !text.includes("D'") &&
       (text.includes('>A<') || text.includes('> A <') || text.includes('A</text>')) &&
@@ -258,6 +310,9 @@ export function autoCanonicalizeGeometrySvg(content: string): string {
   const shapeType = detectCanonicalGeometryType(content);
   if (!shapeType) return content;
 
+  if (shapeType === 'rectangular_box') {
+    return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildRectangularBoxSvg());
+  }
   if (shapeType === 'cube') {
     return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildCubeSvg());
   }
