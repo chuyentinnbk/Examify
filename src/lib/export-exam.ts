@@ -2272,11 +2272,16 @@ export function generatePdfHtml(
       let ansText = cleanMathForDoc(q.correctAnswer || '');
       const normType = normalizeQuestionType(q.type);
       if (normType === 'true_false') {
-        const tfParts = (q.options || []).map((o, oIdx) => {
-          const lk = (o.key || String.fromCharCode(97 + oIdx)).toLowerCase().replace(/[\)\.\:]/g, '');
-          return `${lk}: ${o.isCorrect ? 'Đ' : 'S'}`;
-        });
-        ansText = tfParts.join(', ');
+        const hasExplicitTfAnswer = q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
+        if (hasExplicitTfAnswer) {
+          ansText = cleanMathForDoc(q.correctAnswer);
+        } else {
+          const tfParts = (q.options || []).map((o, oIdx) => {
+            const lk = (o.key || String.fromCharCode(97 + oIdx)).toLowerCase().replace(/[\)\.\:]/g, '');
+            return `${lk}: ${o.isCorrect ? 'Đ' : 'S'}`;
+          });
+          ansText = tfParts.join(', ');
+        }
       } else if (normType === 'essay') {
         ansText = 'Xem chi tiết';
       }

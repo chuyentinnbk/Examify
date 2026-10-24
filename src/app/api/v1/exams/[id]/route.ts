@@ -1,9 +1,12 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import fs from 'fs/promises';
+import path from 'path';
 import prisma from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus } from '@prisma/client';
 import { normalizeSvgGeometry } from '@/lib/exam-sections';
+import { StorageManager } from '@/core/storage/storage-manager';
 
 export async function PUT(
   req: NextRequest,
@@ -106,6 +109,33 @@ export async function PUT(
       data: updateData,
     });
 
+    // Synchronize disk artifact file if present
+    if (existing.filePath) {
+      try {
+        const fullPath = path.isAbsolute(existing.filePath)
+          ? existing.filePath
+          : path.join(process.cwd(), existing.filePath);
+        const existingData = await StorageManager.getExamArtifact(existing.filePath);
+        await fs.writeFile(
+          fullPath,
+          JSON.stringify(
+            {
+              ...(existingData || {}),
+              examId: existing.id,
+              title: newStructured.title || existing.title,
+              content: newStructured,
+              updatedAt: new Date().toISOString(),
+            },
+            null,
+            2
+          ),
+          'utf-8'
+        );
+      } catch (fileErr) {
+        console.warn('Failed to update disk artifact:', fileErr);
+      }
+    }
+
     return apiSuccess({ examId: updated.id }, 'Đã cập nhật đề thi vào cơ sở dữ liệu');
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error updating exam';
@@ -142,6 +172,14 @@ export async function DELETE(
     await prisma.exam.delete({
       where: { id },
     });
+
+    if (existing.filePath) {
+      try {
+        await StorageManager.deleteExamArtifact(existing.filePath);
+      } catch (err) {
+        console.warn('Failed to delete disk artifact file:', err);
+      }
+    }
 
     return apiSuccess({ id }, 'Đã xóa đề thi khỏi cơ sở dữ liệu');
   } catch (error: unknown) {

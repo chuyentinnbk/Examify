@@ -342,27 +342,41 @@ export async function POST(req: NextRequest) {
               // Ensure clean numeric answer without multiple-choice letters
               q.correctAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
             } else if (isTF) {
+              const subKeys = ['a', 'b', 'c', 'd'];
               let answerStr = String(q.correctAnswer || '');
-              const tfMatches = answerStr.match(/(?:[a-d][\:\.\s]+)?([ĐđSsTtFf])/gi);
-              let trueCount = 0;
-              let totalItems = 4;
-              if (tfMatches) {
-                totalItems = tfMatches.length;
-                trueCount = tfMatches.filter((m) => /[ĐđTt]/i.test(m)).length;
+
+              // If correctAnswer is missing or incomplete, try extracting verified truth values from explanation
+              if (!/[a-d]\s*[:=-]/i.test(answerStr) && typeof q.explanation === 'string') {
+                const extracted: string[] = [];
+                subKeys.forEach((k) => {
+                  const reg = new RegExp(`(?:^|\\n|\\s)${k}\\)[^\\n]*?\\((Đúng|Sai|Đ|S|True|False)\\)`, 'i');
+                  const m = q.explanation.match(reg);
+                  if (m) {
+                    const isT = /[ĐđTt]/i.test(m[1]);
+                    extracted.push(`${k}: ${isT ? 'Đ' : 'S'}`);
+                  }
+                });
+                if (extracted.length === 4) {
+                  answerStr = extracted.join(', ');
+                  q.correctAnswer = answerStr;
+                }
               }
 
-              // If all 4 are False (0 True), or all 4 are True, or only 1 True (monotonous 1T 3F)
-              if (trueCount <= 1 || trueCount === totalItems) {
-                const balancedPatterns = [
-                  'a: Đ, b: S, c: Đ, d: S',
-                  'a: Đ, b: Đ, c: S, d: S',
-                  'a: S, b: Đ, c: Đ, d: S',
-                  'a: Đ, b: S, c: S, d: Đ',
-                  'a: S, b: Đ, c: S, d: Đ',
-                  'a: Đ, b: Đ, c: Đ, d: S',
-                  'a: S, b: Đ, c: Đ, d: Đ',
-                ];
-                q.correctAnswer = balancedPatterns[Math.floor(Math.random() * balancedPatterns.length)];
+              // Synchronize options array so each option has key, text, and isCorrect matching correctAnswer
+              if (Array.isArray(q.options) && q.options.length > 0) {
+                q.options = q.options.slice(0, 4).map((opt: any, optIdx: number) => {
+                  const k = subKeys[optIdx] || 'a';
+                  const rawText = typeof opt === 'string' ? opt : (opt.text || '');
+                  const cleanText = rawText.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+                  const isCorrect = /[a-d]\s*[:=-]/i.test(answerStr)
+                    ? new RegExp(`${k}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(answerStr)
+                    : (typeof opt === 'object' && opt !== null && opt.isCorrect !== undefined ? !!opt.isCorrect : optIdx % 2 === 0);
+                  return {
+                    key: k,
+                    text: cleanText || rawText,
+                    isCorrect,
+                  };
+                });
               }
             } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>

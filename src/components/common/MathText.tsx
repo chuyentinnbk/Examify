@@ -137,7 +137,17 @@ export default function MathText({ content, className = '', inline = false }: Ma
 
     let preprocessed = content;
 
-    // Step 0: Normalize naked sqrt functions and auto-wrap math expressions
+    // Step 0.0: Extract and tokenise Vector SVG diagrams (<svg ...>...</svg>) FIRST
+    // to protect all SVG attributes, viewBox coordinates, and xmlns URLs from text/math manipulation
+    const svgBlocks: string[] = [];
+    const svgRegex = /<svg\b[^>]*>[\s\S]*?<\/svg>/gi;
+    preprocessed = preprocessed.replace(svgRegex, (match) => {
+      const token = `__SVG_BLOCK_${svgBlocks.length}__`;
+      svgBlocks.push(match);
+      return token;
+    });
+
+    // Step 0.1: Normalize naked sqrt functions and auto-wrap math expressions
     preprocessed = preprocessed.replace(/(^|[^\\])\bsqrt\s*\{/g, '$1\\sqrt{');
     preprocessed = preprocessed.replace(/(^|[^\\])\bsqrt\s*\(([^)]+)\)/g, '$1\\sqrt{$2}');
 
@@ -158,15 +168,6 @@ export default function MathText({ content, className = '', inline = false }: Ma
         }
       }
     }
-
-    // Step 0.1: Extract and tokenise Vector SVG diagrams (<svg ...>...</svg>)
-    const svgBlocks: string[] = [];
-    const svgRegex = /<svg\b[^>]*>[\s\S]*?<\/svg>/gi;
-    preprocessed = preprocessed.replace(svgRegex, (match) => {
-      const token = `__SVG_BLOCK_${svgBlocks.length}__`;
-      svgBlocks.push(match);
-      return token;
-    });
 
     // Step 1: Extract and tokenise code blocks ```lang\ncode```
     const codeBlocks: { lang: string; code: string }[] = [];

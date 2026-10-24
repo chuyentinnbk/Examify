@@ -58,7 +58,7 @@ export interface GeneratedQuestion {
   type: QuestionType;
   cognitiveLevel: CognitiveLevel;
   content: string;
-  options?: string[]; // Required for MULTIPLE_CHOICE (A, B, C, D)
+  options?: any[]; // Required for MULTIPLE_CHOICE (A, B, C, D) and TRUE_FALSE
   correctAnswer: string;
   explanation: string;
   points: number;

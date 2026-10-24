@@ -155,6 +155,53 @@ export function buildPyramidQuadSaPerpSvg(labels: Record<string, string> = {}): 
 }
 
 /**
+ * 2B. HÌNH CHÓP TỨ GIÁC ĐỀU S.ABCD (ĐÁY HÌNH VUÔNG TÂM O, SO VUÔNG GÓC ĐÁY)
+ * Chuẩn SGK Hình học 11/12 Việt Nam:
+ * - Đáy ABCD: Đỉnh A ở góc khuất phía sau bên trái.
+ * - Tâm đáy O: Giao điểm hai đường chéo AC và BD.
+ * - Đỉnh S: Chiếu thẳng đứng vuông góc lên tâm O (SO nét đứt).
+ */
+export function buildPyramidQuadRegularSvg(labels: Record<string, string> = {}): string {
+  const l = {
+    S: labels['S'] || 'S',
+    O: labels['O'] || 'O',
+    A: labels['A'] || 'A',
+    B: labels['B'] || 'B',
+    C: labels['C'] || 'C',
+    D: labels['D'] || 'D',
+  };
+
+  return `<svg viewBox="0 0 300 220" width="300" height="220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg" data-canonical-geo="pyramid_quad_regular">
+  <!-- Cạnh thấy (nét liền) -->
+  <line x1="140" y1="35" x2="45" y2="180" stroke="black" stroke-width="1.5" />
+  <line x1="140" y1="35" x2="195" y2="180" stroke="black" stroke-width="1.5" />
+  <line x1="140" y1="35" x2="235" y2="135" stroke="black" stroke-width="1.5" />
+  <line x1="45" y1="180" x2="195" y2="180" stroke="black" stroke-width="1.5" />
+  <line x1="195" y1="180" x2="235" y2="135" stroke="black" stroke-width="1.5" />
+  
+  <!-- Cạnh khuất qua đỉnh A (nét đứt) -->
+  <line x1="140" y1="35" x2="85" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="85" y1="135" x2="45" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="85" y1="135" x2="235" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Hai đường chéo đáy AC và BD cắt nhau tại O (nét đứt) -->
+  <line x1="85" y1="135" x2="195" y2="180" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="45" y1="180" x2="235" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Đường cao SO từ đỉnh S xuống tâm đáy O (nét đứt) -->
+  <line x1="140" y1="35" x2="140" y2="157.5" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Nhãn đỉnh -->
+  <text x="136" y="24" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.S}</text>
+  <text x="68" y="136" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.A}</text>
+  <text x="28" y="188" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.B}</text>
+  <text x="202" y="188" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.C}</text>
+  <text x="242" y="138" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.D}</text>
+  <text x="134" y="174" font-size="12" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.O}</text>
+</svg>`;
+}
+
+/**
  * 3. HÌNH CHÓP S.ABC (SA VUÔNG GÓC ĐÁY)
  */
 export function buildPyramidTriangleSaPerpSvg(labels: Record<string, string> = {}): string {
@@ -181,6 +228,41 @@ export function buildPyramidTriangleSaPerpSvg(labels: Record<string, string> = {
   <text x="72" y="136" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.A}</text>
   <text x="28" y="188" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.B}</text>
   <text x="248" y="188" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.C}</text>
+</svg>`;
+}
+
+/**
+ * 3B. HÌNH CHÓP TAM GIÁC ĐỀU / TỨ DIỆN ĐỀU S.ABC (ĐÁY TAM GIÁC ĐỀU TÂM G, SG VUÔNG GÓC ĐÁY)
+ */
+export function buildPyramidTriangleRegularSvg(labels: Record<string, string> = {}): string {
+  const l = {
+    S: labels['S'] || 'S',
+    G: labels['G'] || labels['H'] || 'G',
+    A: labels['A'] || 'A',
+    B: labels['B'] || 'B',
+    C: labels['C'] || 'C',
+  };
+
+  return `<svg viewBox="0 0 300 220" width="300" height="220" xmlns="http://www.w3.org/2000/svg" class="exam-geo-svg" data-canonical-geo="pyramid_triangle_regular">
+  <!-- Cạnh thấy (nét liền) -->
+  <line x1="145" y1="35" x2="55" y2="180" stroke="black" stroke-width="1.5" />
+  <line x1="145" y1="35" x2="235" y2="180" stroke="black" stroke-width="1.5" />
+  <line x1="55" y1="180" x2="235" y2="180" stroke="black" stroke-width="1.5" />
+  
+  <!-- Cạnh khuất qua đỉnh A phía sau (nét đứt) -->
+  <line x1="145" y1="35" x2="145" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="55" y1="180" x2="145" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  <line x1="235" y1="180" x2="145" y2="135" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Đường cao SG từ đỉnh S xuống trọng tâm G của đáy (nét đứt) -->
+  <line x1="145" y1="35" x2="145" y2="165" stroke="black" stroke-width="1.5" stroke-dasharray="4,4" />
+  
+  <!-- Nhãn đỉnh -->
+  <text x="142" y="24" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.S}</text>
+  <text x="142" y="126" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.A}</text>
+  <text x="36" y="186" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.B}</text>
+  <text x="245" y="186" font-size="13" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.C}</text>
+  <text x="152" y="170" font-size="12" font-family="Times New Roman, serif" font-weight="bold" fill="black">${l.G}</text>
 </svg>`;
 }
 
@@ -281,10 +363,18 @@ export function detectCanonicalGeometryType(text: string): GeometryShapeType | n
       (text.includes('>C<') || text.includes('> C <') || text.includes('C</text>'))) {
     return 'prism_triangle';
   }
-  if (norm.includes('chóp s.abcd') || (norm.includes('s.abcd') && (norm.includes('sa vuông góc') || norm.includes('sa⊥')))) {
+
+  // 2. Phân biệt Hình chóp tứ giác đều (SO vuông góc ABCD) vs Hình chóp tứ giác có SA vuông góc đáy
+  if (norm.includes('tứ giác đều') || (norm.includes('chóp đều') && norm.includes('s.abcd'))) {
+    return 'pyramid_quad_regular';
+  }
+  if (norm.includes('tam giác đều') || norm.includes('tứ diện đều') || (norm.includes('chóp đều') && norm.includes('s.abc'))) {
+    return 'pyramid_triangle_regular';
+  }
+  if (norm.includes('chóp s.abcd') || (norm.includes('s.abcd') && (norm.includes('sa vuông góc') || norm.includes('sa⊥') || norm.includes('sa perp')))) {
     return 'pyramid_quad_sa_perp';
   }
-  if (norm.includes('chóp s.abc') || (norm.includes('s.abc') && (norm.includes('sa vuông góc') || norm.includes('sa⊥')))) {
+  if (norm.includes('chóp s.abc') || (norm.includes('s.abc') && (norm.includes('sa vuông góc') || norm.includes('sa⊥') || norm.includes('sa perp')))) {
     return 'pyramid_triangle_sa_perp';
   }
   if (norm.includes('lăng trụ tam giác') || norm.includes("abc.a'b'c'") || norm.includes('abc.a’b’c’')) {
@@ -315,6 +405,12 @@ export function autoCanonicalizeGeometrySvg(content: string): string {
   }
   if (shapeType === 'cube') {
     return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildCubeSvg());
+  }
+  if (shapeType === 'pyramid_quad_regular') {
+    return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildPyramidQuadRegularSvg());
+  }
+  if (shapeType === 'pyramid_triangle_regular') {
+    return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildPyramidTriangleRegularSvg());
   }
   if (shapeType === 'pyramid_quad_sa_perp') {
     return content.replace(/<svg\b[\s\S]*?<\/svg>/i, () => buildPyramidQuadSaPerpSvg());

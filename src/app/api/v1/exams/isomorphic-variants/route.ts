@@ -58,16 +58,15 @@ function normalizeOptions(options: any[], correctAnswer?: string): any[] {
 function normalizeTfOptions(options: any[], correctAnswer?: string): { options: any[]; correctAnswer: string } {
   const subKeys = ['a', 'b', 'c', 'd'];
   let opts: any[] = [];
+  const hasExplicitTfAnswer = correctAnswer && /[a-d]\s*[:=-]/i.test(correctAnswer);
 
   if (Array.isArray(options) && options.length > 0) {
     opts = options.slice(0, 4).map((opt, idx) => {
       const key = subKeys[idx] || 'a';
       const text = typeof opt === 'string' ? opt.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim() : (opt.text || '');
-      const isCorrect = opt.isCorrect !== undefined
-        ? opt.isCorrect === true
-        : correctAnswer
+      const isCorrect = hasExplicitTfAnswer
         ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(correctAnswer)
-        : idx % 2 === 0;
+        : (opt.isCorrect !== undefined ? opt.isCorrect === true : idx % 2 === 0);
       return {
         key,
         text: text || `Mệnh đề ${key}`,
