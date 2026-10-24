@@ -137,9 +137,26 @@ export default function MathText({ content, className = '', inline = false }: Ma
 
     let preprocessed = content;
 
-    // Step 0: If inline/short formula without $ but contains LaTeX commands or operators, auto-wrap in $
-    if (inline && !preprocessed.includes('$') && (preprocessed.includes('\\') || /[\^_\/]/.test(preprocessed))) {
-      preprocessed = `$${preprocessed.trim()}$`;
+    // Step 0: Normalize naked sqrt functions and auto-wrap math expressions
+    preprocessed = preprocessed.replace(/(^|[^\\])\bsqrt\s*\{/g, '$1\\sqrt{');
+    preprocessed = preprocessed.replace(/(^|[^\\])\bsqrt\s*\(([^)]+)\)/g, '$1\\sqrt{$2}');
+
+    // If string has no $, check if it contains mathematical notations needing KaTeX compilation
+    if (!preprocessed.includes('$')) {
+      const hasLatexCommand = /\\[a-zA-Z]+/.test(preprocessed);
+      const hasMathSymbol = /[\^_\/]/.test(preprocessed) && /[0-9a-zA-Z]/.test(preprocessed);
+      const hasComparison = /\b[a-zA-Z0-9]\s*(?:>=|<=|>|<|=|\\ge|\\le)\s*[-+]?[0-9a-zA-Z]/.test(preprocessed);
+
+      if (hasLatexCommand || hasMathSymbol || hasComparison) {
+        if (inline || (preprocessed.length < 150 && !preprocessed.includes('\n'))) {
+          let mathExpr = preprocessed.trim();
+          mathExpr = mathExpr.replace(/>=/g, '\\ge ').replace(/<=/g, '\\le ');
+          preprocessed = `$${mathExpr}$`;
+        } else {
+          // In mixed prose, wrap individual naked LaTeX constructs
+          preprocessed = preprocessed.replace(/(\\[a-zA-Z]+(?:\[[^\]]*\])?(?:\{[^{}]*\})*)/g, '$$$1$$');
+        }
+      }
     }
 
     // Step 0.1: Extract and tokenise Vector SVG diagrams (<svg ...>...</svg>)
@@ -229,7 +246,12 @@ export default function MathText({ content, className = '', inline = false }: Ma
 
         // Inline Math: $...$
         if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
-          const rawFormula = part.slice(1, -1).trim();
+          let rawFormula = part.slice(1, -1).trim();
+          // Normalize naked sqrt and comparison operators
+          rawFormula = rawFormula.replace(/(^|[^\\])\bsqrt\s*\{/g, '$1\\sqrt{');
+          rawFormula = rawFormula.replace(/(^|[^\\])\bsqrt\s*\(([^)]+)\)/g, '$1\\sqrt{$2}');
+          rawFormula = rawFormula.replace(/>=/g, '\\ge ').replace(/<=/g, '\\le ');
+
           // Guard against currency amounts like "$15 and $20"
           const hasMathIndicators = /[\\^_{}=+\-*\/<>()]/.test(rawFormula) || /^[a-zA-Z0-9.,]+$/.test(rawFormula);
           if (!hasMathIndicators && /\s{2,}|[a-zA-Z]+\s+[a-zA-Z]+/.test(rawFormula)) {
