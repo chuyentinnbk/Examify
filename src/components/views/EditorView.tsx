@@ -2208,9 +2208,10 @@ export default function EditorView() {
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                             {['a', 'b', 'c', 'd'].map((subKey) => {
                               const rawOpt = (q.options || []).find((o) => o.key.toLowerCase() === subKey);
-                              const isTruth = rawOpt?.isCorrect !== undefined
-                                ? !!rawOpt.isCorrect
-                                : (q.correctAnswer ? new RegExp(`${subKey}\\s*:\\s*(?:Đ|Đúng|True|1)`, 'i').test(q.correctAnswer) : true);
+                              const hasExplicitTfAnswer = q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
+                              const isTruth = hasExplicitTfAnswer
+                                ? new RegExp(`${subKey}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                                : (rawOpt?.isCorrect !== undefined ? !!rawOpt.isCorrect : true);
                               const opt = {
                                 key: subKey,
                                 text: rawOpt ? rawOpt.text : '',
@@ -2479,9 +2480,10 @@ export default function EditorView() {
                           <tbody>
                             {['a', 'b', 'c', 'd'].map((subKey) => {
                               const rawOpt = (q.options || []).find((o) => o.key.toLowerCase() === subKey);
-                              const isTruth = rawOpt?.isCorrect !== undefined
-                                ? !!rawOpt.isCorrect
-                                : (q.correctAnswer ? new RegExp(`${subKey}\\s*:\\s*(?:Đ|Đúng|True|1)`, 'i').test(q.correctAnswer) : true);
+                              const hasExplicitTfAnswer = q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
+                              const isTruth = hasExplicitTfAnswer
+                                ? new RegExp(`${subKey}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                                : (rawOpt?.isCorrect !== undefined ? !!rawOpt.isCorrect : true);
                               const opt = {
                                 key: subKey,
                                 text: rawOpt ? rawOpt.text : `Mệnh đề khẳng định ý ${subKey}`,

@@ -79,17 +79,23 @@ export async function GET(req: NextRequest) {
               const rawOptions = Array.isArray(q.options) && q.options.length > 0 ? q.options : defaultKeys;
               formattedOptions = rawOptions.map((opt: any, optIdx: number) => {
                 const defaultKey = defaultKeys[optIdx] || String(optIdx);
+                const optKey = (typeof opt === 'object' && opt !== null ? opt.key : defaultKey) || defaultKey;
+                const hasExplicitTfAnswer = isTF && q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
+                const tfTruth = hasExplicitTfAnswer
+                  ? new RegExp(`${optKey.toLowerCase()}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
+                  : ((typeof opt === 'object' && opt !== null && opt.isCorrect !== undefined) ? !!opt.isCorrect : optIdx % 2 === 0);
+
                 if (typeof opt === 'object' && opt !== null) {
                   return {
-                    key: opt.key || defaultKey,
+                    key: optKey,
                     text: opt.text || '',
-                    isCorrect: opt.isCorrect ?? (isTF ? optIdx % 2 === 0 : q.correctAnswer === opt.key),
+                    isCorrect: isTF ? tfTruth : (opt.isCorrect ?? (q.correctAnswer === optKey)),
                   };
                 }
                 return {
                   key: defaultKey,
                   text: String(opt),
-                  isCorrect: isTF ? optIdx % 2 === 0 : q.correctAnswer === defaultKey,
+                  isCorrect: isTF ? tfTruth : (q.correctAnswer === defaultKey),
                 };
               });
             }
