@@ -51,49 +51,10 @@ function shuffleArray<T>(array: T[], rng: () => number): T[] {
 }
 
 /**
- * Safely permutes numeric constants in question statement and options,
- * strictly protecting SVG diagrams and LaTeX mathematical expressions from corruption.
- */
-function permuteNumericalValues(content: string, delta: number): string {
-  if (delta === 0 || !content) return content;
-
-  // 1. Preserve raw SVG diagram blocks so coordinates are never modified
-  const svgs: string[] = [];
-  let safeContent = content.replace(/<svg\b[\s\S]*?<\/svg>/gi, (match) => {
-    svgs.push(match);
-    return `__SVG_PLACEHOLDER_${svgs.length - 1}__`;
-  });
-
-  // 2. Protect LaTeX formulas, exponents, subscripts, and commands
-  const latexTokens: string[] = [];
-  safeContent = safeContent.replace(/(\\[a-zA-Z]+|\^\{?\d+\}?|_\{?\d+\}?|\$\$?[^\$]+\$\$?)/g, (match) => {
-    latexTokens.push(match);
-    return `__LATEX_TOKEN_${latexTokens.length - 1}__`;
-  });
-
-  // 3. Only permute small standalone numbers in word context
-  safeContent = safeContent.replace(/\b([1-9]\d*)\b/g, (match) => {
-    const val = parseInt(match, 10);
-    // Only permute small arbitrary numbers; avoid years, right angles, and standard multiples
-    if (val >= 2 && val <= 50 && val !== 10 && val !== 15 && val !== 30 && val !== 45 && val !== 90) {
-      const offset = delta % 2 === 0 ? 1 : -1;
-      const newVal = Math.max(1, val + offset);
-      return String(newVal);
-    }
-    return match;
-  });
-
-  // 4. Restore LaTeX tokens
-  safeContent = safeContent.replace(/__LATEX_TOKEN_(\d+)__/g, (_, idx) => latexTokens[parseInt(idx, 10)] || '');
-
-  // 5. Restore SVGs
-  safeContent = safeContent.replace(/__SVG_PLACEHOLDER_(\d+)__/g, (_, idx) => svgs[parseInt(idx, 10)] || '');
-
-  return safeContent;
-}
-
-/**
  * Generates N shuffled variants of an exam according to official MoET regulations.
+ * Ensures 100% mathematical integrity: Question and option choices are shuffled within sections,
+ * and correct answers are dynamically updated. Problem numbers and statements are strictly preserved
+ * (numeric variation is delegated to the AI Isomorphic engine to guarantee mathematical correctness).
  */
 export function generateExamVariants(
   baseQuestions: BaseQuestion[],
@@ -102,7 +63,14 @@ export function generateExamVariants(
 ): ShuffledVariant[] {
   const { codeCount = 4, shuffleOrder = true, shuffleValues = false, baseCode = 101 } = config;
 
-  if (codeCount <= 1 && !shuffleOrder && !shuffleValues) {
+  if (shuffleValues && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      '[ExamShuffler] Offline numeric permutation is intentionally disabled to protect mathematical accuracy. ' +
+      'Use the AI Isomorphic Engine (/api/v1/exams/isomorphic-variants) to generate variants with newly calculated parameters.'
+    );
+  }
+
+  if (codeCount <= 1 && !shuffleOrder) {
     return [
       {
         code: String(baseCode),
@@ -194,10 +162,10 @@ export function generateExamVariants(
         // alignment with step-by-step detailed explanations.
         // The True/False questions themselves are already shuffled within the section!
 
-        // 4. Permute numbers if requested
-        if (shuffleValues && c > 0) {
-          q.content = permuteNumericalValues(q.content, c);
-        }
+        // 4. Mathematical integrity guarantee:
+        // Do NOT mutate numbers in question statements offline. Mutating numbers without
+        // recalculating options, answers, and explanations breaks mathematical veracity.
+        // Number variations must be performed via AI isomorphic generation (/api/v1/exams/isomorphic-variants).
 
         assembledQuestions.push(q);
       });
