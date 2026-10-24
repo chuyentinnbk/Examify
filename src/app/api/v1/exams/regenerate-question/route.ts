@@ -255,7 +255,7 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
             const subKeys = ['a', 'b', 'c', 'd'];
             let opts = (parsed.options || []).map((opt: string, idx: number) => {
               const key = subKeys[idx] || 'a';
-              const cleanText = String(opt || '').replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = String(opt || '').replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               const isCorrect = parsed.correctAnswer
                 ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(parsed.correctAnswer)
                 : false;
@@ -277,7 +277,7 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
           } else if (type === 'multiple_choice') {
             formattedOptions = (parsed.options || []).map((opt: string, idx: number) => {
               const key = ['A', 'B', 'C', 'D'][idx] || 'A';
-              const cleanText = String(opt || '').replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = String(opt || '').replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               return {
                 key,
                 text: cleanText || String(opt || ''),

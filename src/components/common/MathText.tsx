@@ -16,7 +16,11 @@ interface MathTextProps {
  */
 export function cleanOptionText(text: string): string {
   if (!text) return '';
-  return text.replace(/^(\(?[A-D]\)[\.\:\-\s]+|[A-D][\.\:\)]\s+)/i, '').trim() || text;
+  return (
+    text
+      .replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '')
+      .trim() || text
+  );
 }
 
 /**

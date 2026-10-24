@@ -1023,7 +1023,7 @@ export default function EditorView() {
             formattedOptions = (q.options || ['Mệnh đề a', 'Mệnh đề b', 'Mệnh đề c', 'Mệnh đề d']).map((opt: any, optIdx: number) => {
               const key = subKeys[optIdx] || String(optIdx);
               const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               const isCorrect = q.correctAnswer
                 ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
                 : optIdx % 2 === 0;
@@ -1033,7 +1033,7 @@ export default function EditorView() {
             formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
               const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
               const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               return {
                 key,
                 text: cleanText || textVal,

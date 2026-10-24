@@ -2237,37 +2237,64 @@ export function isQuestionDuplicate(newContent: string, existingList: string[]):
   const cleanNew = newContent.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   if (cleanNew.length < 8) return true;
 
+  // Strip common generic Vietnamese math preambles
+  const stripPre = (s: string) =>
+    s.replace(
+      /^(chohàmsố|trongkhônggianoxyz|trongkhônggian|tínhtíchphân|nguyênhàmcủa|tậpxácđịnh|phươngtrình|bấtphươngtrình|chohìnhchóp|chohìnhlăngtrụ|chohìnhlậpphương|chohìnhhộpchữnhật|chohìnhhộp|chohìnhnón|chohìnhtrụ|chohìnhcầu|chotứdiện|biết|tính|tìm)/gi,
+      ''
+    );
+
+  const strippedNew = stripPre(cleanNew);
+
+  const stopWords = new Set([
+    'cho',
+    'với',
+    'trong',
+    'các',
+    'của',
+    'được',
+    'thỏa',
+    'mãn',
+    'biết',
+    'rằng',
+    'theo',
+    'hình',
+    'đoạn',
+    'thẳng',
+    'mặt',
+    'phẳng',
+  ]);
+  const wordsA = new Set(
+    newContent
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/gu)
+      .filter((w) => w.length > 2 && !stopWords.has(w))
+  );
+
   for (const exist of existingList) {
     if (!exist) continue;
     const cleanExist = exist.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
     if (cleanExist === cleanNew) return true;
 
-    // Strip common generic Vietnamese math preambles
-    const stripPre = (s: string) =>
-      s.replace(
-        /^(chohàmsố|trongkhônggianoxyz|trongkhônggian|tínhtíchphân|nguyênhàmcủa|tậpxácđịnh|phươngtrình|bấtphươngtrình|chohìnhchóp|chohìnhlăngtrụ|biết|tính|tìm)/gi,
-        ''
-      );
-
-    const strippedNew = stripPre(cleanNew);
     const strippedExist = stripPre(cleanExist);
-
-    if (strippedNew.length >= 15 && strippedExist.length >= 15) {
-      if (strippedNew.slice(0, 50) === strippedExist.slice(0, 50)) {
-        return true;
-      }
+    if (strippedNew.length >= 15 && strippedExist.length >= 15 && strippedNew === strippedExist) {
+      return true;
     }
 
-    // Token Jaccard similarity check
-    const wordsA = new Set(newContent.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
-    const wordsB = new Set(exist.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+    // Token Jaccard similarity check excluding math stopwords
+    const wordsB = new Set(
+      exist
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/gu)
+        .filter((w) => w.length > 2 && !stopWords.has(w))
+    );
     if (wordsA.size >= 5 && wordsB.size >= 5) {
       let common = 0;
       for (const w of wordsA) {
         if (wordsB.has(w)) common++;
       }
       const unionSize = new Set([...wordsA, ...wordsB]).size;
-      if (common / unionSize >= 0.75) {
+      if (common / unionSize >= 0.85) {
         return true;
       }
     }

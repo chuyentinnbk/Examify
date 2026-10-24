@@ -367,7 +367,7 @@ export async function POST(req: NextRequest) {
                 q.options = q.options.slice(0, 4).map((opt: any, optIdx: number) => {
                   const k = subKeys[optIdx] || 'a';
                   const rawText = typeof opt === 'string' ? opt : (opt.text || '');
-                  const cleanText = rawText.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+                  const cleanText = rawText.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
                   const isCorrect = /[a-d]\s*[:=-]/i.test(answerStr)
                     ? new RegExp(`${k}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(answerStr)
                     : (typeof opt === 'object' && opt !== null && opt.isCorrect !== undefined ? !!opt.isCorrect : optIdx % 2 === 0);
@@ -380,7 +380,7 @@ export async function POST(req: NextRequest) {
               }
             } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
-                typeof opt === 'string' ? opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : opt
+                typeof opt === 'string' ? opt.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim() : opt
               );
             }
             q.content = typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content;

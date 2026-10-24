@@ -599,7 +599,7 @@ export default function CreateExamView() {
             formattedOptions = (optionsToUse && optionsToUse.length > 0 ? optionsToUse : ['Ý mệnh đề a', 'Ý mệnh đề b', 'Ý mệnh đề c', 'Ý mệnh đề d']).map((opt: any, optIdx: number) => {
               const key = subKeys[optIdx] || String(optIdx);
               const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               const isCorrect = answerToUse
                 ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(answerToUse)
                 : optIdx % 2 === 0;
@@ -613,7 +613,7 @@ export default function CreateExamView() {
             formattedOptions = (optionsToUse || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
               const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
               const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
               return {
                 key,
                 text: cleanText || textVal,

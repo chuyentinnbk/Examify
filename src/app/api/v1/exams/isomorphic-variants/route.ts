@@ -33,7 +33,7 @@ function normalizeOptions(options: any[], correctAnswer?: string): any[] {
 
   return options.map((opt, idx) => {
     if (typeof opt === 'string') {
-      const cleanText = opt.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim();
+      const cleanText = opt.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
       const key = defaultKeys[idx] || String.fromCharCode(65 + idx);
       return {
         key,
@@ -42,7 +42,7 @@ function normalizeOptions(options: any[], correctAnswer?: string): any[] {
       };
     }
     const key = (opt.key || defaultKeys[idx] || String.fromCharCode(65 + idx)).toUpperCase();
-    const text = typeof opt.text === 'string' ? opt.text.replace(/^[A-Da-d][\.\:\)\-\s]+/i, '').trim() : '';
+    const text = typeof opt.text === 'string' ? opt.text.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim() : '';
     const isCorrect = opt.isCorrect === true || key === normAns;
     return {
       key,
@@ -63,7 +63,7 @@ function normalizeTfOptions(options: any[], correctAnswer?: string): { options: 
   if (Array.isArray(options) && options.length > 0) {
     opts = options.slice(0, 4).map((opt, idx) => {
       const key = subKeys[idx] || 'a';
-      const text = typeof opt === 'string' ? opt.replace(/^[a-da-d][\.\:\)\-\s]+/i, '').trim() : (opt.text || '');
+      const text = typeof opt === 'string' ? opt.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim() : (opt.text || '');
       const isCorrect = hasExplicitTfAnswer
         ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(correctAnswer)
         : (opt.isCorrect !== undefined ? opt.isCorrect === true : idx % 2 === 0);

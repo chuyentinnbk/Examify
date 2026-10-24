@@ -101,7 +101,17 @@ export function parseAiJson<T = any>(rawText: string): T {
       } catch {
         // Strip trailing commas before closing braces/brackets: [1, 2,] -> [1, 2]
         const withoutTrailingCommas = candidate.replace(/,\s*([}\]])/g, '$1');
-        return JSON.parse(withoutTrailingCommas) as T;
+        try {
+          return JSON.parse(withoutTrailingCommas) as T;
+        } catch {
+          // Rescue unescaped LaTeX backslashes in AI JSON output (e.g. \frac, \sqrt, \alpha)
+          let rescued = withoutTrailingCommas.replace(
+            /(?<!\\)\\(frac|text|times|theta|tau|triangle|right|beta|bar|begin|bullet)\b/gi,
+            '\\\\$1'
+          );
+          rescued = rescued.replace(/(?<!\\)\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '\\\\');
+          return JSON.parse(rescued) as T;
+        }
       }
     }
 
