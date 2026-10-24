@@ -181,7 +181,8 @@ Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${target
      * 4 mệnh đề a, b, c, d tương ứng với số liệu mới.
      * Tính toán lại tính đúng/sai thực tế, định dạng "correctAnswer" như "a: Đ, b: S, c: Đ, d: S" (phân bố cân bằng 2Đ-2S hoặc 3Đ-1S, không được 4Đ hoặc 4S).
    - Đối với Trả lời ngắn (short_answer):
-     * Tính toán ra kết quả số học mới chính xác và ghi vào "correctAnswer" (ví dụ: "12", "-4", "3/5").
+     * Tính toán ra kết quả số học mới chính xác ĐÃ ĐƯỢC MÃ HÓA và ghi vào "correctAnswer" (ví dụ: "15", "-4.5", "1.26", "6").
+     * BẮT BUỘC ĐÁP SỐ LÀ CON SỐ CỤ THỂ theo chuẩn phiếu tô trắc nghiệm Bộ GD&ĐT (tối đa 4 ký tự). TUYỆT ĐỐI NGHIÊM CẤM chứa căn thức (\\sqrt), biến số (a, b, m) hay bất đẳng thức.
      * ĐẶC BIỆT: Mỗi mã đề PHẢI RA MỘT ĐÁP SỐ KHÁC NHAU HOÀN TOÀN so với Đề gốc và các mã khác (chọn thông số độc lập, ví dụ nếu đề gốc tính ra 108, mã 102 tính ra 256, thì mã 103 chọn thông số tính ra 500 hoặc 32... TUYỆT ĐỐI KHÔNG TRÙNG ĐÁP SỐ giữa các mã).
    - Đối với Tự luận (essay):
      * Cập nhật lại đề bài và barem điểm giải chi tiết trong "explanation".

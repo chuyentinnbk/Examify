@@ -2270,23 +2270,15 @@ export default function EditorView() {
                   {isSA && (
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-purple-900 dark:text-purple-300 block">
-                        Đáp số / Kết quả ngắn:
+                        Đáp án đã mã hóa (chuẩn phiếu tô Bộ GD&ĐT):
                       </label>
-                      <div className="relative flex items-center w-full">
-                        <input
-                          type="text"
-                          value={q.correctAnswer || ''}
-                          onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                          placeholder="Ví dụ: 12, -3.5, hoặc a^3\sqrt{3}/12..."
-                          className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                        />
-                        {q.correctAnswer && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 max-w-[45%] truncate px-2 py-0.5 bg-purple-100/90 dark:bg-purple-900/60 rounded border border-purple-200 dark:border-purple-800 text-xs font-bold text-purple-800 dark:text-purple-300 pointer-events-none flex items-center gap-1 shadow-sm">
-                            <span className="text-[10px] text-purple-400 select-none">=</span>
-                            <MathText content={q.correctAnswer} inline />
-                          </div>
-                        )}
-                      </div>
+                      <input
+                        type="text"
+                        value={q.correctAnswer || ''}
+                        onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
+                        placeholder="Ví dụ: 15, -4.5, hoặc 1.26..."
+                        className="w-full text-xs font-bold font-mono text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                      />
                     </div>
                   )}
 
@@ -2549,31 +2541,25 @@ export default function EditorView() {
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm text-purple-600">edit_note</span>
-                            <span>Đáp số / Kết quả ngắn gọn (học sinh tự điền):</span>
+                            <span>Đáp án đã mã hóa (học sinh tô số trên phiếu trắc nghiệm):</span>
                           </label>
-                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số hoặc biểu thức ngắn</span>
+                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số nguyên / số thập phân</span>
                         </div>
                         {isEditorMode ? (
-                          <div className="relative flex items-center w-full">
-                            <input
-                              type="text"
-                              value={q.correctAnswer || ''}
-                              onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                              placeholder="Ví dụ: 12, -3.5, hoặc a^3\sqrt{3}/12..."
-                              className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                            />
-                            {q.correctAnswer && (
-                              <div className="absolute right-2 top-1/2 -translate-y-1/2 max-w-[45%] truncate px-2 py-0.5 bg-purple-100/90 dark:bg-purple-900/60 rounded border border-purple-200 dark:border-purple-800 text-xs font-bold text-purple-800 dark:text-purple-300 pointer-events-none flex items-center gap-1 shadow-sm">
-                                <span className="text-[10px] text-purple-400 select-none">=</span>
-                                <MathText content={q.correctAnswer} inline />
-                              </div>
-                            )}
-                          </div>
+                          <input
+                            type="text"
+                            value={q.correctAnswer || ''}
+                            onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
+                            placeholder="Ví dụ: 15, -4.5, hoặc 1.26..."
+                            className="w-full text-xs font-bold font-mono text-purple-900 dark:text-purple-200 px-3 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                          />
                         ) : (
                           <div className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 px-3.5 py-2.5 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 flex items-center gap-2">
-                            <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">Đáp số:</span>
+                            <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">Đáp án (đã mã hóa):</span>
                             {q.correctAnswer ? (
-                              <MathText content={q.correctAnswer} inline />
+                              <span className="font-mono text-sm px-2.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800">
+                                {q.correctAnswer}
+                              </span>
                             ) : (
                               <span className="text-slate-400 italic font-normal">Chưa có đáp số</span>
                             )}

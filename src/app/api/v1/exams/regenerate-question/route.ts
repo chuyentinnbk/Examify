@@ -105,14 +105,17 @@ BẮT BUỘC PHÂN BỐ TỈ LỆ ĐÚNG / SAI CÂN BẰNG THỰC TẾ:
   "explanation": "Giải thích chi tiết tính đúng/sai của từng ý a, b, c, d..."
 }`;
         } else if (type === 'short_answer') {
-          typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (thí sinh chỉ điền đáp số/kết quả cuối cùng, không có lựa chọn A,B,C,D) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
-YÊU CẦU ĐẶC BIỆT: Bạn phải tính toán chi tiết trong "explanation" để tìm ra đáp số chuẩn xác, sau đó ghi kết quả số học chính xác đó vào "correctAnswer" (ví dụ: "25", "-3", "4/3"). TUYỆT ĐỐI KHÔNG điền chữ cái A,B,C,D hay số mặc định.
+          typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (chuẩn phần III đề thi tốt nghiệp THPT GDPT 2018 của Bộ GD&ĐT) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+YÊU CẦU ĐẶC BIỆT (CHUẨN PHIẾU TÔ TRẮC NGHIỆM BỘ GD&ĐT):
+- Thí sinh tô đáp án vào Phiếu trắc nghiệm chỉ gồm các con số (tối đa 4 ký tự). KHÔNG CÓ CĂN THỨC, KHÔNG CÓ BIẾN SỐ.
+- BẮT BUỘC ĐỀ BÀI PHẢI MÃ HÓA CÂU HỎI VỀ MỘT CON SỐ CỤ THỂ (ví dụ: "kết quả có dạng (a\\sqrt{m})/n, tính m + n", hoặc "làm tròn đến hàng phần mười/phần trăm", hoặc "tìm số giá trị nguyên của m").
+- "correctAnswer" BẮT BUỘC LÀ CON SỐ ĐÃ MÃ HÓA (ví dụ: "15", "-3.5", "1.26", "6"). TUYỆT ĐỐI KHÔNG chứa căn thức (\\sqrt), chữ cái biến số, hoặc ký hiệu bất đẳng thức.
 Định dạng JSON trả về:
 {
-  "content": "Nội dung bài toán yêu cầu tìm đáp số...",
+  "content": "Nội dung bài toán đã mã hóa câu hỏi yêu cầu tìm đáp số con số...",
   "options": [],
-  "explanation": "Các bước tính toán chi tiết từng bước dẫn tới kết quả...",
-  "correctAnswer": "kết_quả_số_học_chính_xác"
+  "explanation": "Các bước tính toán chi tiết từng bước dẫn tới kết quả số đã mã hóa...",
+  "correctAnswer": "con_số_đã_mã_hóa"
 }`;
         } else if (type === 'essay') {
           typeInstruction = `Hãy tạo MỘT (1) bài tập TỰ LUẬN tự luận toàn diện kèm barem điểm chi tiết cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.

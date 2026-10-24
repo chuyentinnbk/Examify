@@ -127,12 +127,22 @@ Your sole objective is to author high-quality, academically rigorous, and curric
    - TRUE_FALSE (Đúng / Sai): 1 question statement with context, plus exactly 4 sub-items in "options" corresponding to a, b, c, d.
      * "correctAnswer" formatted as "a: Đ, b: S, c: Đ, d: S" (or "a: Đúng, b: Sai, c: Đúng, d: Đúng").
      * BẮT BUỘC CÂN BẰNG TÍNH ĐÚNG/SAI: Phân bố tính đúng/sai của 4 ý a, b, c, d phải đa dạng và cân bằng theo chuẩn đề thi của Bộ GD&ĐT (ví dụ: 2 Đúng - 2 Sai, 3 Đúng - 1 Sai, hoặc 1 Đúng - 3 Sai). TUYỆT ĐỐI NGHIÊM CẤM tạo câu hỏi mà cả 4 ý đều Sai, hoặc chỉ có duy nhất 1 ý Đúng và 3 ý còn lại đều mặc định là Sai một cách rập khuôn.
-   - SHORT_ANSWER (Trả lời ngắn):
-     * Yêu cầu bài toán dẫn đến một đáp số cụ thể. "options" bắt buộc là mảng rỗng [].
-     * BẮT BUỘC GIẢI CHI TIẾT TRƯỚC: Bạn PHẢI tính toán cẩn thận từng bước trong "explanation" trước khi kết luận đáp số.
-     * "correctAnswer" PHẢI LÀ KẾT QUẢ SỐ HỌC HOẶC BIỂU THỨC RÚT GỌN CHÍNH XÁC (ví dụ: "15", "-4.5", "2/3", "\\sqrt{2}").
-     * TUYỆT ĐỐI KHÔNG điền chữ cái A, B, C, D vào correctAnswer của SHORT_ANSWER.
-     * TUYỆT ĐỐI KHÔNG dùng số mặc định hay đoán mò. Mọi đáp số phải khớp 100% với lời giải trong explanation.
+   - SHORT_ANSWER (Trả lời ngắn theo chuẩn thi tốt nghiệp THPT Bộ GD&ĐT):
+     * BẮT BUỘC MÃ HÓA CÂU HỎI VỀ ĐÁP SỐ LÀ MỘT CON SỐ CỤ THỂ (SỐ NGUYÊN HOẶC SỐ THẬP PHÂN LÀM TRÒN):
+       + Trong kỳ thi tốt nghiệp THPT chuẩn GDPT 2018, thí sinh tô đáp án vào Phiếu trả lời trắc nghiệm (tối đa 4 ký tự gồm dấu âm, dấu phẩy/chấm và các chữ số 0-9). Phiếu thi KHÔNG CÓ ký hiệu căn thức, không có biến số (a, b, m, x) hay phân số chứa căn!
+       + VÌ VẬY, GIÁO VIÊN VÀ HỆ THỐNG CHẤM THI BẮT BUỘC CẦN ĐÁP ÁN ĐÃ MÃ HÓA THÀNH CON SỐ THỰC TẾ.
+       + MỌI CÂU HỎI CÓ KẾT QUẢ LÀ BIỂU THỨC CHỨA CĂN HOẶC THAM SỐ: ĐỀ BÀI BẮT BUỘC PHẢI DÙNG KỸ THUẬT MÃ HÓA CHUẨN BỘ GD&ĐT:
+         - Dạng phân số/căn: Nếu kết quả là V = (a^3\\sqrt{m})/n, đề bài PHẢI hỏi: "Biết thể tích khối chóp là V = (a^3\\sqrt{m})/n với m, n nguyên dương, m/n tối giản. Tính giá trị T = m + n." -> "correctAnswer": "15" (hoặc con số cụ thể).
+         - Dạng làm tròn thập phân: Nếu kết quả vô tỉ (như căn bậc ba của 2), đề bài PHẢI yêu cầu: "Tính bán kính r (làm tròn kết quả đến hàng phần mười / phần trăm)..." -> "correctAnswer": "1.26".
+         - Dạng cực trị/đếm: Nếu tìm điều kiện tham số (như m >= 3), đề bài PHẢI hỏi: "Tìm giá trị nhỏ nhất của tham số m..." hoặc "Có bao nhiêu giá trị nguyên của m thuộc [-5; 5]..." -> "correctAnswer": "3".
+         - Dạng tọa độ: "Biết tọa độ điểm M(a; b; c). Tính tổng a + b + c." -> "correctAnswer": "5".
+     * TUYỆT ĐỐI NGHIÊM CẤM:
+       + NGHIÊM CẤM "correctAnswer" chứa căn thức (\\sqrt, sqrt), căn bậc hai, biến số (a, b, m, x), dấu bất đẳng thức (>=, <=), hoặc khoảng nghiệm.
+       + "correctAnswer" BẮT BUỘC LÀ CON SỐ CỤ THỂ (ví dụ: "15", "-4.5", "1.26", "6", "161.25").
+       + TUYỆT ĐỐI KHÔNG điền chữ cái A, B, C, D vào correctAnswer của SHORT_ANSWER.
+       + TUYỆT ĐỐI KHÔNG dùng số mặc định hay đoán mò. Mọi đáp số phải khớp 100% với lời giải trong explanation.
+     * "options" bắt buộc là mảng rỗng [].
+     * BẮT BUỘC GIẢI CHI TIẾT TRƯỚC trong "explanation" và suy ra con số mã hóa cuối cùng khớp 100% với "correctAnswer".
    - ESSAY (Tự luận): Multi-step analytical problem. "options" must be empty array []. "correctAnswer": "Xem hướng dẫn chấm". "explanation" must provide step-by-step scoring rubric with partial points.
 7. QUY TẮC ĐỊNH DẠNG ĐOẠN MÃ LẬP TRÌNH (CODE SNIPPETS):
    - Đối với các câu hỏi môn Tin học / Lập trình có chứa mã nguồn (Python, C++, SQL...):
@@ -266,7 +276,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
       if (dist.shortAnswer && dist.shortAnswer.count > 0) {
         const counts = calculateMinOneCognitiveCounts(dist.shortAnswer.count, dist.shortAnswer.matrix);
         parts.push(`- PHẦN III: CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN (SHORT_ANSWER)
-  * Số lượng: ĐÚNG ${dist.shortAnswer.count} câu (options: [], correctAnswer là đáp số số học/biểu thức rút gọn chính xác)
+  * Số lượng: ĐÚNG ${dist.shortAnswer.count} câu (options: [], đề bài BẮT BUỘC mã hóa câu hỏi để correctAnswer là con số cụ thể chuẩn phiếu tô trắc nghiệm BGD, TUYỆT ĐỐI KHÔNG chứa căn thức \\sqrt hay biến số)
   * Phân bổ mức độ nhận thức cụ thể:
     + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
     + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
