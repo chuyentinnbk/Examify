@@ -158,10 +158,17 @@ export default function MathText({ content, className = '', inline = false }: Ma
     // If string has no $, check if it contains mathematical notations needing KaTeX compilation
     if (!preprocessed.includes('$')) {
       const hasLatexCommand = /\\[a-zA-Z]+/.test(preprocessed);
-      const hasMathSymbol = /[\^_\/]/.test(preprocessed) && /[0-9a-zA-Z]/.test(preprocessed);
+      // Guard: Do not treat fill-in-the-blank blanks (_____) or words with underscores/slashes as math
+      const hasMathUnderscore = /(?<!_)\b[a-zA-Z]\s*_\s*[{0-9a-zA-Z](?!_)/.test(preprocessed);
+      const hasCaret = /\b[0-9a-zA-Z]\s*\^\s*[{0-9a-zA-Z+-]/.test(preprocessed);
+      const hasMathSymbol = hasMathUnderscore || hasCaret;
       const hasComparison = /\b[a-zA-Z0-9]\s*(?:>=|<=|>|<|=|\\ge|\\le)\s*[-+]?[0-9a-zA-Z]/.test(preprocessed);
 
-      if (hasLatexCommand || hasMathSymbol || hasComparison) {
+      // Check if text is natural language prose (contains 3+ dictionary words)
+      const words = preprocessed.trim().split(/\s+/).filter((w) => /^[a-zA-Z\u00C0-\u1EF9]{2,}$/.test(w));
+      const isProse = words.length >= 3;
+
+      if ((hasLatexCommand || hasMathSymbol || hasComparison) && !isProse) {
         if (inline || (preprocessed.length < 150 && !preprocessed.includes('\n'))) {
           let mathExpr = preprocessed.trim();
           mathExpr = mathExpr.replace(/>=/g, '\\ge ').replace(/<=/g, '\\le ');
@@ -170,6 +177,9 @@ export default function MathText({ content, className = '', inline = false }: Ma
           // In mixed prose, wrap individual naked LaTeX constructs
           preprocessed = preprocessed.replace(/(\\[a-zA-Z]+(?:\[[^\]]*\])?(?:\{[^{}]*\})*)/g, '$$$1$$');
         }
+      } else if (hasLatexCommand && isProse) {
+        // In prose, only wrap explicit naked LaTeX commands like \sqrt{...} or \frac{...}{...}
+        preprocessed = preprocessed.replace(/(\\[a-zA-Z]+(?:\[[^\]]*\])?(?:\{[^{}]*\})*)/g, '$$$1$$');
       }
     }
 
@@ -251,11 +261,11 @@ export default function MathText({ content, className = '', inline = false }: Ma
           try {
             return katex.renderToString(rawFormula, {
               displayMode: true,
-              throwOnError: false,
+              throwOnError: true,
               output: 'htmlAndMathml',
             });
           } catch {
-            return `<span class="katex-error">${escapeHtml(part)}</span>`;
+            return escapeHtml(part);
           }
         }
 
@@ -272,14 +282,22 @@ export default function MathText({ content, className = '', inline = false }: Ma
           if (!hasMathIndicators && /\s{2,}|[a-zA-Z]+\s+[a-zA-Z]+/.test(rawFormula)) {
             return escapeHtml(part);
           }
+
+          // If the wrapped content is clearly natural language prose (contains 3+ normal words and no LaTeX command)
+          const words = rawFormula.split(/\s+/).filter((w) => /^[a-zA-Z\u00C0-\u1EF9]{2,}$/.test(w));
+          if (words.length >= 3 && !rawFormula.includes('\\')) {
+            return escapeHtml(rawFormula);
+          }
+
           try {
             return katex.renderToString(rawFormula, {
               displayMode: false,
-              throwOnError: false,
+              throwOnError: true,
               output: 'htmlAndMathml',
             });
           } catch {
-            return `<span class="katex-error">${escapeHtml(part)}</span>`;
+            // Graceful fallback to clean plain text, NEVER render red error tag
+            return escapeHtml(rawFormula);
           }
         }
 
