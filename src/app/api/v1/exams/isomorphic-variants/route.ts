@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess, parseAiJson } from '@/lib/utils';
 import { generateExamVariants, ShuffledVariant } from '@/lib/exam-shuffler';
-import { normalizeQuestionType, normalizeSvgGeometry } from '@/lib/exam-sections';
+import { normalizeQuestionType, normalizeSvgGeometry, reconcileTrueFalseQuestion, cleanseInternalMonologue } from '@/lib/exam-sections';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamQuestion } from '@/lib/store/app-store';
 
@@ -56,32 +56,8 @@ function normalizeOptions(options: any[], correctAnswer?: string): any[] {
  * Normalizes True/False options into a, b, c, d
  */
 function normalizeTfOptions(options: any[], correctAnswer?: string): { options: any[]; correctAnswer: string } {
-  const subKeys = ['a', 'b', 'c', 'd'];
-  let opts: any[] = [];
-  const hasExplicitTfAnswer = correctAnswer && /[a-d]\s*[:=-]/i.test(correctAnswer);
-
-  if (Array.isArray(options) && options.length > 0) {
-    opts = options.slice(0, 4).map((opt, idx) => {
-      const key = subKeys[idx] || 'a';
-      const text = typeof opt === 'string' ? opt.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim() : (opt.text || '');
-      const isCorrect = hasExplicitTfAnswer
-        ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(correctAnswer)
-        : (opt.isCorrect !== undefined ? opt.isCorrect === true : idx % 2 === 0);
-      return {
-        key,
-        text: text || `Mệnh đề ${key}`,
-        isCorrect,
-      };
-    });
-  }
-
-  while (opts.length < 4) {
-    const k = subKeys[opts.length] || 'a';
-    opts.push({ key: k, text: `Mệnh đề ${k}`, isCorrect: opts.length % 2 === 0 });
-  }
-
-  const ansStr = opts.map((o) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
-  return { options: opts, correctAnswer: ansStr };
+  const healed = reconcileTrueFalseQuestion({ options, correctAnswer }, false);
+  return { options: healed.options, correctAnswer: healed.correctAnswer };
 }
 
 export async function POST(req: NextRequest) {
@@ -152,10 +128,10 @@ export async function POST(req: NextRequest) {
       const genAI = new GoogleGenerativeAI(geminiKey);
 
       const diversityDirectives = [
-        `MÃ ĐỀ ${targetCode} (Biến thể thứ 1): Hãy chọn hệ số chẵn đẹp hoặc nhân hệ số k = 2; các nghiệm số nguyên dương gọn gàng.`,
-        `MÃ ĐỀ ${targetCode} (Biến thể thứ 2): Hãy chọn hệ số lẻ hoặc phân số tối giản đẹp, nhân hệ số k = 3 hoặc tịnh tiến biến số; tuyệt đối không chọn lại các số của Mã 101 và Mã 102.`,
-        `MÃ ĐỀ ${targetCode} (Biến thể thứ 3): Hãy chọn hệ số nguyên tố nhỏ (2, 3, 5, 7) hoặc đổi dấu âm/dương, nhân hệ số k = 4; đảm bảo số liệu hoàn toàn khác biệt với các mã trước.`,
-        `MÃ ĐỀ ${targetCode} (Biến thể thứ 4): Tịnh tiến thông số (ví dụ đổi bán kính, diện tích, hoành độ theo chiều hướng mới), nghiệm nguyên đẹp, số liệu độc lập 100%.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 1): Hãy đổi thông số, biến số hoặc hệ số sang bộ số mới; giải lại chi tiết và bảo toàn phương pháp.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 2): Hãy đổi thông số, hệ số sang bộ số mới, tịnh tiến biến số; tuyệt đối không chọn lại các số của Mã 101 và Mã 102.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 3): Hãy đổi thông số sang bộ số mới; đảm bảo số liệu hoàn toàn khác biệt với các mã trước.`,
+        `MÃ ĐỀ ${targetCode} (Biến thể thứ 4): Tịnh tiến thông số, đổi tọa độ hoặc đại lượng bài toán; số liệu độc lập 100%.`,
       ];
       const directive = diversityDirectives[codeIndex % diversityDirectives.length];
 
@@ -170,21 +146,23 @@ Nhiệm vụ của bạn: Tạo MÃ ĐỀ THI ĐỒNG DẠNG (MÃ ĐỀ ${target
 ### NGUYÊN TẮC ĐỒNG DẠNG BẮT BUỘC (ISOMORPHIC RULES):
 1. ĐỒNG BỘ 1-1 VỚI TỪNG CÂU HỎI CỦA ĐỀ GỐC:
    - Câu thứ i trong Mã đề ${targetCode} PHẢI CÙNG DẠNG BÀI TOÁN, CÙNG DẠNG CÂU HỎI (multiple_choice, true_false, short_answer, essay), CÙNG CẤP ĐỘ NHẬN THỨC với câu thứ i của Đề gốc.
-   - GIỮ NGUYÊN dạng bài nhưng THAY ĐỔI TOÀN BỘ BỘ SỐ LIỆU (hệ số phương trình, tọa độ, số liệu bài toán thực tế...) sang một bộ số mới giải ra kết quả đẹp, hợp lý để chống quay cóp giữa các học sinh.
+   - GIỮ NGUYÊN dạng bài nhưng THAY ĐỔI TOÀN BỘ BỘ SỐ LIỆU (hệ số phương trình, tọa độ, số liệu bài toán thực tế...) sang một bộ số mới hợp lý, khả thi về mặt toán học để chống quay cóp giữa các học sinh.
 2. TỰ ĐỘNG GIẢI VÀ TÍNH TOÁN LẠI ĐÁP ÁN CHUẨN XÁC 100%:
    - BẮT BUỘC giải lại chi tiết từng bước trong "explanation" theo bộ số mới.
    - Đối với Trắc nghiệm (multiple_choice):
      * Tính toán ra 4 phương án (A, B, C, D) gồm 1 đáp án đúng và 3 phương án nhiễu hợp lý theo bộ số mới.
+     * BẮT BUỘC 1 trong 4 phương án A, B, C, D phải trùng khớp chính xác 100% với giá trị tính toán của Lời giải. TUYỆT ĐỐI NGHIÊM CẤM ngụy biện chọn phương án xấp xỉ gần nhất.
      * Cập nhật "correctAnswer" chuẩn xác ('A', 'B', 'C', hoặc 'D').
    - Đối với Đúng/Sai (true_false):
      * 4 mệnh đề a, b, c, d tương ứng với số liệu mới.
      * Tính toán lại tính đúng/sai thực tế, định dạng "correctAnswer" như "a: Đ, b: S, c: Đ, d: S" (phân bố cân bằng 2Đ-2S hoặc 3Đ-1S, không được 4Đ hoặc 4S).
    - Đối với Trả lời ngắn (short_answer):
-     * Tính toán ra kết quả số học mới chính xác ĐÃ ĐƯỢC MÃ HÓA và ghi vào "correctAnswer" (ví dụ: "15", "-4.5", "1.26", "6").
-     * BẮT BUỘC ĐÁP SỐ LÀ CON SỐ CỤ THỂ theo chuẩn phiếu tô trắc nghiệm Bộ GD&ĐT (tối đa 4 ký tự). TUYỆT ĐỐI NGHIÊM CẤM chứa căn thức (\\sqrt), biến số (a, b, m) hay bất đẳng thức.
-     * ĐẶC BIỆT: Mỗi mã đề PHẢI RA MỘT ĐÁP SỐ KHÁC NHAU HOÀN TOÀN so với Đề gốc và các mã khác (chọn thông số độc lập, ví dụ nếu đề gốc tính ra 108, mã 102 tính ra 256, thì mã 103 chọn thông số tính ra 500 hoặc 32... TUYỆT ĐỐI KHÔNG TRÙNG ĐÁP SỐ giữa các mã).
+     * BẢO TOÀN THAM SỐ 100%: Dữ liệu đề bài là bất biến, Lời giải BẮT BUỘC phải tính toán theo số liệu mới của đề bài đó. Tuyệt đối nghiêm cấm tự ý sửa đề trong lời giải (CẤM: "Để số đẹp hơn, chọn...", "Chọn lại...").
+     * Giữ 5-6 chữ số thập phân ở các bước tính toán trung gian.
+     * Định dạng "correctAnswer" theo chuẩn song hành: Trục căn thức ở mẫu, tối giản phân số kết hợp với số thập phân làm tròn 2 chữ số (ví dụ: "\\frac{24\\sqrt{89}}{89} \\approx 2.54" hoặc "\\frac{3}{4} = 0.75"), hoặc số nguyên nếu chẵn (ví dụ: "15", "-3").
+     * BẮT BUỘC giải ra một kết quả số học mới hoàn toàn tương ứng với bộ số mới. TUYỆT ĐỐI NGHIÊM CẤM copy-paste đáp án cũ của Đề gốc.
    - Đối với Tự luận (essay):
-     * Cập nhật lại đề bài và barem điểm giải chi tiết trong "explanation".
+     * Cập nhật lại đề bài và tính toán lại toàn bộ Barem điểm giải chi tiết theo các bước (Step-by-step Rubric: Bước 1, Bước 2, Bước 3 kèm phân phối điểm 0.25đ - 0.5đ) trong "explanation" theo bộ số mới. BẢO TOÀN 100% số liệu đề bài mới.
 3. KHÔNG ĐƯỢC ĐẢO THỨ TỰ CÂU TRONG BƯỚC NÀY:
    - Giữ nguyên thứ tự câu 1 đến câu ${simplifiedBase.length} đúng theo đề gốc để đảm bảo sự đồng bộ 1-1.
 
@@ -241,7 +219,7 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
             model: currentModel,
             generationConfig: {
               responseMimeType: 'application/json',
-              temperature: Math.min(0.95, 0.75 + codeIndex * 0.05),
+              temperature: 0.2,
             },
           });
           const result = await model.generateContent(prompt);
@@ -284,21 +262,31 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
 
         let options: any[] = [];
         let finalAnswer = q.correctAnswer || baseRef.correctAnswer;
+        let cleanExpl = cleanseInternalMonologue(normalizeSvgGeometry(q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'));
 
         if (normType === 'true_false') {
           const tfResult = normalizeTfOptions(q.options || baseRef.options, q.correctAnswer);
-          options = tfResult.options;
-          finalAnswer = tfResult.correctAnswer;
+          const reconciled = reconcileTrueFalseQuestion({
+            id: Date.now() + idx,
+            type: normType,
+            content: normalizeSvgGeometry(q.content),
+            options: tfResult.options,
+            correctAnswer: tfResult.correctAnswer,
+            explanation: cleanExpl,
+          });
+          options = reconciled.options;
+          finalAnswer = reconciled.correctAnswer;
+          cleanExpl = reconciled.explanation;
         } else if (normType === 'multiple_choice') {
           options = normalizeOptions(q.options || baseRef.options, q.correctAnswer);
           const found = options.find((o) => o.isCorrect);
           finalAnswer = found ? found.key : (q.correctAnswer || 'A');
         } else if (normType === 'short_answer') {
           options = [];
-          finalAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+          finalAnswer = extractCleanShortAnswerValue(null, cleanExpl, q.correctAnswer);
         } else {
           options = [];
-          finalAnswer = 'Xem hướng dẫn chấm';
+          finalAnswer = 'Xem hướng dẫn chấm và barem điểm';
         }
 
         return {
@@ -313,7 +301,7 @@ BẮT BUỘC trả về DUY NHẤT một mảng JSON:
           options,
           points: baseRef.points || (normType === 'essay' ? 1.5 : normType === 'true_false' ? 1.0 : normType === 'short_answer' ? 0.5 : 0.25),
           correctAnswer: finalAnswer,
-          explanation: normalizeSvgGeometry(q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'),
+          explanation: cleanExpl,
         };
       });
 

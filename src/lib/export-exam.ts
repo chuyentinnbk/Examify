@@ -21,6 +21,7 @@ import {
   DEFAULT_SECTION_DESCRIPTIONS,
   normalizeQuestionType,
   normalizeSvgGeometry,
+  reconcileTrueFalseQuestion,
 } from './exam-sections';
 import { normalizeDepartmentAccents } from './education-departments';
 
@@ -75,6 +76,33 @@ export function getExamOptionText(
     return q.options[fallbackIndex].text;
   }
   return '';
+}
+
+/**
+ * Trích xuất đáp số ngắn gọn (cho ô bảng đáp án nhanh 10 cột) từ biểu thức song hành
+ * Ví dụ: "\frac{24\sqrt{89}}{89} \approx 2.54" -> "2.54"
+ *         "3/4 = 0.75" -> "0.75"
+ *         "5" -> "5"
+ */
+export function extractConciseAnswerForGrid(ans?: string | null): string {
+  if (!ans || typeof ans !== 'string') return '';
+  const str = ans.trim();
+  // 1. Nếu có dấu xấp xỉ \approx hoặc ≈: bốc số thập phân sau dấu xấp xỉ
+  const approxMatch = str.match(/(?:\\approx|≈)\s*([+-]?[0-9]+(?:[\.,][0-9]+)?)/i);
+  if (approxMatch && approxMatch[1]) {
+    return approxMatch[1].replace(',', '.');
+  }
+  // 2. Nếu có dấu bằng = ở cuối: bốc số sau dấu =
+  const eqMatch = str.match(/=\s*([+-]?[0-9]+(?:[\.,][0-9]+)?)\s*[$a-zA-Z%]*\s*$/);
+  if (eqMatch && eqMatch[1]) {
+    return eqMatch[1].replace(',', '.');
+  }
+  // 3. Nếu là dạng số kèm đơn vị đo: ví dụ "2.54 cm", "15m"
+  const unitMatch = str.match(/^([+-]?[0-9]+(?:[\.,][0-9]+)?)\s*(?:[a-zA-Z\$\\%°]+)?$/);
+  if (unitMatch && unitMatch[1]) {
+    return unitMatch[1].replace(',', '.');
+  }
+  return str.replace(/^\$+|\$+$/g, '').trim();
 }
 
 /**
@@ -172,15 +200,15 @@ export function cleanMathForDoc(text: string): string {
     return str.split('').map((c: string) => supers[c] || c).join('');
   });
 
-  // Subscripts
+  // Subscripts (only when attached to variable names, e.g. x_1, a_0, not isolated identifiers)
   const subs: Record<string, string> = {
     '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
     '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
     'x': 'ₓ', 'y': 'ᵧ'
   };
-  res = res.replace(/_([0-9xy])/g, (_, ch) => subs[ch] || `_${ch}`);
-  res = res.replace(/_\{([0-9xy]+)\}/g, (_, str) => {
-    return str.split('').map((c: string) => subs[c] || c).join('');
+  res = res.replace(/([a-zA-Z\)\}\]])_([0-9xy])(?![0-9a-zA-Z])/g, (_, p1, ch) => `${p1}${subs[ch] || `_${ch}`}`);
+  res = res.replace(/([a-zA-Z\)\}\]])_\{([0-9xy]+)\}/g, (_, p1, str) => {
+    return p1 + str.split('').map((c: string) => subs[c] || c).join('');
   });
 
   // Strip text{} and mathrm{}
@@ -333,7 +361,7 @@ function renderTextAndTablesToDocx(
 
 /**
  * Converts an SVG XML string into a PNG buffer suitable for docx ImageRun.
- * Uses an offscreen HTMLCanvasElement in the browser.
+ * Uses an offscreen HTMLCanvasElement in the browser with 2.5x retina scaling for crisp print resolution.
  */
 async function svgToPngBuffer(
   svgString: string
@@ -342,7 +370,21 @@ async function svgToPngBuffer(
 
   return new Promise((resolve) => {
     try {
-      const vbMatch = svgString.match(/viewBox=["']([0-9.\s-]+)["']/i);
+      let cleanSvg = (svgString || '').trim();
+      // Remove any markdown code fences (```xml ... ``` or ```svg ... ```)
+      cleanSvg = cleanSvg.replace(/^```(?:xml|svg)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+      // Extract only the <svg>...</svg> root block if there are outer wrappers
+      const svgMatch = cleanSvg.match(/<svg\b[\s\S]*?<\/svg>/i);
+      if (svgMatch) {
+        cleanSvg = svgMatch[0];
+      }
+
+      // Canonicalize geometry and remove stroke halo / line glitches
+      cleanSvg = normalizeSvgGeometry(cleanSvg);
+
+      // Extract viewBox or width/height
+      const vbMatch = cleanSvg.match(/viewBox=["']([0-9.\s-]+)["']/i);
       let nativeW = 340;
       let nativeH = 220;
       if (vbMatch) {
@@ -352,73 +394,130 @@ async function svgToPngBuffer(
           nativeH = parts[3];
         }
       } else {
-        const wMatch = svgString.match(/\bwidth=["']([0-9.]+)["']/i);
-        const hMatch = svgString.match(/\bheight=["']([0-9.]+)["']/i);
+        const wMatch = cleanSvg.match(/\bwidth=["']([0-9.]+)["']/i);
+        const hMatch = cleanSvg.match(/\bheight=["']([0-9.]+)["']/i);
         if (wMatch && hMatch) {
           nativeW = Number(wMatch[1]) || 340;
           nativeH = Number(hMatch[1]) || 220;
         }
       }
 
-      // Constrain display dimensions inside Word page (max width 400px)
-      const maxDisplayW = 400;
+      // Constrain display dimensions inside Word page (max width 420px)
+      const maxDisplayW = 420;
       const scale = Math.min(1, maxDisplayW / nativeW);
       const displayW = Math.round(nativeW * scale);
       const displayH = Math.round(nativeH * scale);
 
-      let cleanSvg = svgString;
+      // Ensure xmlns attributes
       if (!cleanSvg.includes('xmlns=')) {
         cleanSvg = cleanSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
       }
+      if (!cleanSvg.includes('xmlns:xlink=')) {
+        cleanSvg = cleanSvg.replace('<svg', '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+      }
+      // Ensure viewBox is present
+      if (!cleanSvg.match(/<svg[^>]*\bviewBox=/i)) {
+        cleanSvg = cleanSvg.replace('<svg', `<svg viewBox="0 0 ${nativeW} ${nativeH}"`);
+      }
+      // Ensure width & height are set
+      if (!cleanSvg.match(/<svg[^>]*\bwidth=/i)) {
+        cleanSvg = cleanSvg.replace('<svg', `<svg width="${nativeW}"`);
+      }
+      if (!cleanSvg.match(/<svg[^>]*\bheight=/i)) {
+        cleanSvg = cleanSvg.replace('<svg', `<svg height="${nativeH}"`);
+      }
 
-      const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
+      // Set up Canvas with 2.5x retina scaling for crisp print resolution
+      const dpr = 2.5;
+      const canvasW = Math.round(nativeW * dpr);
+      const canvasH = Math.round(nativeH * dpr);
 
-      img.onload = () => {
+      let isFinished = false;
+      const finish = (result: { data: Uint8Array; width: number; height: number } | null) => {
+        if (!isFinished) {
+          isFinished = true;
+          resolve(result);
+        }
+      };
+
+      // 2.5 second timeout safeguard
+      const timer = setTimeout(() => {
+        finish(null);
+      }, 2500);
+
+      const drawAndExport = (imgElement: HTMLImageElement, cleanup: () => void) => {
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = nativeW * 2;
-          canvas.height = nativeH * 2;
+          canvas.width = canvasW;
+          canvas.height = canvasH;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            URL.revokeObjectURL(url);
-            resolve(null);
+            cleanup();
+            clearTimeout(timer);
+            finish(null);
             return;
           }
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          ctx.fillRect(0, 0, canvasW, canvasH);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(imgElement, 0, 0, canvasW, canvasH);
 
           canvas.toBlob((pngBlob) => {
-            URL.revokeObjectURL(url);
+            cleanup();
+            clearTimeout(timer);
             if (!pngBlob) {
-              resolve(null);
+              finish(null);
               return;
             }
             const reader = new FileReader();
             reader.onloadend = () => {
               const arrayBuffer = reader.result as ArrayBuffer;
-              resolve({
+              finish({
                 data: new Uint8Array(arrayBuffer),
                 width: displayW,
                 height: displayH,
               });
             };
+            reader.onerror = () => finish(null);
             reader.readAsArrayBuffer(pngBlob);
           }, 'image/png');
         } catch {
-          URL.revokeObjectURL(url);
-          resolve(null);
+          cleanup();
+          clearTimeout(timer);
+          finish(null);
         }
       };
 
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(null);
+      // Try Blob URL first; fallback to Data URI if blob fails
+      const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        drawAndExport(img, () => URL.revokeObjectURL(blobUrl));
       };
 
-      img.src = url;
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        // Fallback: UTF-8 encoded Data URI
+        try {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            drawAndExport(fallbackImg, () => {});
+          };
+          fallbackImg.onerror = () => {
+            clearTimeout(timer);
+            finish(null);
+          };
+          fallbackImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(cleanSvg);
+        } catch {
+          clearTimeout(timer);
+          finish(null);
+        }
+      };
+
+      img.src = blobUrl;
     } catch {
       resolve(null);
     }
@@ -435,24 +534,30 @@ async function renderQuestionContentToDocx(
 ): Promise<(Paragraph | Table)[]> {
   const elements: (Paragraph | Table)[] = [];
 
+  // Strip code fence wrappers around SVG if any
+  const sanitizedContent = (rawContent || '').replace(
+    /```(?:xml|svg)?\s*(<svg\b[\s\S]*?<\/svg>)\s*```/gi,
+    '$1'
+  );
+
   // Split content by SVG blocks
   const svgRegex = /<svg\b[\s\S]*?<\/svg>/gi;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   const chunks: { type: 'text' | 'svg'; text: string }[] = [];
 
-  while ((match = svgRegex.exec(rawContent)) !== null) {
+  while ((match = svgRegex.exec(sanitizedContent)) !== null) {
     if (match.index > lastIdx) {
-      chunks.push({ type: 'text', text: rawContent.slice(lastIdx, match.index) });
+      chunks.push({ type: 'text', text: sanitizedContent.slice(lastIdx, match.index) });
     }
     chunks.push({ type: 'svg', text: match[0] });
     lastIdx = match.index + match[0].length;
   }
-  if (lastIdx < rawContent.length) {
-    chunks.push({ type: 'text', text: rawContent.slice(lastIdx) });
+  if (lastIdx < sanitizedContent.length) {
+    chunks.push({ type: 'text', text: sanitizedContent.slice(lastIdx) });
   }
   if (chunks.length === 0) {
-    chunks.push({ type: 'text', text: rawContent });
+    chunks.push({ type: 'text', text: sanitizedContent });
   }
 
   const isFirstPartRef = { value: true };
@@ -536,6 +641,182 @@ async function renderQuestionContentToDocx(
       const textAfter = textChunk.slice(lastCodeIdx);
       if (textAfter || isFirstPartRef.value) {
         elements.push(...renderTextAndTablesToDocx(textAfter, isFirstPartRef, qNum));
+      }
+    }
+  }
+
+  return elements;
+}
+
+/**
+ * Renders Markdown tables and prose text inside an explanation.
+ */
+function renderExplanationTextAndTables(
+  text: string,
+  isFirstPartRef: { value: boolean },
+  labelPrefix: string,
+  isEssay: boolean
+): (Paragraph | Table)[] {
+  const elements: (Paragraph | Table)[] = [];
+  const tableRegex = /(?:^[ \t]*\|[^\n]+\|[ \t]*\r?\n)+[ \t]*\|[^\n]+\|[ \t]*/gm;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = tableRegex.exec(text)) !== null) {
+    const before = text.slice(lastIdx, m.index).trim();
+    if (before || isFirstPartRef.value) {
+      const runs: TextRun[] = [];
+      if (isFirstPartRef.value) {
+        runs.push(new TextRun({ text: labelPrefix, bold: true, size: 20 }));
+        isFirstPartRef.value = false;
+      }
+      if (before) {
+        runs.push(new TextRun({ text: cleanMathForDoc(before), size: 20, italics: !isEssay }));
+      }
+      elements.push(new Paragraph({ children: runs, spacing: { before: 100, after: 80 } }));
+    }
+
+    elements.push(renderMarkdownTableToDocx(m[0]));
+    lastIdx = m.index + m[0].length;
+  }
+
+  const after = text.slice(lastIdx).trim();
+  if (after || isFirstPartRef.value) {
+    const runs: TextRun[] = [];
+    if (isFirstPartRef.value) {
+      runs.push(new TextRun({ text: labelPrefix, bold: true, size: 20 }));
+      isFirstPartRef.value = false;
+    }
+    if (after) {
+      runs.push(new TextRun({ text: cleanMathForDoc(after), size: 20, italics: !isEssay }));
+    }
+    elements.push(new Paragraph({ children: runs, spacing: { before: 100, after: 80 } }));
+  }
+
+  return elements;
+}
+
+/**
+ * Renders question explanation into formatted docx elements,
+ * supporting regular text, highlighted code blocks, structured tables (e.g. rubrics), and embedded SVG diagrams.
+ */
+async function renderExplanationToDocx(
+  qNum: number,
+  rawExplanation: string,
+  isEssay: boolean,
+  correctAnswer?: string
+): Promise<(Paragraph | Table)[]> {
+  const elements: (Paragraph | Table)[] = [];
+
+  // Strip code fence wrappers around SVG if any
+  const cleanExplanation = (rawExplanation || '').replace(
+    /```(?:xml|svg)?\s*(<svg\b[\s\S]*?<\/svg>)\s*```/gi,
+    '$1'
+  );
+
+  const svgRegex = /<svg\b[\s\S]*?<\/svg>/gi;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+  const chunks: { type: 'text' | 'svg'; text: string }[] = [];
+
+  while ((match = svgRegex.exec(cleanExplanation)) !== null) {
+    if (match.index > lastIdx) {
+      chunks.push({ type: 'text', text: cleanExplanation.slice(lastIdx, match.index) });
+    }
+    chunks.push({ type: 'svg', text: match[0] });
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < cleanExplanation.length) {
+    chunks.push({ type: 'text', text: cleanExplanation.slice(lastIdx) });
+  }
+  if (chunks.length === 0) {
+    chunks.push({ type: 'text', text: cleanExplanation });
+  }
+
+  const isFirstPartRef = { value: true };
+  const labelPrefix = isEssay
+    ? `Câu ${qNum} (Barem & Hướng dẫn chấm): `
+    : `Câu ${qNum} (Đáp án ${cleanMathForDoc(correctAnswer || '')}): `;
+
+  for (const chunk of chunks) {
+    if (chunk.type === 'svg') {
+      const pngInfo = await svgToPngBuffer(chunk.text);
+      if (pngInfo) {
+        elements.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 120, after: 120 },
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: pngInfo.data,
+                transformation: {
+                  width: pngInfo.width,
+                  height: pngInfo.height,
+                },
+              }),
+            ],
+          })
+        );
+      } else {
+        elements.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 80, after: 80 },
+            children: [
+              new TextRun({
+                text: '[Hình vẽ minh họa]',
+                italics: true,
+                size: 20,
+                color: '64748B',
+              }),
+            ],
+          })
+        );
+      }
+    } else {
+      const textChunk = chunk.text;
+      const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
+      let lastCodeIdx = 0;
+      let codeMatch: RegExpExecArray | null;
+
+      while ((codeMatch = codeBlockRegex.exec(textChunk)) !== null) {
+        const textBefore = textChunk.slice(lastCodeIdx, codeMatch.index);
+        if (textBefore || isFirstPartRef.value) {
+          elements.push(...renderExplanationTextAndTables(textBefore, isFirstPartRef, labelPrefix, isEssay));
+        }
+
+        const code = codeMatch[1].replace(/\r\n/g, '\n').trimEnd();
+        const codeLines = code.split('\n');
+        elements.push(
+          new Paragraph({
+            children: codeLines.map((line, lineIdx) =>
+              new TextRun({
+                text: line,
+                font: 'Consolas',
+                size: 20,
+                color: '1E293B',
+                break: lineIdx > 0 ? 1 : 0,
+              })
+            ),
+            shading: { fill: 'F1F5F9' },
+            indent: { left: 400, right: 400 },
+            spacing: { before: 80, after: 80 },
+            border: {
+              left: { style: BorderStyle.SINGLE, size: 12, color: '3B82F6' },
+              top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+              right: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+            },
+          })
+        );
+
+        lastCodeIdx = codeMatch.index + codeMatch[0].length;
+      }
+
+      const textAfter = textChunk.slice(lastCodeIdx);
+      if (textAfter || isFirstPartRef.value) {
+        elements.push(...renderExplanationTextAndTables(textAfter, isFirstPartRef, labelPrefix, isEssay));
       }
     }
   }
@@ -759,12 +1040,8 @@ export async function generateDocxBlob(
 
     // 1. Loại: Đúng / Sai (Bảng 4 cột chuẩn Bộ GD&ĐT: STT, Mệnh đề, Đúng, Sai)
     if (normType === 'true_false') {
-      const items = (q.options || []).length > 0 ? q.options : [
-        { key: 'a', text: 'Mệnh đề a', isCorrect: true },
-        { key: 'b', text: 'Mệnh đề b', isCorrect: false },
-        { key: 'c', text: 'Mệnh đề c', isCorrect: true },
-        { key: 'd', text: 'Mệnh đề d', isCorrect: false },
-      ];
+      const rec = reconcileTrueFalseQuestion(q, true);
+      const items = rec.options;
 
       const borderSingle = {
         top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -808,7 +1085,7 @@ export async function generateDocxBlob(
         ],
       });
 
-      const bodyRows: TableRow[] = items.map((item, itemIdx) => {
+      const bodyRows: TableRow[] = (items as any[]).map((item: any, itemIdx: number) => {
         const isCorrect = item.isCorrect === true;
         const dungMark = options.includeAnswers ? (isCorrect ? 'X' : '') : '';
         const saiMark = options.includeAnswers ? (!isCorrect ? 'X' : '') : '';
@@ -1138,6 +1415,16 @@ export async function generateDocxBlob(
         const qIdx = r * tableCols + c;
         if (qIdx < questions.length) {
           const q = questions[qIdx];
+          const normT = normalizeQuestionType(q.type || q.section);
+          let finalAnsStr = q.correctAnswer || '';
+          if (normT === 'short_answer') {
+            finalAnsStr = extractConciseAnswerForGrid(finalAnsStr);
+          } else if (normT === 'true_false') {
+            const rec = reconcileTrueFalseQuestion(q, true);
+            finalAnsStr = rec.correctAnswer;
+          } else if (normT === 'essay') {
+            finalAnsStr = 'Xem barem';
+          }
           cells.push(
             new TableCell({
               width: { size: 1920, type: WidthType.DXA },
@@ -1145,7 +1432,7 @@ export async function generateDocxBlob(
                 new Paragraph({
                   children: [
                     new TextRun({ text: `Câu ${qIdx + 1}: `, bold: true, size: 19 }),
-                    new TextRun({ text: cleanMathForDoc(q.correctAnswer || ''), bold: true, color: '008800', size: 20 }),
+                    new TextRun({ text: cleanMathForDoc(finalAnsStr), bold: true, color: '008800', size: 20 }),
                   ],
                   alignment: AlignmentType.CENTER,
                 }),
@@ -1184,17 +1471,18 @@ export async function generateDocxBlob(
       })
     );
 
-    questions.forEach((q, idx) => {
-      docChildren.push(
-        new Paragraph({
-          children: [
-            new TextRun({ text: `Câu ${idx + 1} (Đáp án ${cleanMathForDoc(q.correctAnswer || '')}): `, bold: true, size: 20 }),
-            new TextRun({ text: cleanMathForDoc(q.explanation || 'Xem lý thuyết sách giáo khoa.'), size: 20, italics: true }),
-          ],
-          spacing: { before: 100, after: 80 },
-        })
+    for (let idx = 0; idx < questions.length; idx++) {
+      const q = questions[idx];
+      const normT = normalizeQuestionType(q.type || q.section);
+      const isEssay = normT === 'essay';
+      const explElements = await renderExplanationToDocx(
+        idx + 1,
+        q.explanation || (isEssay ? 'Xem barem chi tiết.' : 'Xem lý thuyết sách giáo khoa.'),
+        isEssay,
+        q.correctAnswer
       );
-    });
+      explElements.forEach((el) => docChildren.push(el));
+    }
   }
 
   const doc = new Document({
@@ -1325,17 +1613,31 @@ function formatTextAndTablesForDocHtml(text: string): string {
 
 /**
  * Formats question content for Microsoft Word HTML (.doc),
- * rendering code snippets with Consolas blocks, tables, and preserving clean math typography.
+ * rendering code snippets with Consolas blocks, tables, preserving SVG diagrams, and preserving clean math typography.
  */
 function formatContentForDocHtml(rawContent: string): string {
   if (!rawContent) return '';
+
+  // 1. Strip code fence wrappers around SVG if any
+  let safeContent = rawContent.replace(
+    /```(?:xml|svg)?\s*(<svg\b[\s\S]*?<\/svg>)\s*```/gi,
+    '$1'
+  );
+
+  // 2. Extract SVG blocks so they are not stripped by cleanMathForDoc
+  const svgBlocks: string[] = [];
+  safeContent = safeContent.replace(/<svg\b[\s\S]*?<\/svg>/gi, (svgBlock) => {
+    svgBlocks.push(normalizeSvgGeometry(svgBlock));
+    return `@@@EXAMIFYDOCSVG#${svgBlocks.length - 1}@@@`;
+  });
+
   const codeBlockRegex = /```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   const parts: string[] = [];
 
-  while ((match = codeBlockRegex.exec(rawContent)) !== null) {
-    const textBefore = rawContent.slice(lastIndex, match.index);
+  while ((match = codeBlockRegex.exec(safeContent)) !== null) {
+    const textBefore = safeContent.slice(lastIndex, match.index);
     if (textBefore) {
       parts.push(formatTextAndTablesForDocHtml(textBefore));
     }
@@ -1348,11 +1650,19 @@ function formatContentForDocHtml(rawContent: string): string {
     );
     lastIndex = match.index + match[0].length;
   }
-  const textAfter = rawContent.slice(lastIndex);
+  const textAfter = safeContent.slice(lastIndex);
   if (textAfter) {
     parts.push(formatTextAndTablesForDocHtml(textAfter));
   }
-  return parts.join('');
+  let result = parts.join('');
+
+  // 3. Restore SVG blocks with centered wrapper
+  result = result.replace(/@@@EXAMIFYDOCSVG#(\d+)@@@/g, (_, idx) => {
+    const rawSvg = svgBlocks[parseInt(idx, 10)] || '';
+    return `<div style="text-align: center; margin: 8px 0; max-width: 100%;">${rawSvg}</div>`;
+  });
+
+  return result;
 }
 
 /**
@@ -1496,12 +1806,8 @@ export function generateDocHtml(
     `;
 
     if (normType === 'true_false') {
-      const items = (q.options || []).length > 0 ? q.options : [
-        { key: 'a', text: 'Mệnh đề a', isCorrect: true },
-        { key: 'b', text: 'Mệnh đề b', isCorrect: false },
-        { key: 'c', text: 'Mệnh đề c', isCorrect: true },
-        { key: 'd', text: 'Mệnh đề d', isCorrect: false },
-      ];
+      const rec = reconcileTrueFalseQuestion(q, true);
+      const items = rec.options;
 
       htmlContent += `
       <table class="tf-print-table" style="width: 100%; border-collapse: collapse; margin-top: 6px; margin-bottom: 8px; border: 1.5pt solid #000;">
@@ -1513,8 +1819,8 @@ export function generateDocHtml(
           </tr>
         </thead>
         <tbody>
-          ${items
-            .map((item, itemIdx) => {
+          ${(items as any[])
+            .map((item: any, itemIdx: number) => {
               const isCorrect = item.isCorrect === true;
               const dungMark = options.includeAnswers && isCorrect ? '<strong>X</strong>' : '';
               const saiMark = options.includeAnswers && !isCorrect ? '<strong>X</strong>' : '';
@@ -1621,7 +1927,17 @@ export function generateDocHtml(
       if (idx > 0 && idx % 10 === 0) {
         htmlContent += `</tr><tr>`;
       }
-      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}</span></td>`;
+      const normT = normalizeQuestionType(q.type || q.section);
+      let finalAnsStr = q.correctAnswer || '';
+      if (normT === 'short_answer') {
+        finalAnsStr = extractConciseAnswerForGrid(finalAnsStr);
+      } else if (normT === 'true_false') {
+        const rec = reconcileTrueFalseQuestion(q, true);
+        finalAnsStr = rec.correctAnswer;
+      } else if (normT === 'essay') {
+        finalAnsStr = 'Xem barem';
+      }
+      htmlContent += `<td><strong>${idx + 1}</strong>: <span style="color: #008800; font-weight: bold;">${escapeHtmlForDoc(cleanMathForDoc(finalAnsStr))}</span></td>`;
     });
 
     htmlContent += `
@@ -1632,9 +1948,12 @@ export function generateDocHtml(
     `;
 
     questions.forEach((q, idx) => {
+      const normT = normalizeQuestionType(q.type || q.section);
+      const isEssay = normT === 'essay';
+      const labelPrefix = isEssay ? `Câu ${idx + 1} (Barem & Hướng dẫn chấm):` : `Câu ${idx + 1} (Đáp án ${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}):`;
       htmlContent += `
       <div class="solution-item">
-        <strong>Câu ${idx + 1} (Đáp án ${escapeHtmlForDoc(cleanMathForDoc(q.correctAnswer || ''))}):</strong> <em>${escapeHtmlForDoc(cleanMathForDoc(q.explanation || 'Xem định nghĩa SGK.'))}</em>
+        <strong>${labelPrefix}</strong> ${isEssay ? `<div style="margin-top: 4px; padding-left: 8px;">${formatContentForDocHtml(q.explanation || 'Xem barem chi tiết.')}</div>` : `<em>${formatContentForDocHtml(q.explanation || 'Xem định nghĩa SGK.')}</em>`}
       </div>
       `;
     });
@@ -1800,18 +2119,14 @@ export function generateLatexString(
     latex += `\\noindent \\textbf{Câu ${idx + 1}:} ${formatContentForLatex(q.content)}\\\\[0.2em]\n`;
 
     if (normType === 'true_false') {
-      const items = (q.options || []).length > 0 ? q.options : [
-        { key: 'a', text: 'Mệnh đề a', isCorrect: true },
-        { key: 'b', text: 'Mệnh đề b', isCorrect: false },
-        { key: 'c', text: 'Mệnh đề c', isCorrect: true },
-        { key: 'd', text: 'Mệnh đề d', isCorrect: false },
-      ];
+      const rec = reconcileTrueFalseQuestion(q, true);
+      const items = rec.options;
 
       latex += `\\begin{center}\n`;
       latex += `\\begin{tabular}{|c|p{12.2cm}|c|c|}\n`;
       latex += `\\hline\n`;
       latex += `\\multicolumn{2}{|c|}{\\textbf{Mệnh đề}} & \\textbf{Đúng} & \\textbf{Sai} \\\\ \\hline\n`;
-      items.forEach((item, itemIdx) => {
+      (items as any[]).forEach((item: any, itemIdx: number) => {
         const isCorrect = item.isCorrect === true;
         const dungMark = options.includeAnswers && isCorrect ? '\\textbf{X}' : '';
         const saiMark = options.includeAnswers && !isCorrect ? '\\textbf{X}' : '';
@@ -1882,7 +2197,17 @@ export function generateLatexString(
         const qIdx = r * actualCols + c;
         if (qIdx < questions.length) {
           qNums.push(`\\textbf{${qIdx + 1}}`);
-          let ansText = String(questions[qIdx].correctAnswer || '').trim();
+          const targetQ = questions[qIdx];
+          const normT = normalizeQuestionType(targetQ.type || targetQ.section);
+          let ansText = String(targetQ.correctAnswer || '').trim();
+          if (normT === 'short_answer') {
+            ansText = extractConciseAnswerForGrid(ansText);
+          } else if (normT === 'true_false') {
+            const rec = reconcileTrueFalseQuestion(targetQ, true);
+            ansText = rec.correctAnswer;
+          } else if (normT === 'essay') {
+            ansText = 'Xem barem';
+          }
           // Escape LaTeX special characters
           ansText = ansText.replace(/(?<!\\)%/g, '\\%').replace(/_/g, '\\_');
           // Shorten long answers so table does not overflow page
@@ -1904,8 +2229,11 @@ export function generateLatexString(
 
     latex += `\\noindent\\textbf{HƯỚNG DẪN GIẢI CHI TIẾT:}\\\\[0.5em]\n`;
     questions.forEach((q, idx) => {
+      const normT = normalizeQuestionType(q.type || q.section);
+      const isEssay = normT === 'essay';
       const safeAns = String(q.correctAnswer || '').replace(/(?<!\\)%/g, '\\%').replace(/_/g, '\\_');
-      latex += `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${safeAns}):} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
+      const labelPrefix = isEssay ? `\\noindent\\textbf{Câu ${idx + 1} (Barem \\& Hướng dẫn chấm):}` : `\\noindent\\textbf{Câu ${idx + 1} (Đáp án ${safeAns}):}`;
+      latex += `${labelPrefix} \\textit{${formatContentForLatex(q.explanation || 'Xem định nghĩa SGK.')}}\\\\[0.6em]\n`;
     });
   }
 
@@ -1985,7 +2313,7 @@ function formatContentForPdfHtml(rawContent: string): string {
   const svgs: string[] = [];
   let safeContent = rawContent.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, (match) => {
     svgs.push(match);
-    return `__PDF_SVG_${svgs.length - 1}__`;
+    return `@@@EXAMIFYPDFSVG#${svgs.length - 1}@@@`;
   });
 
   // 2. Tokenize Code Blocks
@@ -1997,7 +2325,7 @@ function formatContentForPdfHtml(rawContent: string): string {
       .replace(/>/g, '&gt;');
     const block = `<pre style="background: #f1f5f9; border-left: 3px solid #2563eb; border: 1px solid #e2e8f0; padding: 6px 10px; margin: 6px 0; font-family: Consolas, monospace; font-size: 10pt; line-height: 1.4; color: #0f172a; white-space: pre-wrap; border-radius: 4px;"><code>${escaped}</code></pre>`;
     codeBlocks.push(block);
-    return `__PDF_CODE_${codeBlocks.length - 1}__`;
+    return `@@@EXAMIFYPDFCODE#${codeBlocks.length - 1}@@@`;
   });
 
   // 3. Tokenize Markdown Tables
@@ -2027,20 +2355,20 @@ function formatContentForPdfHtml(rawContent: string): string {
 
     const tbl = `<table style="width: 100%; border-collapse: collapse; margin: 6px 0; border: 1pt solid #000;">${rowsHtml}</table>`;
     tableBlocks.push(tbl);
-    return `__PDF_TABLE_${tableBlocks.length - 1}__`;
+    return `@@@EXAMIFYPDFTABLE#${tableBlocks.length - 1}@@@`;
   });
 
   // 4. Clean math symbols on remaining prose text (convert LaTeX formulas to Unicode symbols)
   safeContent = cleanMathForDoc(safeContent);
 
   // 5. Restore Table Blocks
-  safeContent = safeContent.replace(/__PDF_TABLE_(\d+)__/g, (_, idx) => tableBlocks[parseInt(idx, 10)] || '');
+  safeContent = safeContent.replace(/@@@EXAMIFYPDFTABLE#(\d+)@@@/g, (_, idx) => tableBlocks[parseInt(idx, 10)] || '');
 
   // 6. Restore Code Blocks
-  safeContent = safeContent.replace(/__PDF_CODE_(\d+)__/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || '');
+  safeContent = safeContent.replace(/@@@EXAMIFYPDFCODE#(\d+)@@@/g, (_, idx) => codeBlocks[parseInt(idx, 10)] || '');
 
   // 7. Restore SVGs inside clean centered wrappers
-  safeContent = safeContent.replace(/__PDF_SVG_(\d+)__/g, (_, idx) => {
+  safeContent = safeContent.replace(/@@@EXAMIFYPDFSVG#(\d+)@@@/g, (_, idx) => {
     const rawSvg = normalizeSvgGeometry(svgs[parseInt(idx, 10)] || '');
     return `<div style="text-align: center; margin: 8px 0; max-width: 100%; overflow: hidden;">${rawSvg}</div>`;
   });
@@ -2138,12 +2466,8 @@ export function generatePdfHtml(
     `;
 
     if (normType === 'true_false') {
-      const items = (q.options || []).length > 0 ? q.options : [
-        { key: 'a', text: 'Mệnh đề a', isCorrect: true },
-        { key: 'b', text: 'Mệnh đề b', isCorrect: false },
-        { key: 'c', text: 'Mệnh đề c', isCorrect: true },
-        { key: 'd', text: 'Mệnh đề d', isCorrect: false },
-      ];
+      const rec = reconcileTrueFalseQuestion(q, true);
+      const items = rec.options;
 
       html += `
       <table style="width: 100%; border-collapse: collapse; border: 1.2pt solid #000; margin-top: 4px; margin-bottom: 6px;">
@@ -2157,7 +2481,7 @@ export function generatePdfHtml(
         <tbody>
       `;
 
-      items.forEach((item, itemIdx) => {
+      (items as any[]).forEach((item: any, itemIdx: number) => {
         const isCorrect = item.isCorrect === true;
         const dungMark = options.includeAnswers && isCorrect ? '<strong>X</strong>' : '';
         const saiMark = options.includeAnswers && !isCorrect ? '<strong>X</strong>' : '';
@@ -2271,19 +2595,13 @@ export function generatePdfHtml(
     questions.forEach((q, idx) => {
       let ansText = cleanMathForDoc(q.correctAnswer || '');
       const normType = normalizeQuestionType(q.type);
-      if (normType === 'true_false') {
-        const hasExplicitTfAnswer = q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
-        if (hasExplicitTfAnswer) {
-          ansText = cleanMathForDoc(q.correctAnswer);
-        } else {
-          const tfParts = (q.options || []).map((o, oIdx) => {
-            const lk = (o.key || String.fromCharCode(97 + oIdx)).toLowerCase().replace(/[\)\.\:]/g, '');
-            return `${lk}: ${o.isCorrect ? 'Đ' : 'S'}`;
-          });
-          ansText = tfParts.join(', ');
-        }
+      if (normType === 'short_answer') {
+        ansText = extractConciseAnswerForGrid(ansText);
+      } else if (normType === 'true_false') {
+        const rec = reconcileTrueFalseQuestion(q, true);
+        ansText = rec.correctAnswer;
       } else if (normType === 'essay') {
-        ansText = 'Xem chi tiết';
+        ansText = 'Xem barem';
       }
 
       html += `
@@ -2312,10 +2630,13 @@ export function generatePdfHtml(
     `;
 
     questions.forEach((q, idx) => {
+      const normType = normalizeQuestionType(q.type);
+      const isEssay = normType === 'essay';
+      const labelPrefix = isEssay ? `Câu ${idx + 1} (Barem & Hướng dẫn chấm):` : `Câu ${idx + 1} (Đáp án ${cleanMathForDoc(q.correctAnswer || '')}):`;
       html += `
       <div style="margin-bottom: 8px; font-size: 10.5pt;">
-        <strong>Câu ${idx + 1} (Đáp án ${cleanMathForDoc(q.correctAnswer || '')}):</strong>
-        <em>${cleanMathForDoc(q.explanation || 'Xem lý thuyết sách giáo khoa.')}</em>
+        <strong>${labelPrefix}</strong>
+        ${isEssay ? `<div style="margin-top: 4px; padding-left: 8px;">${formatContentForPdfHtml(q.explanation || 'Xem barem chi tiết.')}</div>` : `<em>${formatContentForPdfHtml(q.explanation || 'Xem lý thuyết sách giáo khoa.')}</em>`}
       </div>
       `;
     });

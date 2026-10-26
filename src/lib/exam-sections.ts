@@ -147,44 +147,122 @@ export interface SectionFormatPreset {
   };
 }
 
-export const EXAM_FORMAT_PRESETS: SectionFormatPreset[] = [
-  {
-    id: 'moet_2025',
-    name: 'Chuẩn Bộ GD&ĐT 2025 (22 câu)',
-    description: '12 Trắc nghiệm + 4 Đúng/Sai + 6 Trả lời ngắn',
-    totalQuestions: 22,
-    sections: {
-      multiple_choice: { count: 12, matrix: { knowledge: 60, comprehension: 40, application: 0, highApplication: 0 } },
-      true_false: { count: 4, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
-      short_answer: { count: 6, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
-      essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+/**
+ * Kiểm tra xem môn học có phải là Toán hay không.
+ * Môn Toán có đặc thù công thức KaTeX phức tạp, hình học SVG không gian và barem tự luận,
+ * cần giới hạn tối đa 30 câu để tránh tràn giới hạn token của LLM.
+ */
+export function isMathSubject(subject?: string): boolean {
+  if (!subject) return false;
+  const s = subject.toLowerCase().trim();
+  return (
+    s.includes('toán') ||
+    s.includes('toan') ||
+    s.includes('math') ||
+    s.includes('hình học') ||
+    s.includes('đại số')
+  );
+}
+
+/**
+ * Lấy giới hạn số lượng câu hỏi tối đa dựa trên môn học:
+ * - Toán học: tối đa 30 câu (tránh nghẽn/tràn 8k token do SVG và LaTeX)
+ * - Các môn khác (Sử, Địa, Ngoại ngữ, GDCD...): tối đa 50 câu (thoải mái ra đề 40-50 câu chuẩn Bộ)
+ */
+export function getMaxQuestionsForSubject(subject?: string): number {
+  return isMathSubject(subject) ? 30 : 50;
+}
+
+/**
+ * Mẫu cấu trúc đề thi được tùy biến theo từng môn học:
+ * - Với môn Toán: Giới hạn tối đa 30 câu (chuẩn 2025: 22 câu, truyền thống: 30 câu).
+ * - Với môn KHXH / Ngoại ngữ (Sử, Địa, Tiếng Anh...): Chuẩn 2025 là 28 câu, truyền thống là 40 câu trắc nghiệm (50 phút).
+ */
+export function getExamFormatPresets(subject?: string): SectionFormatPreset[] {
+  const isMath = isMathSubject(subject);
+  if (isMath) {
+    return [
+      {
+        id: 'moet_2025',
+        name: 'Chuẩn Bộ GD&ĐT 2025 (22 câu)',
+        description: '12 Trắc nghiệm + 4 Đúng/Sai + 6 Trả lời ngắn',
+        totalQuestions: 22,
+        sections: {
+          multiple_choice: { count: 12, matrix: { knowledge: 60, comprehension: 40, application: 0, highApplication: 0 } },
+          true_false: { count: 4, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+          short_answer: { count: 6, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
+          essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+        },
+      },
+      {
+        id: 'traditional_mc',
+        name: 'Trắc nghiệm Truyền thống (30 câu)',
+        description: '30 câu trắc nghiệm 4 lựa chọn phủ đều 4 cấp độ tư duy',
+        totalQuestions: 30,
+        sections: {
+          multiple_choice: { count: 30, matrix: { knowledge: 40, comprehension: 30, application: 20, highApplication: 10 } },
+          true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+          short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
+          essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+        },
+      },
+      {
+        id: 'mixed_essay',
+        name: 'Trắc nghiệm & Tự luận (22 câu)',
+        description: '20 câu trắc nghiệm + 2 câu tự luận mở rộng',
+        totalQuestions: 22,
+        sections: {
+          multiple_choice: { count: 20, matrix: { knowledge: 40, comprehension: 40, application: 20, highApplication: 0 } },
+          true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+          short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
+          essay: { count: 2, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+        },
+      },
+    ];
+  }
+
+  // Đối với các môn KHXH, Ngoại ngữ, KHTN...
+  return [
+    {
+      id: 'moet_2025',
+      name: 'Chuẩn Bộ GD&ĐT 2025 (28 câu)',
+      description: '24 Trắc nghiệm nhiều lựa chọn + 4 Đúng/Sai',
+      totalQuestions: 28,
+      sections: {
+        multiple_choice: { count: 24, matrix: { knowledge: 50, comprehension: 30, application: 20, highApplication: 0 } },
+        true_false: { count: 4, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+        short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+        essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+      },
     },
-  },
-  {
-    id: 'traditional_mc',
-    name: 'Trắc nghiệm Truyền thống (40 câu)',
-    description: '40 câu trắc nghiệm 4 lựa chọn phủ đều 4 cấp độ tư duy',
-    totalQuestions: 40,
-    sections: {
-      multiple_choice: { count: 40, matrix: { knowledge: 40, comprehension: 30, application: 20, highApplication: 10 } },
-      true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
-      short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
-      essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+    {
+      id: 'traditional_mc',
+      name: 'Trắc nghiệm Truyền thống (40 câu)',
+      description: '40 câu trắc nghiệm 4 lựa chọn (Chuẩn thi tốt nghiệp 50 phút)',
+      totalQuestions: 40,
+      sections: {
+        multiple_choice: { count: 40, matrix: { knowledge: 40, comprehension: 30, application: 20, highApplication: 10 } },
+        true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+        short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
+        essay: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+      },
     },
-  },
-  {
-    id: 'mixed_essay',
-    name: 'Trắc nghiệm & Tự luận (22 câu)',
-    description: '20 câu trắc nghiệm + 2 câu tự luận mở rộng',
-    totalQuestions: 22,
-    sections: {
-      multiple_choice: { count: 20, matrix: { knowledge: 40, comprehension: 40, application: 20, highApplication: 0 } },
-      true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
-      short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
-      essay: { count: 2, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+    {
+      id: 'mixed_essay',
+      name: 'Trắc nghiệm & Tự luận (22 câu)',
+      description: '20 câu trắc nghiệm + 2 câu tự luận mở rộng',
+      totalQuestions: 22,
+      sections: {
+        multiple_choice: { count: 20, matrix: { knowledge: 40, comprehension: 40, application: 20, highApplication: 0 } },
+        true_false: { count: 0, matrix: { knowledge: 0, comprehension: 50, application: 50, highApplication: 0 } },
+        short_answer: { count: 0, matrix: { knowledge: 0, comprehension: 0, application: 60, highApplication: 40 } },
+        essay: { count: 2, matrix: { knowledge: 0, comprehension: 0, application: 50, highApplication: 50 } },
+      },
     },
-  },
-];
+  ];
+}
+
+export const EXAM_FORMAT_PRESETS: SectionFormatPreset[] = getExamFormatPresets('Toán học');
 
 /**
  * Tính khoảng cách từ điểm (px, py) đến đoạn thẳng (x1, y1)-(x2, y2)
@@ -551,4 +629,167 @@ export function normalizeSvgGeometry(content: string): string {
     return fixed;
   });
 }
+
+/**
+ * Trích xuất giá trị Đúng/Sai cho một nhãn (a, b, c, d) từ chuỗi đáp án (correctAnswer)
+ * Sử dụng cờ Unicode `u` và bộ ký tự biên an toàn (?!\p{L}) để tránh bắt nhầm các từ như "Đường thẳng", "Đồ thị"
+ */
+export function parseTrueFalseTruth(key: string, answerStr?: string | null): boolean | null {
+  if (!answerStr || typeof answerStr !== 'string') return null;
+
+  const k = key.trim().toLowerCase();
+
+  // Trường hợp 1: Khớp trực tiếp nhãn và token (a: Đ, a: Đúng, a: S, a: Sai, a. Đ, a) S)
+  const directMatch = answerStr.match(
+    new RegExp('(?:^|[\\s,;|\\n])' + k + '[-:=.,;()–—\\s]+(?:(Đúng|True|Đ|T|1)|(Sai|False|S|F|0))(?!\\p{L})', 'iu')
+  );
+  if (directMatch) {
+    if (directMatch[1]) return true;
+    if (directMatch[2]) return false;
+  }
+
+  // Trường hợp 2: Khớp câu đảo ngữ (c: ... là Sai)
+  const tailMatch = answerStr.match(
+    new RegExp('(?:^|[\\s,;|\\n])' + k + '[-:=.,;()–—\\s]+[^,;|\\n]*?(?:là|thì|kết quả|khẳng định|mệnh đề)?\\s*(?:(Đúng|True|Đ|T|1)|(Sai|False|S|F|0))(?!\\p{L})[\\s.,;|\\n]*?(?=[a-d][-:=.,;()]|$)', 'iu')
+  );
+  if (tailMatch) {
+    if (tailMatch[1]) return true;
+    if (tailMatch[2]) return false;
+  }
+
+  return null;
+}
+
+/**
+ * Gọt sạch 100% các câu độc thoại nội tâm rác hoặc lời tự thú của mô hình AI
+ */
+export function cleanseInternalMonologue(text?: string | null): string {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text;
+
+  // 1. Phán đoán chọn đáp án gần nhất (Nearest neighbor guessing)
+  cleaned = cleaned.replace(/[.,;\s]*(?:[^\n.]|(?<=\d)\.(?=\d))*?(?:gần\s+nhất|xấp\s+xỉ\s+nhất|gần\s+(?:với\s+)?[^\n.]*?\s+nhất)(?:[^\n.]|(?<=\d)\.(?=\d))*?\bnên\s+(?:ta\s+)?chọn(?:[^\n.]|(?<=\d)\.(?=\d))*/giu, '');
+  cleaned = cleaned.replace(/[.,;\s]*Chọn\s+(?:[^\n.]|(?<=\d)\.(?=\d))*?\blà\s+xấp\s+xỉ\s+gần\s+nhất(?:[^\n.]|(?<=\d)\.(?=\d))*/giu, '');
+
+  // 2. Tự ý đổi số / sửa tham số đề bài (Parameter mutation)
+  cleaned = cleaned.replace(/[.,;\s]*(?:Để\s+số\s+(?:nguyên\s+)?đẹp(?:\s+hơn)?|(?:Do|Vì)\s+số\s+(?:xấu|lẻ)|(?:Chọn|Sửa)\s+lại\s+[A-Za-z0-9]+)(?:[^\n.]|(?<=\d)\.(?=\d))*/giu, '');
+
+  // 3. Độc thoại hoảng loạn sửa đáp án
+  cleaned = cleaned.replace(/[.,;\s]*Sửa\s+[a-d]\s+thành\s+(?:Đ|S|Đúng|Sai|True|False)[.,;\s]*/giu, '. ');
+  cleaned = cleaned.replace(/[.,;\s]*Thôi\s+để\s+[a-d]\s*[:=-](?:[^\n.]|(?<=\d)\.(?=\d))*/giu, '');
+  cleaned = cleaned.replace(/[.,;\s]*Có\s+vẻ\s+đề\s+cần\s+chỉnh(?:[^\n.]|(?<=\d)\.(?=\d))*/giu, '');
+
+  // Chuẩn hóa dấu trừ Unicode sang ASCII trừ chuẩn
+  cleaned = cleaned.replace(/[−–—]/g, '-');
+
+  cleaned = cleaned.replace(/\s{2,}/g, ' ').replace(/^\s*[.,;]\s*/, '').replace(/[.,;]\s*([.,;])/g, '$1').trim();
+  return cleaned;
+}
+
+/**
+ * Bóc tách kết luận Đúng/Sai từ lời giải chi tiết (explanation)
+ */
+export function extractTruthFromExplanation(key: string, expl?: string | null): boolean | null {
+  if (!expl || typeof expl !== 'string') return null;
+  const k = key.trim().toLowerCase();
+
+  // Dạng 1: 'a) ... (Đ)' hoặc '(S)' hoặc '(Đúng)'
+  const p1 = expl.match(new RegExp('(?:^|\\n|\\s)' + k + '\\)[^\\n]*?\\(((?:Đúng|Sai|True|False|Đ|S))\\)', 'iu'));
+  if (p1) return /[ĐđTt]/iu.test(p1[1]);
+
+  // Dạng 2: 'a) ... là Đúng/Sai', '- Ý a: ... ĐÚNG', hoặc 'Khẳng định a: ... SAI'
+  const p2 = expl.match(new RegExp('(?:^|\\n|\\s)(?:[-*+]\\s*)?(?:Ý|Mệnh đề|Khẳng định)?\\s*' + k + '[-:).;\\s]+[^\\n]*?(?<!\\p{L})(Đúng|Sai|True|False|Đ|S)(?!\\p{L})', 'iu'));
+  if (p2) return /[ĐđTt]/iu.test(p2[1]);
+
+  return null;
+}
+
+/**
+ * Đồng bộ hóa toàn diện câu hỏi Đúng/Sai (True/False):
+ * 1. Làm sạch độc thoại nội tâm trong explanation
+ * 2. Đồng bộ hóa options mảng đối tượng { key, text, isCorrect }
+ * 3. Tái tạo correctAnswer chuẩn "a: Đ, b: S, c: Đ, d: S"
+ * 4. Tôn trọng dữ liệu đã chỉnh sửa của giáo viên nếu preserveTeacherEdits = true
+ */
+export function reconcileTrueFalseQuestion(q: any, preserveTeacherEdits: boolean = true): any {
+  if (!q) return q;
+
+  const subKeys = ['a', 'b', 'c', 'd'];
+  const rawAnswer = String(q.correctAnswer || '');
+  const rawExpl = String(q.explanation || '');
+
+  // 1. Làm sạch độc thoại nội tâm trong lời giải
+  const cleanedExpl = cleanseInternalMonologue(rawExpl);
+
+  // 2. Kiểm tra nếu options đã có sẵn thuộc tính isCorrect hợp lệ và đang ở chế độ tôn trọng giáo viên
+  const hasValidStoredOptions =
+    preserveTeacherEdits &&
+    Array.isArray(q.options) &&
+    q.options.length >= 4 &&
+    q.options.every((o: any) => typeof o === 'object' && o !== null && typeof o.isCorrect === 'boolean');
+
+  if (hasValidStoredOptions) {
+    const syncedAnswer = q.options
+      .slice(0, 4)
+      .map((o: any) => `${o.key ? String(o.key).toLowerCase() : 'a'}: ${o.isCorrect ? 'Đ' : 'S'}`)
+      .join(', ');
+
+    return {
+      ...q,
+      explanation: cleanedExpl || q.explanation,
+      correctAnswer: syncedAnswer || q.correctAnswer,
+    };
+  }
+
+  // 3. Chuẩn hóa options thô từ AI hoặc dữ liệu chưa có isCorrect
+  const currentOpts = Array.isArray(q.options) && q.options.length > 0
+    ? q.options.slice(0, 4)
+    : subKeys.map((k) => ({ key: k, text: `Mệnh đề ${k}` }));
+
+  const normalizedOptions = currentOpts.map((opt: any, idx: number) => {
+    const k = subKeys[idx] || 'a';
+    const rawText = typeof opt === 'string' ? opt : (opt.text || '');
+    const cleanText = rawText
+      .replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '')
+      .trim();
+
+    const explTruth = extractTruthFromExplanation(k, rawExpl);
+    const answerTruth = parseTrueFalseTruth(k, rawAnswer);
+
+    let isCorrect: boolean;
+    if (explTruth !== null) {
+      isCorrect = explTruth;
+    } else if (answerTruth !== null) {
+      isCorrect = answerTruth;
+    } else if (typeof opt === 'object' && opt !== null && typeof opt.isCorrect === 'boolean') {
+      isCorrect = opt.isCorrect;
+    } else {
+      isCorrect = idx % 2 === 0;
+    }
+
+    return {
+      key: k,
+      text: cleanText || rawText || `Mệnh đề khẳng định ý ${k}`,
+      isCorrect,
+    };
+  });
+
+  // Đảm bảo đủ 4 ý a, b, c, d
+  while (normalizedOptions.length < 4) {
+    const k = subKeys[normalizedOptions.length] || 'a';
+    normalizedOptions.push({ key: k, text: `Mệnh đề khẳng định ý ${k}`, isCorrect: false });
+  }
+
+  const normalizedAnswer = normalizedOptions
+    .map((o: any) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`)
+    .join(', ');
+
+  return {
+    ...q,
+    options: normalizedOptions,
+    correctAnswer: normalizedAnswer,
+    explanation: cleanedExpl || q.explanation,
+  };
+}
+
 

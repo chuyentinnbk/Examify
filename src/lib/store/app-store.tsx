@@ -18,6 +18,18 @@ export interface QuestionOption {
 
 export type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
 
+export interface ExamQuestionVersion {
+  timestamp: number;
+  content: string;
+  type?: QuestionType | string;
+  section?: string;
+  options: QuestionOption[];
+  correctAnswer: string;
+  explanation: string;
+  level?: string;
+  points?: number;
+}
+
 export interface ExamQuestion {
   id: number | string;
   order: string;
@@ -33,6 +45,8 @@ export interface ExamQuestion {
   explanation: string;
   _backupOptions?: QuestionOption[];
   _backupAnswer?: string;
+  _previousContents?: string[];
+  _previousVersions?: ExamQuestionVersion[];
 }
 
 export interface ExamItem {

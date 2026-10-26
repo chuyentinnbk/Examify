@@ -9,7 +9,12 @@ import {
   normalizeQuestionType,
   calculateMinOneCognitiveCounts,
   EXAM_FORMAT_PRESETS,
+  getExamFormatPresets,
+  getMaxQuestionsForSubject,
+  isMathSubject,
   CognitiveMatrixPercent,
+  reconcileTrueFalseQuestion,
+  cleanseInternalMonologue,
 } from '@/lib/exam-sections';
 import { generateExamVariants } from '@/lib/exam-shuffler';
 
@@ -138,10 +143,23 @@ export default function CreateExamView() {
   // Tab đang chọn để chỉnh ma trận nhận thức
   const [activeSectionTab, setActiveSectionTab] = useState<'multiple_choice' | 'true_false' | 'short_answer' | 'essay'>('multiple_choice');
 
+  // Mẫu cấu trúc đề thi động & Giới hạn số câu theo từng môn học (Toán: max 30; Sử/Địa/Ngoại ngữ...: max 50)
+  const presets = useMemo(() => getExamFormatPresets(subject), [subject]);
+  const maxQuestions = useMemo(() => getMaxQuestionsForSubject(subject), [subject]);
+
+  // Tự động kiểm tra trần số câu khi người dùng đổi môn học
+  useEffect(() => {
+    const limit = getMaxQuestionsForSubject(subject);
+    if (questionCount > limit) {
+      setQuestionCount(limit);
+      showToast(`Môn ${subject} có giới hạn tối đa ${limit} câu để đảm bảo chất lượng AI tốt nhất.`, 'info');
+    }
+  }, [subject]);
+
   // Kiểm tra tổng câu các phần
   const totalSectionQuestions = mcCount + tfCount + saCount + essayCount;
   const isSectionCountValid =
-    totalSectionQuestions === questionCount && questionCount >= 5 && questionCount <= 50;
+    totalSectionQuestions === questionCount && questionCount >= 5 && questionCount <= maxQuestions;
 
   // Tính toán số câu thực tế từng phần theo thuật toán Min-1
   const mcAlloc = calculateMinOneCognitiveCounts(mcCount, mcMatrix);
@@ -376,7 +394,7 @@ export default function CreateExamView() {
   }, [aiProvider]);
 
   const handleApplyPreset = (presetId: string) => {
-    const preset = EXAM_FORMAT_PRESETS.find((p) => p.id === presetId);
+    const preset = presets.find((p) => p.id === presetId);
     if (!preset) return;
     setQuestionCount(preset.totalQuestions);
     setMcCount(preset.sections.multiple_choice.count);
@@ -401,9 +419,9 @@ export default function CreateExamView() {
       return;
     }
 
-    if (questionCount < 5 || questionCount > 50) {
+    if (questionCount < 5 || questionCount > maxQuestions) {
       showToast(
-        `Số lượng câu hỏi của đề thi phải từ 5 đến 50 câu (hiện tại: ${questionCount} câu) để đảm bảo chất lượng AI và lời giải chi tiết tốt nhất!`,
+        `Số lượng câu hỏi của đề thi môn ${subject} phải từ 5 đến ${maxQuestions} câu (hiện tại: ${questionCount} câu) để đảm bảo chất lượng AI và lời giải chi tiết tốt nhất!`,
         'error'
       );
       return;
@@ -582,7 +600,7 @@ export default function CreateExamView() {
 
           let optionsToUse = q.options;
           let answerToUse = q.correctAnswer;
-          let explanationToUse = q.explanation;
+          let explanationToUse = cleanseInternalMonologue(q.explanation);
 
           // If duplicate, replace with fresh procedural question so total count is preserved
           if (isQuestionDuplicate(questionContent, existingList)) {
@@ -590,25 +608,18 @@ export default function CreateExamView() {
             questionContent = fresh.content;
             optionsToUse = fresh.options;
             answerToUse = fresh.correctAnswer;
-            explanationToUse = fresh.explanation;
+            explanationToUse = cleanseInternalMonologue(fresh.explanation);
           }
 
           let formattedOptions: any[] = [];
           if (qType === 'true_false') {
-            const subKeys = ['a', 'b', 'c', 'd'];
-            formattedOptions = (optionsToUse && optionsToUse.length > 0 ? optionsToUse : ['Ý mệnh đề a', 'Ý mệnh đề b', 'Ý mệnh đề c', 'Ý mệnh đề d']).map((opt: any, optIdx: number) => {
-              const key = subKeys[optIdx] || String(optIdx);
-              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
-              const isCorrect = answerToUse
-                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(answerToUse)
-                : optIdx % 2 === 0;
-              return {
-                key,
-                text: cleanText || textVal,
-                isCorrect,
-              };
-            });
+            const healed = reconcileTrueFalseQuestion(
+              { options: optionsToUse, correctAnswer: answerToUse, explanation: explanationToUse },
+              true
+            );
+            formattedOptions = healed.options;
+            answerToUse = healed.correctAnswer;
+            explanationToUse = healed.explanation;
           } else if (qType === 'multiple_choice') {
             formattedOptions = (optionsToUse || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
               const key = ['A', 'B', 'C', 'D'][optIdx] || String(optIdx);
@@ -630,7 +641,7 @@ export default function CreateExamView() {
               : null;
             finalAnswer = extractCleanShortAnswerValue(firstOptText, explanationToUse, answerToUse);
           } else if (qType === 'essay') {
-            finalAnswer = answerToUse && !answerToUse.includes('Xem') ? answerToUse : 'Xem hướng dẫn chấm';
+            finalAnswer = answerToUse && !answerToUse.includes('Xem') ? answerToUse : 'Xem hướng dẫn chấm và barem điểm';
           } else if (qType === 'true_false') {
             finalAnswer = answerToUse || 'a: Đ, b: S, c: Đ, d: S';
           } else {
@@ -1051,7 +1062,7 @@ export default function CreateExamView() {
               <div className="space-y-1.5 sm:col-span-1">
                 <div className="flex items-center justify-between h-5">
                   <label className="text-xs font-semibold text-slate-700">Tổng số câu hỏi</label>
-                  <span className="text-[10px] text-slate-400 font-semibold">Tối đa 50 câu</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">Tối đa {maxQuestions} câu</span>
                 </div>
                 <input
                   type="number"
@@ -1064,14 +1075,14 @@ export default function CreateExamView() {
                     }
                     const num = parseInt(val, 10);
                     if (isNaN(num)) return;
-                    setQuestionCount(Math.min(50, Math.max(0, num)));
+                    setQuestionCount(Math.min(maxQuestions, Math.max(0, num)));
                   }}
                   onBlur={() => {
                     if (questionCount < 5) setQuestionCount(5);
-                    else if (questionCount > 50) setQuestionCount(50);
+                    else if (questionCount > maxQuestions) setQuestionCount(maxQuestions);
                   }}
                   min={5}
-                  max={50}
+                  max={maxQuestions}
                   className="w-full h-10 px-3 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium transition"
                 />
               </div>
@@ -1357,7 +1368,7 @@ export default function CreateExamView() {
                 <span>Chọn mẫu cấu trúc định dạng chuẩn:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {EXAM_FORMAT_PRESETS.map((preset) => (
+                {presets.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
@@ -1386,11 +1397,11 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={50}
+                    max={maxQuestions}
                     value={mcCount === 0 ? 0 : mcCount}
                     onChange={(e) => {
                       const num = parseInt(e.target.value, 10);
-                      setMcCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                      setMcCount(isNaN(num) ? 0 : Math.min(maxQuestions, Math.max(0, num)));
                     }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
@@ -1407,11 +1418,11 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={50}
+                    max={maxQuestions}
                     value={tfCount === 0 ? 0 : tfCount}
                     onChange={(e) => {
                       const num = parseInt(e.target.value, 10);
-                      setTfCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                      setTfCount(isNaN(num) ? 0 : Math.min(maxQuestions, Math.max(0, num)));
                     }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
@@ -1428,11 +1439,11 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={50}
+                    max={maxQuestions}
                     value={saCount === 0 ? 0 : saCount}
                     onChange={(e) => {
                       const num = parseInt(e.target.value, 10);
-                      setSaCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                      setSaCount(isNaN(num) ? 0 : Math.min(maxQuestions, Math.max(0, num)));
                     }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
@@ -1449,11 +1460,11 @@ export default function CreateExamView() {
                   <input
                     type="number"
                     min={0}
-                    max={50}
+                    max={maxQuestions}
                     value={essayCount === 0 ? 0 : essayCount}
                     onChange={(e) => {
                       const num = parseInt(e.target.value, 10);
-                      setEssayCount(isNaN(num) ? 0 : Math.min(50, Math.max(0, num)));
+                      setEssayCount(isNaN(num) ? 0 : Math.min(maxQuestions, Math.max(0, num)));
                     }}
                     className="w-full h-8 px-2.5 text-xs rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                   />
@@ -1468,9 +1479,9 @@ export default function CreateExamView() {
                 <div className="flex items-center gap-2 font-medium">
                   <span className="material-symbols-outlined text-base text-rose-600">error</span>
                   <span>
-                    {totalSectionQuestions > 50 ? (
+                    {totalSectionQuestions > maxQuestions ? (
                       <>
-                        Tổng các phần đang là <strong>{totalSectionQuestions} câu</strong> (vượt giới hạn an toàn tối đa <strong>50 câu</strong>). Vui lòng giảm bớt để đảm bảo AI duy trì độ sâu và chất lượng lời giải tốt nhất.
+                        Tổng các phần đang là <strong>{totalSectionQuestions} câu</strong> (vượt giới hạn an toàn tối đa <strong>{maxQuestions} câu</strong> cho môn {subject}). Vui lòng giảm bớt để đảm bảo AI duy trì độ sâu và chất lượng lời giải tốt nhất.
                       </>
                     ) : questionCount < 5 ? (
                       <>
@@ -1483,7 +1494,7 @@ export default function CreateExamView() {
                     )}
                   </span>
                 </div>
-                {totalSectionQuestions <= 50 && totalSectionQuestions >= 5 && (
+                {totalSectionQuestions <= maxQuestions && totalSectionQuestions >= 5 && (
                   <button
                     type="button"
                     onClick={() => setQuestionCount(totalSectionQuestions)}
@@ -1497,7 +1508,7 @@ export default function CreateExamView() {
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2 text-xs font-medium">
                 <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
                 <span>
-                  Cấu trúc phân bổ câu hỏi hợp lệ: Đúng {totalSectionQuestions} câu cho 4 phần (Nằm trong vùng an toàn 5 - 50 câu).
+                  Cấu trúc phân bổ câu hỏi hợp lệ: Đúng {totalSectionQuestions} câu cho 4 phần (Nằm trong vùng an toàn 5 - {maxQuestions} câu).
                 </span>
               </div>
             )}
@@ -2222,8 +2233,8 @@ export default function CreateExamView() {
                 <>
                   <span className="material-symbols-outlined text-base text-amber-300">warning</span>
                   <span>
-                    {totalSectionQuestions > 50
-                      ? `Vượt quá giới hạn tối đa (${totalSectionQuestions}/50 câu)`
+                    {totalSectionQuestions > maxQuestions
+                      ? `Vượt quá giới hạn tối đa (${totalSectionQuestions}/${maxQuestions} câu)`
                       : questionCount < 5
                       ? `Cần tối thiểu 5 câu (${questionCount}/5 câu)`
                       : `Chưa khớp số câu các phần (${totalSectionQuestions}/${questionCount})`}

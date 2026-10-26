@@ -124,26 +124,44 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 5. PRECISE & PEDAGOGICAL: Questions must be unambiguous, factually accurate, and mathematically verified.
 6. QUESTION TYPES & SPECIFICATIONS:
    - MULTIPLE_CHOICE: 4 distinct choices (A, B, C, D) in "options", exactly one correct option in "correctAnswer" ("A", "B", "C", or "D").
+     * BẮT BUỘC PHÂN BỐ ĐỀU ĐÁP ÁN: Đáp án đúng (correctAnswer) của 12 câu trắc nghiệm Phần I BẮT BUỘC phải phân bố đều cho cả 4 phương án A, B, C, D (khoảng 3A, 3B, 3C, 3D). TUYỆT ĐỐI KHÔNG dồn phần lớn đáp án đúng vào phương án A.
+     * BẮT BUỘC KHỚP TUYỆT ĐỐI 100% VỚI PHƯƠNG ÁN: Một trong 4 phương án A, B, C, D BẮT BUỘC phải trùng khớp chính xác 100% với giá trị tính toán của Lời giải. TUYỆT ĐỐI NGHIÊM CẤM ngụy biện chọn phương án xấp xỉ gần nhất (CẤM: "tính ra 2.54 gần với 2.4 nhất nên chọn A").
+     * Trong "explanation", hãy tập trung giải thích các bước biến đổi toán học và kết luận giá trị/đáp số cụ thể (ví dụ: "Do đó x = 3", "Vậy thể tích V = a³/3"), HẠN CHẾ viết câu cứng nhắc như "Do đó chọn A".
    - TRUE_FALSE (Đúng / Sai): 1 question statement with context, plus exactly 4 sub-items in "options" corresponding to a, b, c, d.
-     * "correctAnswer" formatted as "a: Đ, b: S, c: Đ, d: S" (or "a: Đúng, b: Sai, c: Đúng, d: Đúng").
-     * BẮT BUỘC CÂN BẰNG TÍNH ĐÚNG/SAI: Phân bố tính đúng/sai của 4 ý a, b, c, d phải đa dạng và cân bằng theo chuẩn đề thi của Bộ GD&ĐT (ví dụ: 2 Đúng - 2 Sai, 3 Đúng - 1 Sai, hoặc 1 Đúng - 3 Sai). TUYỆT ĐỐI NGHIÊM CẤM tạo câu hỏi mà cả 4 ý đều Sai, hoặc chỉ có duy nhất 1 ý Đúng và 3 ý còn lại đều mặc định là Sai một cách rập khuôn.
+     * BẮT BUỘC SINH THEO THỨ TỰ "REASONING FIRST": Trong mỗi câu Đúng/Sai, bạn BẮT BUỘC phải viết trường "explanation" (giải chi tiết từng ý a, b, c, d và kết luận rõ (Đúng) hoặc (Sai)) TRƯỚC trường "correctAnswer". Sau khi giải xong 4 ý, mới chốt các giá trị vào "correctAnswer" ("a: Đ, b: S, c: Đ, d: S").
+     * TUYỆT ĐỐI NGHIÊM CẤM đoán trước đáp án rồi mới giải, dẫn đến việc phải độc thoại sửa sai trong explanation ("sửa c thành S", "thôi để...").
+     * BẮT BUỘC CÂN BẰNG TÍNH ĐÚNG/SAI: Phân bố tính đúng/sai của 4 ý a, b, c, d phải đa dạng và cân bằng theo chuẩn đề thi của Bộ GD&ĐT (ví dụ: 2 Đúng - 2 Sai, 3 Đúng - 1 Sai, hoặc 1 Đúng - 3 Sai). TUYỆT ĐỐI NGHIÊM CẤM tạo câu hỏi mà cả 4 ý đều Đúng hoặc cả 4 ý đều Sai.
    - SHORT_ANSWER (Trả lời ngắn theo chuẩn thi tốt nghiệp THPT Bộ GD&ĐT):
-     * BẮT BUỘC MÃ HÓA CÂU HỎI VỀ ĐÁP SỐ LÀ MỘT CON SỐ CỤ THỂ (SỐ NGUYÊN HOẶC SỐ THẬP PHÂN LÀM TRÒN):
-       + Trong kỳ thi tốt nghiệp THPT chuẩn GDPT 2018, thí sinh tô đáp án vào Phiếu trả lời trắc nghiệm (tối đa 4 ký tự gồm dấu âm, dấu phẩy/chấm và các chữ số 0-9). Phiếu thi KHÔNG CÓ ký hiệu căn thức, không có biến số (a, b, m, x) hay phân số chứa căn!
-       + VÌ VẬY, GIÁO VIÊN VÀ HỆ THỐNG CHẤM THI BẮT BUỘC CẦN ĐÁP ÁN ĐÃ MÃ HÓA THÀNH CON SỐ THỰC TẾ.
-       + MỌI CÂU HỎI CÓ KẾT QUẢ LÀ BIỂU THỨC CHỨA CĂN HOẶC THAM SỐ: ĐỀ BÀI BẮT BUỘC PHẢI DÙNG KỸ THUẬT MÃ HÓA CHUẨN BỘ GD&ĐT:
-         - Dạng phân số/căn: Nếu kết quả là V = (a^3\\sqrt{m})/n, đề bài PHẢI hỏi: "Biết thể tích khối chóp là V = (a^3\\sqrt{m})/n với m, n nguyên dương, m/n tối giản. Tính giá trị T = m + n." -> "correctAnswer": "15" (hoặc con số cụ thể).
-         - Dạng làm tròn thập phân: Nếu kết quả vô tỉ (như căn bậc ba của 2), đề bài PHẢI yêu cầu: "Tính bán kính r (làm tròn kết quả đến hàng phần mười / phần trăm)..." -> "correctAnswer": "1.26".
-         - Dạng cực trị/đếm: Nếu tìm điều kiện tham số (như m >= 3), đề bài PHẢI hỏi: "Tìm giá trị nhỏ nhất của tham số m..." hoặc "Có bao nhiêu giá trị nguyên của m thuộc [-5; 5]..." -> "correctAnswer": "3".
-         - Dạng tọa độ: "Biết tọa độ điểm M(a; b; c). Tính tổng a + b + c." -> "correctAnswer": "5".
-     * TUYỆT ĐỐI NGHIÊM CẤM:
-       + NGHIÊM CẤM "correctAnswer" chứa căn thức (\\sqrt, sqrt), căn bậc hai, biến số (a, b, m, x), dấu bất đẳng thức (>=, <=), hoặc khoảng nghiệm.
-       + "correctAnswer" BẮT BUỘC LÀ CON SỐ CỤ THỂ (ví dụ: "15", "-4.5", "1.26", "6", "161.25").
-       + TUYỆT ĐỐI KHÔNG điền chữ cái A, B, C, D vào correctAnswer của SHORT_ANSWER.
-       + TUYỆT ĐỐI KHÔNG dùng số mặc định hay đoán mò. Mọi đáp số phải khớp 100% với lời giải trong explanation.
+     * BẢO TOÀN THAM SỐ 100% (FROZEN / IMMUTABLE CONTENT):
+       + Mọi thông số, độ dài, tọa độ đã ghi trong đề bài "content" là HẰNG SỐ BẤT BIẾN.
+       + Lời giải "explanation" BẮT BUỘC phải kế thừa và tính toán trung thực 100% theo đúng số liệu đó.
+       + TUYỆT ĐỐI NGHIÊM CẤM MỌI HÀNH VI TỰ Ý SỬA ĐỀ TRONG LỜI GIẢI (CẤM: "Để số đẹp hơn, chọn...", "Chọn lại...", "Do số xấu nên giả sử...").
+     * CHẤP NHẬN SỐ LIỆU TỰ NHIÊN / THỰC TẾ:
+       + Trong đề thi thực tế, các đại lượng đo đạc (khoảng cách, thể tích, diện tích, góc) thường là số lẻ hoặc chứa căn thức. Hãy cứ tính toán tự nhiên theo công thức chuẩn.
+     * ĐỘ CHÍNH XÁC TRUNG GIAN (INTERMEDIATE PRECISION):
+       + Nếu cần tính xấp xỉ ở các bước giữa chừng, BẮT BUỘC giữ từ 5 đến 6 chữ số thập phân để triệt tiêu hoàn toàn sai số tích lũy và sai số phi tuyến.
+     * QUY CHUẨN ĐÁP SỐ "correctAnswer" (SONG HÀNH PHÂN SỐ TRỤC CĂN & SỐ THẬP PHÂN LÀM TRÒN):
+       + Nếu kết quả là phân số hoặc vô tỉ chứa căn thức: Trục căn thức ở mẫu, tối giản phân số, kết hợp với giá trị số thập phân làm tròn đúng 2 chữ số (theo quy tắc >= 5 làm tròn lên).
+         Ví dụ: "\\frac{24\\sqrt{89}}{89} \\approx 2.54" hoặc "\\frac{3}{4} = 0.75".
+       + Nếu kết quả là số nguyên: Ghi số nguyên thuần túy (ví dụ: "15", "-3", "5").
+       + Bỏ số 0 thừa ở đuôi phần thập phân (ghi "2.4" thay vì "2.40", ghi "5" thay vì "5.00").
+     * ĐƠN NGHIỆM DUY NHẤT (SINGLE-VALUED PRINCIPLE):
+       + Mọi câu hỏi Phần III BẮT BUỘC dẫn tới duy nhất 1 con số cụ thể (hỏi tổng các nghiệm, tích các nghiệm, nghiệm dương, min, max, đếm số nghiệm).
+       + TUYỆT ĐỐI KHÔNG ra đề lơ lửng dẫn đến đa nghiệm (như "m = 1; 2") hay khoảng nghiệm (như "m >= 3" hay "[3; +inf)").
+     * CẤM KÝ HIỆU CHU KỲ TUẦN HOÀN:
+       + TUYỆT ĐỐI KHÔNG viết dạng chu kỳ tuần hoàn ngoặc đơn như "$0.(3)$" hay "$1.(6)$"; BẮT BUỘC làm tròn 2 chữ số thập phân: "0.33", "1.67".
+     * ẤN ĐỊNH ĐƠN VỊ ĐO BÀI TOÁN THỰC TẾ:
+       + Với các bài toán ứng dụng thực tế có đơn vị đo lường (triệu đồng, mét khối, km/h...), đề bài BẮT BUỘC phải ấn định rõ đơn vị cần điền ngay trong câu hỏi (ví dụ: "Tính chi phí nhỏ nhất theo đơn vị triệu đồng (kết quả làm tròn đến 2 chữ số sau dấu phẩy, chỉ điền số, không điền chữ)").
      * "options" bắt buộc là mảng rỗng [].
-     * BẮT BUỘC GIẢI CHI TIẾT TRƯỚC trong "explanation" và suy ra con số mã hóa cuối cùng khớp 100% với "correctAnswer".
-   - ESSAY (Tự luận): Multi-step analytical problem. "options" must be empty array []. "correctAnswer": "Xem hướng dẫn chấm". "explanation" must provide step-by-step scoring rubric with partial points.
+     * BẮT BUỘC GIẢI CHI TIẾT TRƯỚC trong "explanation" và chốt đáp số cuối cùng khớp 100% với "correctAnswer".
+   - ESSAY (Tự luận):
+     * "options" bắt buộc là mảng rỗng [].
+     * "correctAnswer": "Xem hướng dẫn chấm và barem điểm".
+     * BẮT BUỘC trong "explanation" phải phân rã thành Barem chấm điểm từng bước (Step-by-step Scoring Rubric) với mốc điểm chi tiết (0.25đ, 0.5đ, 0.75đ, 1.0đ...) chuẩn Bộ GD&ĐT:
+       - Bước 1 (0.25đ): Nêu điều kiện xác định / đặt ẩn phụ / phân tích giả thiết...
+       - Bước 2 (0.50đ): Lập luận biến đổi đại số / đạo hàm / lập bảng biến thiên / giải phương trình...
+       - Bước 3 (0.25đ): Đối chiếu điều kiện và kết luận giá trị cuối cùng...
+     * BẢO TOÀN THAM SỐ 100%: Dữ liệu đề bài là bất biến, Lời giải và Barem BẮT BUỘC phải kế thừa và tính toán trung thực 100% theo đúng số liệu đó.
 7. QUY TẮC ĐỊNH DẠNG ĐOẠN MÃ LẬP TRÌNH (CODE SNIPPETS):
    - Đối với các câu hỏi môn Tin học / Lập trình có chứa mã nguồn (Python, C++, SQL...):
      * TUYỆT ĐỐI KHÔNG VIẾT DỒN CODE TRÊN 1 DÒNG DUY NHẤT.
@@ -276,7 +294,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
       if (dist.shortAnswer && dist.shortAnswer.count > 0) {
         const counts = calculateMinOneCognitiveCounts(dist.shortAnswer.count, dist.shortAnswer.matrix);
         parts.push(`- PHẦN III: CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN (SHORT_ANSWER)
-  * Số lượng: ĐÚNG ${dist.shortAnswer.count} câu (options: [], đề bài BẮT BUỘC mã hóa câu hỏi để correctAnswer là con số cụ thể chuẩn phiếu tô trắc nghiệm BGD, TUYỆT ĐỐI KHÔNG chứa căn thức \\sqrt hay biến số)
+  * Số lượng: ĐÚNG ${dist.shortAnswer.count} câu (options: [], correctAnswer tuân thủ chuẩn song hành phân số/căn thức kèm giá trị thập phân làm tròn 2 chữ số, ví dụ "\\frac{24\\sqrt{89}}{89} \\approx 2.54", hoặc số nguyên nếu chẵn)
   * Phân bổ mức độ nhận thức cụ thể:
     + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
     + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
@@ -287,7 +305,7 @@ ${curriculum.lesson ? `- Lesson Focus: ${curriculum.lesson}` : ''}
       if (dist.essay && dist.essay.count > 0) {
         const counts = calculateMinOneCognitiveCounts(dist.essay.count, dist.essay.matrix);
         parts.push(`- PHẦN IV: TỰ LUẬN (ESSAY)
-  * Số lượng: ĐÚNG ${dist.essay.count} câu
+  * Số lượng: ĐÚNG ${dist.essay.count} câu (options: [], correctAnswer: "Xem hướng dẫn chấm và barem điểm", explanation phân rã Barem chấm điểm chi tiết 0.25đ - 0.5đ từng bước)
   * Phân bổ mức độ nhận thức cụ thể:
     + ${counts.knowledge} câu Nhận biết (KNOWLEDGE)
     + ${counts.comprehension} câu Thông hiểu (COMPREHENSION)
@@ -347,8 +365,7 @@ ${matrixSpecs}
         "First option content (WITHOUT leading A. prefix for MULTIPLE_CHOICE, or sub-item a for TRUE_FALSE, or empty array for SHORT_ANSWER and ESSAY)"
       ],
       "explanation": "string (Step-by-step pedagogical explanation and calculations FIRST before writing final answer)",
-      "correctAnswer": "A | B | C | D (for MULTIPLE_CHOICE) or balanced propositions like 'a: Đ, b: S, c: Đ, d: S' or 'a: S, b: Đ, c: Đ, d: S' (for TRUE_FALSE, must have realistic 2T-2F, 3T-1F, or 1T-3F mix; NEVER default to 1T-3F) or 'exact_concise_numerical_value' (for SHORT_ANSWER) or 'Xem hướng dẫn chấm' (for ESSAY)",
-      "points": 0.5
+      "correctAnswer": "A | B | C | D (for MULTIPLE_CHOICE) or balanced propositions like 'a: Đ, b: S, c: Đ, d: S' or 'a: S, b: Đ, c: Đ, d: S' (for TRUE_FALSE, must have realistic 2T-2F, 3T-1F, or 1T-3F mix) or dual format like '\\frac{24\\sqrt{89}}{89} \\approx 2.54' or exact integer/decimal (for SHORT_ANSWER) or 'Xem hướng dẫn chấm và barem điểm' (for ESSAY)"
     }
   ]
 }`;

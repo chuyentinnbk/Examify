@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
 import { extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
+import { reconcileTrueFalseQuestion } from '@/lib/exam-sections';
 
 export async function GET(req: NextRequest) {
   const userId = req.headers.get('x-user-id');
@@ -74,28 +75,31 @@ export async function GET(req: NextRequest) {
             const normType = isTF ? 'true_false' : isSA ? 'short_answer' : isEs ? 'essay' : 'multiple_choice';
 
             let formattedOptions: any[] = [];
-            if (!isSA && !isEs) {
-              const defaultKeys = isTF ? ['a', 'b', 'c', 'd'] : ['A', 'B', 'C', 'D'];
+            let normalizedAnswer = q.correctAnswer;
+            let normalizedExplanation = q.explanation;
+
+            if (isTF) {
+              const healed = reconcileTrueFalseQuestion(q, true);
+              formattedOptions = healed.options;
+              normalizedAnswer = healed.correctAnswer;
+              normalizedExplanation = healed.explanation;
+            } else if (!isSA && !isEs) {
+              const defaultKeys = ['A', 'B', 'C', 'D'];
               const rawOptions = Array.isArray(q.options) && q.options.length > 0 ? q.options : defaultKeys;
               formattedOptions = rawOptions.map((opt: any, optIdx: number) => {
                 const defaultKey = defaultKeys[optIdx] || String(optIdx);
                 const optKey = (typeof opt === 'object' && opt !== null ? opt.key : defaultKey) || defaultKey;
-                const hasExplicitTfAnswer = isTF && q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
-                const tfTruth = hasExplicitTfAnswer
-                  ? new RegExp(`${optKey.toLowerCase()}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
-                  : ((typeof opt === 'object' && opt !== null && opt.isCorrect !== undefined) ? !!opt.isCorrect : optIdx % 2 === 0);
-
                 if (typeof opt === 'object' && opt !== null) {
                   return {
                     key: optKey,
                     text: opt.text || '',
-                    isCorrect: isTF ? tfTruth : (opt.isCorrect ?? (q.correctAnswer === optKey)),
+                    isCorrect: opt.isCorrect ?? (q.correctAnswer === optKey),
                   };
                 }
                 return {
                   key: defaultKey,
                   text: String(opt),
-                  isCorrect: isTF ? tfTruth : (q.correctAnswer === defaultKey),
+                  isCorrect: q.correctAnswer === defaultKey,
                 };
               });
             }
@@ -129,8 +133,8 @@ export async function GET(req: NextRequest) {
               points: q.points || (normType === 'essay' ? 1.5 : normType === 'true_false' ? 1.0 : normType === 'short_answer' ? 0.5 : 0.25),
               correctAnswer: normType === 'short_answer'
                 ? extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer)
-                : (q.correctAnswer || (normType === 'essay' ? 'Xem hướng dẫn chấm' : normType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A')),
-              explanation: q.explanation || 'Lời giải chi tiết biên soạn theo chuẩn chương trình.',
+                : (normalizedAnswer || (normType === 'essay' ? 'Xem hướng dẫn chấm và barem điểm' : normType === 'true_false' ? 'a: Đ, b: S, c: Đ, d: S' : 'A')),
+              explanation: normalizedExplanation || q.explanation || 'Lời giải chi tiết biên soạn theo chuẩn chương trình.',
             };
           });
         }

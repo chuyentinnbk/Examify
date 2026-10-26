@@ -1770,8 +1770,11 @@ export const openApiSpec: OpenAPISpec = {
                   },
                   "totalQuestions": {
                     "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
                     "default": 20,
-                    "example": 20
+                    "example": 20,
+                    "description": "Tổng số câu hỏi của đề thi (Tối đa 30 câu cho môn Toán, tối đa 50 câu cho các môn khác như Lịch sử, Địa lý, Ngoại ngữ...)"
                   },
                   "cognitiveMatrix": {
                     "$ref": "#/components/schemas/CognitiveMatrix"

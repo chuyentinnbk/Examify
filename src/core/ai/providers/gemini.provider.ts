@@ -20,13 +20,18 @@ export class GeminiProvider implements IAIProvider {
     const rawKeys = config?.apiKey || process.env.GEMINI_API_KEY || '';
     this.keyPool = new KeyPoolManager('Gemini', rawKeys);
 
-    // Support comma-separated models list: "gemini-3.8-flash, gemini-3.7-flash, gemini-3.5-flash"
-    const rawModels = (config?.model || process.env.GEMINI_MODEL || 'gemini-3.8-flash')
+    // Support comma-separated models list: "gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.8-flash, gemini-3.7-flash, gemini-3-flash-preview, gemini-3.1-flash-lite"
+    const defaultModels = (process.env.GEMINI_MODEL || 'gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.8-flash, gemini-3.7-flash, gemini-3-flash-preview, gemini-3.1-flash-lite')
       .split(/[,;]+/)
       .map((m) => m.trim())
       .filter((m) => m.length > 0);
 
-    this.modelName = rawModels[0] || 'gemini-3.8-flash';
+    const preferred = config?.model?.trim();
+    const rawModels = preferred
+      ? [preferred, ...defaultModels.filter((m) => m !== preferred)]
+      : defaultModels;
+
+    this.modelName = rawModels[0] || 'gemini-3.5-flash';
     this.fallbackModels = rawModels;
   }
 
@@ -70,7 +75,8 @@ export class GeminiProvider implements IAIProvider {
           systemInstruction: systemPrompt,
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.7,
+            temperature: 0.2,
+            maxOutputTokens: 32768,
           },
         });
 

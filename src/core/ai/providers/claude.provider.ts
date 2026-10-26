@@ -89,7 +89,7 @@ export class ClaudeProvider implements IAIProvider {
           },
           body: JSON.stringify({
             model: currentModel,
-            max_tokens: 4096,
+            max_tokens: 8192,
             system: `${systemPrompt}\n\nIMPORTANT: You must return ONLY raw valid JSON matching the requested schema. Do not enclose in markdown blocks.`,
             messages: [
               {

@@ -52,7 +52,8 @@ export class AIFactory {
    */
   public static async generateWithFallback(
     payload: ExamGenerationPayload,
-    preferredProvider?: string
+    preferredProvider?: string,
+    preferredModel?: string
   ): Promise<ExamGenerationResult> {
     const defaultProvider = process.env.DEFAULT_AI_PROVIDER || 'gemini';
     const primary = (preferredProvider || defaultProvider).toLowerCase();
@@ -74,7 +75,8 @@ export class AIFactory {
 
     for (let i = 0; i < providersToTry.length; i++) {
       const pName = providersToTry[i];
-      const provider = this.getProvider(pName);
+      const modelConfig = (i === 0 && preferredModel) ? { model: preferredModel } : undefined;
+      const provider = this.getProvider(pName, modelConfig);
 
       if (process.env.DEBUG === 'true') {
         console.log(`[AIFactory] Attempting generation with provider: ${pName}`);

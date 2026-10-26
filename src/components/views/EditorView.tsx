@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useAppStore, ExamQuestion, ExamItem, QuestionType, QuestionOption, formatExamCode } from '@/lib/store/app-store';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useAppStore, ExamQuestion, ExamQuestionVersion, ExamItem, QuestionType, QuestionOption, formatExamCode } from '@/lib/store/app-store';
 import UserAvatar from '@/components/common/UserAvatar';
 import MathText, { cleanOptionText } from '@/components/common/MathText';
 import PortalModal from '@/components/common/PortalModal';
@@ -11,6 +11,11 @@ import {
   DEFAULT_SECTION_TITLES,
   DEFAULT_SECTION_DESCRIPTIONS,
   normalizeQuestionType,
+  reconcileTrueFalseQuestion,
+  cleanseInternalMonologue,
+  parseTrueFalseTruth,
+  extractTruthFromExplanation,
+  getMaxQuestionsForSubject,
 } from '@/lib/exam-sections';
 import {
   exportExamToDocx,
@@ -49,6 +54,10 @@ export default function EditorView() {
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isEditorMode, setIsEditorMode] = useState(false);
+  const [history, setHistory] = useState<ExamQuestion[][]>(() => [activeExam?.questions || []]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [viewingHistoryQId, setViewingHistoryQId] = useState<number | string | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const addDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,6 +105,8 @@ export default function EditorView() {
       setVariants(incomingVariants);
       setSelectedVariantIdx(0);
       setQuestions(activeExam.questions || []);
+      setHistory([activeExam.questions || []]);
+      setHistoryIndex(0);
       setExamCode(formatExamCode(activeExam.id, activeExam.code));
       if (activeExam.department) setDepartment(normalizeDepartmentAccents(activeExam.department));
       if (activeExam.schoolName) {
@@ -159,6 +170,8 @@ export default function EditorView() {
     const target = updatedVariants[idx];
     setExamCode(target.code || String(101 + idx));
     setQuestions(target.questions || []);
+    setHistory([target.questions || []]);
+    setHistoryIndex(0);
     showToast(`Đang hiển thị đề thi: Mã đề ${target.code}`, 'info');
   };
 
@@ -198,6 +211,8 @@ export default function EditorView() {
           if (newVariants[0]) {
             setExamCode(newVariants[0].code);
             setQuestions(newVariants[0].questions);
+            setHistory([newVariants[0].questions || []]);
+            setHistoryIndex(0);
           }
           if (activeExam?.id) {
             const baseCode = newVariants[0]?.code || '101';
@@ -237,6 +252,8 @@ export default function EditorView() {
     if (newVariants[0]) {
       setExamCode(newVariants[0].code);
       setQuestions(newVariants[0].questions);
+      setHistory([newVariants[0].questions || []]);
+      setHistoryIndex(0);
     }
     if (activeExam?.id) {
       const baseCode = newVariants[0]?.code || '101';
@@ -313,6 +330,116 @@ export default function EditorView() {
     );
   }
 
+  const pushSnapshot = useCallback((snapshot: ExamQuestion[]) => {
+    setHistory((prev) => {
+      const current = prev.slice(0, historyIndex + 1);
+      const next = [...current, snapshot];
+      if (next.length > 30) return next.slice(next.length - 30);
+      return next;
+    });
+    setHistoryIndex((prev) => Math.min(prev + 1, 29));
+  }, [historyIndex]);
+
+  const commitQuestionsImmediate = useCallback((newQuestions: ExamQuestion[]) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    setQuestions(newQuestions);
+    pushSnapshot(newQuestions);
+
+    if (variants && variants.length > 0) {
+      setVariants((prev) =>
+        prev.map((v, vIdx) => {
+          if (vIdx === selectedVariantIdx) {
+            return { ...v, questions: newQuestions };
+          }
+          return v;
+        })
+      );
+    }
+  }, [pushSnapshot, variants, selectedVariantIdx]);
+
+  const commitQuestionsDebounced = useCallback((newQuestions: ExamQuestion[]) => {
+    setQuestions(newQuestions);
+    if (variants && variants.length > 0) {
+      setVariants((prev) =>
+        prev.map((v, vIdx) => {
+          if (vIdx === selectedVariantIdx) {
+            return { ...v, questions: newQuestions };
+          }
+          return v;
+        })
+      );
+    }
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      pushSnapshot(newQuestions);
+    }, 600);
+  }, [pushSnapshot, variants, selectedVariantIdx]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const targetIdx = historyIndex - 1;
+      const targetQuestions = history[targetIdx];
+      setHistoryIndex(targetIdx);
+      setQuestions(targetQuestions);
+      if (variants && variants.length > 0) {
+        setVariants((prev) =>
+          prev.map((v, vIdx) => (vIdx === selectedVariantIdx ? { ...v, questions: targetQuestions } : v))
+        );
+      }
+      showToast('Đã hoàn tác (Undo)', 'info');
+    }
+  }, [historyIndex, history, variants, selectedVariantIdx, showToast]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const targetIdx = historyIndex + 1;
+      const targetQuestions = history[targetIdx];
+      setHistoryIndex(targetIdx);
+      setQuestions(targetQuestions);
+      if (variants && variants.length > 0) {
+        setVariants((prev) =>
+          prev.map((v, vIdx) => (vIdx === selectedVariantIdx ? { ...v, questions: targetQuestions } : v))
+        );
+      }
+      showToast('Đã làm lại (Redo)', 'info');
+    }
+  }, [historyIndex, history, variants, selectedVariantIdx, showToast]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable);
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        if (e.key.toLowerCase() === 'z') {
+          if (e.shiftKey) {
+            if (!isInput) {
+              e.preventDefault();
+              handleRedo();
+            }
+          } else {
+            if (!isInput) {
+              e.preventDefault();
+              handleUndo();
+            }
+          }
+        } else if (e.key.toLowerCase() === 'y') {
+          if (!isInput) {
+            e.preventDefault();
+            handleRedo();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+
   const getTypeLabel = (type?: string) => {
     const t = String(type || 'multiple_choice').toLowerCase().replace(/[\s_-]+/g, '');
     if (t.includes('true') || t.includes('dung')) return 'Đúng / Sai';
@@ -323,25 +450,27 @@ export default function EditorView() {
 
   const handleUpdateQuestion = (qId: number | string, field: keyof ExamQuestion, value: any) => {
     if (!isEditorMode) return;
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === qId ? { ...q, [field]: value } : q))
-    );
+    const updated = questions.map((q) => (q.id === qId ? { ...q, [field]: value } : q));
+    if (field === 'content' || field === 'explanation' || field === 'correctAnswer') {
+      commitQuestionsDebounced(updated);
+    } else {
+      commitQuestionsImmediate(updated);
+    }
   };
 
   const handleUpdateOption = (qId: number | string, optKey: string, text: string) => {
     if (!isEditorMode) return;
     const cleaned = cleanOptionText(text);
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id === qId) {
-          const newOpts = (q.options || []).map((opt) =>
-            opt.key.toLowerCase() === optKey.toLowerCase() ? { ...opt, text: cleaned } : opt
-          );
-          return { ...q, options: newOpts };
-        }
-        return q;
-      })
-    );
+    const updated = questions.map((q) => {
+      if (q.id === qId) {
+        const newOpts = (q.options || []).map((opt) =>
+          opt.key.toLowerCase() === optKey.toLowerCase() ? { ...opt, text: cleaned } : opt
+        );
+        return { ...q, options: newOpts };
+      }
+      return q;
+    });
+    commitQuestionsDebounced(updated);
   };
 
   const handleSetCorrectAnswer = (qId: number | string, correctKey: string) => {
@@ -350,19 +479,18 @@ export default function EditorView() {
       return;
     }
     const normKey = correctKey.trim().toUpperCase();
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id === qId) {
-          const newOpts = (q.options || []).map((opt) => ({
-            ...opt,
-            key: opt.key.toUpperCase(),
-            isCorrect: opt.key.toUpperCase() === normKey,
-          }));
-          return { ...q, correctAnswer: normKey, options: newOpts };
-        }
-        return q;
-      })
-    );
+    const updated = questions.map((q) => {
+      if (q.id === qId) {
+        const newOpts = (q.options || []).map((opt) => ({
+          ...opt,
+          key: opt.key.toUpperCase(),
+          isCorrect: opt.key.toUpperCase() === normKey,
+        }));
+        return { ...q, correctAnswer: normKey, options: newOpts };
+      }
+      return q;
+    });
+    commitQuestionsImmediate(updated);
   };
 
   const handleToggleTrueFalse = (qId: number | string, optKey: string, isCorrect: boolean) => {
@@ -371,26 +499,26 @@ export default function EditorView() {
       return;
     }
     const targetKey = optKey.trim().toLowerCase();
-    setQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id === qId) {
-          const subKeys = ['a', 'b', 'c', 'd'];
-          const currentOpts =
-            q.options && q.options.length > 0
-              ? q.options
-              : subKeys.map((k) => ({ key: k, text: `Mệnh đề ${k}`, isCorrect: true }));
+    const updatedQuestions = questions.map((q) => {
+      if (q.id === qId) {
+        const subKeys = ['a', 'b', 'c', 'd'];
+        const currentOpts =
+          q.options && q.options.length > 0
+            ? q.options
+            : subKeys.map((k) => ({ key: k, text: `Mệnh đề ${k}`, isCorrect: true }));
 
-          const newOpts = currentOpts.map((opt) =>
-            opt.key.toLowerCase() === targetKey ? { ...opt, key: opt.key.toLowerCase(), isCorrect } : opt
-          );
-          const answerStr = newOpts
-            .map((opt) => `${opt.key.toLowerCase()}: ${opt.isCorrect ? 'Đ' : 'S'}`)
-            .join(', ');
-          return { ...q, options: newOpts, correctAnswer: answerStr };
-        }
-        return q;
-      })
-    );
+        const newOpts = currentOpts.map((opt) =>
+          opt.key.toLowerCase() === targetKey ? { ...opt, key: opt.key.toLowerCase(), isCorrect } : opt
+        );
+        const answerStr = newOpts
+          .map((opt) => `${opt.key.toLowerCase()}: ${opt.isCorrect ? 'Đ' : 'S'}`)
+          .join(', ');
+        return { ...q, options: newOpts, correctAnswer: answerStr };
+      }
+      return q;
+    });
+
+    commitQuestionsImmediate(updatedQuestions);
   };
 
   const QUESTION_TYPE_ORDER: Record<string, number> = {
@@ -597,9 +725,9 @@ export default function EditorView() {
           newAns = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
         }
 
-        // If still empty (e.g. question had no explanation and no options), try finding any number in content or backup
-        if (!newAns) {
-          newAns = extractCleanShortAnswerValue(null, q.content, q._backupAnswer);
+        // If still empty, use backup answer if available
+        if (!newAns && q._backupAnswer) {
+          newAns = extractCleanShortAnswerValue(null, null, q._backupAnswer);
         }
 
         points = 0.5;
@@ -608,20 +736,7 @@ export default function EditorView() {
       // --- 4. CONVERT TO ESSAY (TỰ LUẬN) ---
       else if (normNewType === 'essay') {
         newOptions = [];
-
-        if (oldType === 'multiple_choice') {
-          const currentOpts = (q.options && q.options.length > 0) ? q.options : backupOptions;
-          const correctOpt = currentOpts.find(
-            (o) => o.key.toUpperCase() === q.correctAnswer?.trim().toUpperCase() || o.isCorrect
-          );
-          const answerText = correctOpt ? `${correctOpt.key}. ${cleanOptionText(correctOpt.text)}` : q.correctAnswer;
-          newAns = `Đáp số: ${answerText}`;
-        } else if (oldType === 'true_false') {
-          newAns = q.correctAnswer ? `Đáp án Đúng/Sai: ${q.correctAnswer}` : 'Xem hướng dẫn chấm';
-        } else if (oldType === 'short_answer') {
-          newAns = q.correctAnswer ? `Đáp số: ${q.correctAnswer}` : 'Xem hướng dẫn chấm';
-        }
-
+        newAns = 'Xem hướng dẫn chấm và barem điểm';
         points = 1.5;
       }
 
@@ -639,7 +754,7 @@ export default function EditorView() {
 
     // Auto-sort into official Ministry of Education sections (Phần I -> Phần II -> Phần III -> Phần IV)
     const sorted = sortQuestionsBySection(updatedQuestions);
-    setQuestions(sorted);
+    commitQuestionsImmediate(sorted);
 
     const qIndex = questions.findIndex((q) => q.id === qId);
     const convertedQuestion = sorted.find((q) => q.id === qId);
@@ -693,7 +808,7 @@ export default function EditorView() {
     const qIndex = questions.findIndex((q) => q.id === qId);
     const remaining = questions.filter((q) => q.id !== qId);
     const sorted = sortQuestionsBySection(remaining);
-    setQuestions(sorted);
+    commitQuestionsImmediate(sorted);
 
     if (variants && variants.length > 0) {
       const updatedVariants = variants.map((v, vIdx) => {
@@ -782,7 +897,7 @@ export default function EditorView() {
     };
 
     const sorted = sortQuestionsBySection([...questions, newQ]);
-    setQuestions(sorted);
+    commitQuestionsImmediate(sorted);
 
     if (variants && variants.length > 0) {
       const updatedVariants = variants.map((v, vIdx) => {
@@ -842,9 +957,22 @@ export default function EditorView() {
         }
       }
 
-      // Accumulate previous contents for this question slot to prevent bouncing between X and Y
-      const previousVersions = ((q as any)._previousContents || []) as string[];
-      const updatedHistory = Array.from(new Set([...previousVersions, q.content].filter(Boolean)));
+      // Accumulate previous versions and contents for this question slot
+      const previousVersions: ExamQuestionVersion[] = (q._previousVersions || []).map((v) => ({ ...v }));
+      const currentSnapshot: ExamQuestionVersion = {
+        timestamp: Date.now(),
+        content: q.content,
+        type: q.type,
+        section: q.section,
+        options: (q.options || []).map((o) => ({ ...o })),
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        level: q.level,
+        points: q.points,
+      };
+      const updatedVersions = [currentSnapshot, ...previousVersions].slice(0, 10);
+      const previousContents = (q._previousContents || []) as string[];
+      const updatedHistory = Array.from(new Set([...previousContents, q.content].filter(Boolean)));
 
       const res = await fetch('/api/v1/exams/regenerate-question', {
         method: 'POST',
@@ -874,6 +1002,7 @@ export default function EditorView() {
           item.id === q.id
             ? {
                 ...item,
+                _previousVersions: updatedVersions,
                 _previousContents: Array.from(new Set([...updatedHistory, newQ.content])),
                 content: newQ.content,
                 type: normType,
@@ -890,7 +1019,7 @@ export default function EditorView() {
             : item
         );
         const sorted = sortQuestionsBySection(updatedList);
-        setQuestions(sorted);
+        commitQuestionsImmediate(sorted);
 
         const qIndex = questions.findIndex((item) => item.id === q.id);
         const replacedItem = sorted.find((item) => item.id === q.id);
@@ -951,6 +1080,96 @@ export default function EditorView() {
     }
   };
 
+  const handleRestoreQuestionVersion = (qId: number | string, versionIndex: number) => {
+    const targetQ = questions.find((item) => item.id === qId);
+    if (!targetQ || !targetQ._previousVersions || !targetQ._previousVersions[versionIndex]) {
+      return;
+    }
+    const versionToRestore = targetQ._previousVersions[versionIndex];
+    const remainingVersions = targetQ._previousVersions.filter((_, idx) => idx !== versionIndex);
+    const currentSnapshot: ExamQuestionVersion = {
+      timestamp: Date.now(),
+      content: targetQ.content,
+      type: targetQ.type,
+      section: targetQ.section,
+      options: (targetQ.options || []).map((o) => ({ ...o })),
+      correctAnswer: targetQ.correctAnswer,
+      explanation: targetQ.explanation,
+      level: targetQ.level,
+      points: targetQ.points,
+    };
+    const newPreviousVersions = [currentSnapshot, ...remainingVersions].slice(0, 10);
+
+    const normType = versionToRestore.type || targetQ.type || 'multiple_choice';
+    const updatedList = questions.map((item) => {
+      if (item.id === qId) {
+        return {
+          ...item,
+          content: versionToRestore.content,
+          type: normType,
+          section: normType,
+          options: versionToRestore.options || item.options,
+          correctAnswer: versionToRestore.correctAnswer || item.correctAnswer,
+          explanation: versionToRestore.explanation || item.explanation,
+          level: versionToRestore.level || item.level,
+          points: versionToRestore.points || item.points,
+          _previousVersions: newPreviousVersions,
+        };
+      }
+      return item;
+    });
+
+    const sorted = sortQuestionsBySection(updatedList);
+    commitQuestionsImmediate(sorted);
+
+    const qIndex = questions.findIndex((item) => item.id === qId);
+    const replacedItem = sorted.find((item) => item.id === qId);
+
+    if (variants && variants.length > 0) {
+      const updatedVariants = variants.map((v, vIdx) => {
+        if (vIdx === selectedVariantIdx) {
+          return { ...v, questions: sorted };
+        }
+        const vQuestions = (v.questions || []).map((vQ: ExamQuestion, idx: number) => {
+          if (vQ.id === qId || (qIndex >= 0 && idx === qIndex)) {
+            return {
+              ...vQ,
+              content: replacedItem?.content ?? versionToRestore.content,
+              type: normType,
+              section: normType,
+              options: replacedItem?.options ?? versionToRestore.options,
+              correctAnswer: replacedItem?.correctAnswer ?? versionToRestore.correctAnswer,
+              explanation: replacedItem?.explanation ?? versionToRestore.explanation,
+              level: replacedItem?.level ?? versionToRestore.level,
+              points: replacedItem?.points ?? versionToRestore.points,
+            };
+          }
+          return vQ;
+        });
+        return {
+          ...v,
+          questions: sortQuestionsBySection(vQuestions),
+        };
+      });
+      setVariants(updatedVariants);
+      if (activeExam?.id) {
+        updateExam(activeExam.id, {
+          variants: updatedVariants,
+          questions: selectedVariantIdx === 0 ? sorted : (updatedVariants[0]?.questions || sorted),
+          questionsCount: sorted.length,
+        });
+      }
+    } else if (activeExam?.id) {
+      updateExam(activeExam.id, {
+        questions: sorted,
+        questionsCount: sorted.length,
+      });
+    }
+
+    setViewingHistoryQId(null);
+    showToast(`Đã khôi phục phiên bản trước của Câu ${targetQ.order || ''}!`, 'success');
+  };
+
   // Entire Exam AI Regeneration
   const handleRegenerateEntireExam = async () => {
     if (!isEditorMode) {
@@ -967,7 +1186,8 @@ export default function EditorView() {
       const medium = activeExam.matrix?.medium || 30;
       const hard = activeExam.matrix?.hard || 20;
       const veryHard = activeExam.matrix?.veryHard || 10;
-      const questionCount = questions.length > 0 ? questions.length : 20;
+      const maxAllowed = getMaxQuestionsForSubject(activeExam.subject);
+      const questionCount = Math.min(maxAllowed, Math.max(5, questions.length > 0 ? questions.length : 20));
 
       const payload = {
         title: title || activeExam.title,
@@ -1019,16 +1239,13 @@ export default function EditorView() {
           const levelStr = q.level || 'Thông hiểu';
           let formattedOptions: any[] = [];
           if (qType === 'true_false') {
-            const subKeys = ['a', 'b', 'c', 'd'];
-            formattedOptions = (q.options || ['Mệnh đề a', 'Mệnh đề b', 'Mệnh đề c', 'Mệnh đề d']).map((opt: any, optIdx: number) => {
-              const key = subKeys[optIdx] || String(optIdx);
-              const textVal = typeof opt === 'object' && opt !== null ? opt.text : String(opt || '');
-              const cleanText = textVal.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
-              const isCorrect = q.correctAnswer
-                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
-                : optIdx % 2 === 0;
-              return { key, text: cleanText || textVal, isCorrect };
-            });
+            const healed = reconcileTrueFalseQuestion(
+              { options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation },
+              true
+            );
+            formattedOptions = healed.options;
+            q.correctAnswer = healed.correctAnswer;
+            q.explanation = healed.explanation;
           } else if (qType === 'multiple_choice') {
             formattedOptions = (q.options || ['A', 'B', 'C', 'D']).map((opt: any, optIdx: number) => {
               const key = ['A', 'B', 'C', 'D'][optIdx] || 'A';
@@ -1042,11 +1259,12 @@ export default function EditorView() {
             });
           }
 
+          const cleanExpl = cleanseInternalMonologue(q.explanation);
           let finalAnswer = q.correctAnswer || 'A';
           if (qType === 'short_answer') {
-            finalAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
+            finalAnswer = extractCleanShortAnswerValue(null, cleanExpl, q.correctAnswer);
           } else if (qType === 'essay') {
-            finalAnswer = q.correctAnswer && !q.correctAnswer.includes('Xem') ? q.correctAnswer : 'Xem hướng dẫn chấm';
+            finalAnswer = q.correctAnswer && !q.correctAnswer.includes('Xem') ? q.correctAnswer : 'Xem hướng dẫn chấm và barem điểm';
           } else if (qType === 'true_false') {
             finalAnswer = q.correctAnswer || 'a: Đ, b: S, c: Đ, d: S';
           }
@@ -1070,7 +1288,7 @@ export default function EditorView() {
             options: formattedOptions,
             points: q.points || (qType === 'essay' ? 1.5 : qType === 'true_false' ? 1.0 : qType === 'short_answer' ? 0.5 : 0.25),
             correctAnswer: finalAnswer,
-            explanation: q.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
+            explanation: cleanExpl || 'Lời giải chi tiết biên soạn bởi mô hình AI.',
           };
         });
 
@@ -1078,7 +1296,7 @@ export default function EditorView() {
         sorted.forEach((item, idx) => {
           item.order = `Câu ${String(idx + 1).padStart(2, '0')}`;
         });
-        setQuestions(sorted);
+        commitQuestionsImmediate(sorted);
 
         let updatedVariants: any[] | undefined = undefined;
         if (variants && variants.length > 1) {
@@ -1353,6 +1571,39 @@ export default function EditorView() {
 
           {isEditorMode && (
             <>
+              {/* Undo / Redo Controls */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    historyIndex <= 0
+                      ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 shadow-xs cursor-pointer'
+                  }`}
+                  title="Hoàn tác thay đổi vừa thực hiện (Ctrl + Z)"
+                >
+                  <span className="material-symbols-outlined text-sm">undo</span>
+                  <span className="hidden sm:inline">Hoàn tác</span>
+                </button>
+                <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700"></div>
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  disabled={historyIndex >= history.length - 1}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    historyIndex >= history.length - 1
+                      ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 shadow-xs cursor-pointer'
+                  }`}
+                  title="Làm lại thao tác vừa hoàn tác (Ctrl + Y hoặc Ctrl + Shift + Z)"
+                >
+                  <span className="material-symbols-outlined text-sm">redo</span>
+                  <span className="hidden sm:inline">Làm lại</span>
+                </button>
+              </div>
+
               {/* Regenerate Entire Exam Button */}
               <button
                 type="button"
@@ -1583,7 +1834,7 @@ export default function EditorView() {
               type="button"
               onClick={() => {
                 const sorted = sortQuestionsBySection(questions);
-                setQuestions(sorted);
+                commitQuestionsImmediate(sorted);
                 showToast('Đã sắp xếp lại toàn bộ câu hỏi theo chuẩn Phần I, II, III, IV Bộ GD&ĐT!', 'success');
               }}
               className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
@@ -2073,6 +2324,23 @@ export default function EditorView() {
 
                 {isEditorMode && (
                   <div className="no-print flex items-center gap-1.5">
+                    {/* Version History Button */}
+                    {(q._previousVersions?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingHistoryQId(viewingHistoryQId === q.id ? null : q.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                          viewingHistoryQId === q.id
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'border border-purple-200 dark:border-purple-900 bg-purple-50/70 dark:bg-purple-950/50 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                        }`}
+                        title="Xem và khôi phục các phiên bản trước của câu hỏi này"
+                      >
+                        <span className="material-symbols-outlined text-xs">history</span>
+                        <span>Lịch sử ({q._previousVersions!.length})</span>
+                      </button>
+                    )}
+
                     {/* AI Regenerate Single Question */}
                     <button
                       type="button"
@@ -2121,6 +2389,62 @@ export default function EditorView() {
                   </div>
                 )}
               </div>
+
+              {/* QUESTION VERSION HISTORY PANEL */}
+              {viewingHistoryQId === q.id && q._previousVersions && q._previousVersions.length > 0 && (
+                <div className="no-print mt-2 mb-3 p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-800 dark:text-purple-300">
+                      <span className="material-symbols-outlined text-sm">history_toggle_off</span>
+                      <span>Lịch sử các phiên bản AI đã tạo ({q._previousVersions.length} bản trước)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setViewingHistoryQId(null)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-semibold px-2 py-0.5 rounded hover:bg-purple-100 dark:hover:bg-purple-900/40"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {q._previousVersions.map((v, vIdx) => {
+                      const timeStr = new Date(v.timestamp).toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      });
+                      return (
+                        <div
+                          key={vIdx}
+                          className="p-2.5 rounded-lg border border-purple-100 dark:border-purple-900/40 bg-white dark:bg-slate-900 flex items-start justify-between gap-3 shadow-2xs"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                                Bản #{q._previousVersions!.length - vIdx} • {timeStr}
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                Đáp án: <strong className="text-purple-700 dark:text-purple-300">{v.correctAnswer || 'Xem lời giải'}</strong>
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2">
+                              {v.content}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreQuestionVersion(q.id, vIdx)}
+                            className="shrink-0 px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-xs">restore</span>
+                            <span>Khôi phục</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* INLINE EDIT MODE */}
               {isEditing && isEditorMode ? (
@@ -2274,14 +2598,14 @@ export default function EditorView() {
                         <label className="text-xs font-bold text-purple-900 dark:text-purple-300 block">
                           Đáp số / Kết quả ngắn:
                         </label>
-                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số, căn thức hoặc bất đẳng thức</span>
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số nguyên, thập phân hoặc phân số/căn thức kèm xấp xỉ</span>
                       </div>
                       <div className="relative flex items-center w-full">
                         <input
                           type="text"
                           value={q.correctAnswer || ''}
                           onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                          placeholder="Ví dụ: 12, \sqrt[3]{2}, m \ge 3, hoặc 1.25..."
+                          placeholder="Ví dụ: 15, \frac{24\sqrt{89}}{89} \approx 2.54, hoặc 2.54..."
                           className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                         />
                         {q.correctAnswer && (
@@ -2478,12 +2802,11 @@ export default function EditorView() {
                             </tr>
                           </thead>
                           <tbody>
-                            {['a', 'b', 'c', 'd'].map((subKey) => {
+                            {['a', 'b', 'c', 'd'].map((subKey, subIdx) => {
                               const rawOpt = (q.options || []).find((o) => o.key.toLowerCase() === subKey);
-                              const hasExplicitTfAnswer = q.correctAnswer && /[a-d]\s*[:=-]/i.test(q.correctAnswer);
-                              const isTruth = hasExplicitTfAnswer
-                                ? new RegExp(`${subKey}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)`, 'i').test(q.correctAnswer)
-                                : (rawOpt?.isCorrect !== undefined ? !!rawOpt.isCorrect : true);
+                              const isTruth = typeof rawOpt?.isCorrect === 'boolean'
+                                ? rawOpt.isCorrect
+                                : (parseTrueFalseTruth(subKey, q.correctAnswer) ?? (extractTruthFromExplanation(subKey, q.explanation) ?? (subIdx % 2 === 0)));
                               const opt = {
                                 key: subKey,
                                 text: rawOpt ? rawOpt.text : `Mệnh đề khẳng định ý ${subKey}`,
@@ -2556,7 +2879,7 @@ export default function EditorView() {
                             <span className="material-symbols-outlined text-sm text-purple-600">edit_note</span>
                             <span>Đáp số / Kết quả ngắn gọn:</span>
                           </label>
-                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số, căn thức hoặc bất đẳng thức</span>
+                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Số nguyên, thập phân hoặc phân số/căn thức kèm xấp xỉ</span>
                         </div>
                         {isEditorMode ? (
                           <div className="relative flex items-center w-full">
@@ -2564,7 +2887,7 @@ export default function EditorView() {
                               type="text"
                               value={q.correctAnswer || ''}
                               onChange={(e) => handleUpdateQuestion(q.id, 'correctAnswer', e.target.value)}
-                              placeholder="Ví dụ: 12, \sqrt[3]{2}, m \ge 3, hoặc 1.25..."
+                              placeholder="Ví dụ: 15, \frac{24\sqrt{89}}{89} \approx 2.54, hoặc 2.54..."
                               className="w-full text-xs font-bold text-purple-900 dark:text-purple-200 pl-3 pr-28 py-2 rounded-lg border border-purple-300 dark:border-purple-800 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                             />
                             {q.correctAnswer && (

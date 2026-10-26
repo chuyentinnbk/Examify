@@ -9,9 +9,9 @@ import { AuditLogger } from '@/core/logger/audit-logger';
 import { apiError, apiSuccess } from '@/lib/utils';
 import { ExamStatus, ExamType } from '@prisma/client';
 import { AcademicStorage } from '@/core/storage/academic-storage';
-import { normalizeSvgGeometry } from '@/lib/exam-sections';
+import { normalizeSvgGeometry, reconcileTrueFalseQuestion, cleanseInternalMonologue, isMathSubject, getMaxQuestionsForSubject } from '@/lib/exam-sections';
 
-export const maxDuration = 300; // Tối đa 5 phút cho việc AI sinh trọn bộ đề thi (20-50 câu có SVG và lời giải)
+export const maxDuration = 300; // Tối đa 5 phút cho việc AI sinh trọn bộ đề thi (5-50 câu có SVG và lời giải)
 export const dynamic = 'force-dynamic';
 
 const GenerateExamSchema = z.object({
@@ -134,6 +134,16 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = validation.data;
+
+    // Validate subject-specific max questions limit (Math: 30, Other subjects: 50)
+    const maxAllowed = getMaxQuestionsForSubject(payload.curriculum.subject);
+    if (payload.totalQuestions > maxAllowed) {
+      return apiError(
+        `Số lượng câu hỏi cho môn "${payload.curriculum.subject}" tối đa là ${maxAllowed} câu (hiện tại: ${payload.totalQuestions} câu) để đảm bảo an toàn chất lượng và giới hạn xử lý AI.`,
+        422,
+        'Exceeded subject question limit'
+      );
+    }
 
     // Validate that sections sum matches totalQuestions if sectionDistribution is provided
     if (payload.sectionDistribution) {
@@ -269,7 +279,8 @@ export async function POST(req: NextRequest) {
           sampleExamText: payload.sampleExamText,
           sampleExamFileName: payload.sampleExamFileName,
         },
-        selectedProvider
+        selectedProvider,
+        payload.aiModel
       );
 
       if (!generationResult.success || !generationResult.examData) {
@@ -317,16 +328,41 @@ export async function POST(req: NextRequest) {
             );
 
             const isShortAnswer = String(q.type).toUpperCase().includes('SHORT');
+            const isTF = String(q.type).toUpperCase().includes('TRUE');
+            const isEssay = String(q.type).toUpperCase().includes('ESSAY');
+
+            let freshOptions: any[] = fresh.options;
+            let freshCorrectAnswer = fresh.correctAnswer;
+            let freshExplanation = fresh.explanation ? normalizeSvgGeometry(cleanseInternalMonologue(fresh.explanation)) : undefined;
+
+            if (isShortAnswer) {
+              freshOptions = [];
+              freshCorrectAnswer = extractCleanShortAnswerValue(fresh.options[0]?.text, freshExplanation, fresh.correctAnswer);
+            } else if (isTF) {
+              const healed = reconcileTrueFalseQuestion({
+                content: fresh.content,
+                options: fresh.options,
+                correctAnswer: fresh.correctAnswer,
+                explanation: freshExplanation
+              }, false);
+              freshOptions = healed.options;
+              freshCorrectAnswer = healed.correctAnswer;
+              freshExplanation = healed.explanation;
+            } else if (isEssay) {
+              freshOptions = [];
+              freshCorrectAnswer = 'Xem hướng dẫn chấm và barem điểm';
+            } else {
+              freshOptions = fresh.options.map((opt) => `${opt.key}. ${opt.text}`);
+            }
+
             const replacement = {
               questionNumber: i + 1,
               type: q.type || 'MULTIPLE_CHOICE',
               cognitiveLevel: q.cognitiveLevel || 'COMPREHENSION',
               content: normalizeSvgGeometry(fresh.content),
-              options: isShortAnswer ? [] : fresh.options.map((opt) => `${opt.key}. ${opt.text}`),
-              correctAnswer: isShortAnswer
-                ? extractCleanShortAnswerValue(fresh.options[0]?.text, fresh.explanation, fresh.correctAnswer)
-                : fresh.correctAnswer,
-              explanation: fresh.explanation ? normalizeSvgGeometry(fresh.explanation) : undefined,
+              options: freshOptions,
+              correctAnswer: freshCorrectAnswer,
+              explanation: freshExplanation,
               points: q.points || payload.totalPoints / payload.totalQuestions,
             };
 
@@ -335,57 +371,29 @@ export async function POST(req: NextRequest) {
           } else {
             existingContents.push(q.content);
             q.questionNumber = i + 1;
+            q.content = typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content;
+            if (q.explanation && typeof q.explanation === 'string') {
+              q.explanation = cleanseInternalMonologue(normalizeSvgGeometry(q.explanation));
+            }
             const isSA = String(q.type).toUpperCase().includes('SHORT');
             const isTF = String(q.type).toUpperCase().includes('TRUE');
+            const isEs = String(q.type).toUpperCase().includes('ESSAY');
             if (isSA) {
               q.options = [];
               // Ensure clean numeric answer without multiple-choice letters
               q.correctAnswer = extractCleanShortAnswerValue(null, q.explanation, q.correctAnswer);
             } else if (isTF) {
-              const subKeys = ['a', 'b', 'c', 'd'];
-              let answerStr = String(q.correctAnswer || '');
-
-              // If correctAnswer is missing or incomplete, try extracting verified truth values from explanation
-              if (!/[a-d]\s*[:=-]/i.test(answerStr) && typeof q.explanation === 'string') {
-                const extracted: string[] = [];
-                subKeys.forEach((k) => {
-                  const reg = new RegExp(`(?:^|\\n|\\s)${k}\\)[^\\n]*?\\((Đúng|Sai|Đ|S|True|False)\\)`, 'i');
-                  const m = q.explanation.match(reg);
-                  if (m) {
-                    const isT = /[ĐđTt]/i.test(m[1]);
-                    extracted.push(`${k}: ${isT ? 'Đ' : 'S'}`);
-                  }
-                });
-                if (extracted.length === 4) {
-                  answerStr = extracted.join(', ');
-                  q.correctAnswer = answerStr;
-                }
-              }
-
-              // Synchronize options array so each option has key, text, and isCorrect matching correctAnswer
-              if (Array.isArray(q.options) && q.options.length > 0) {
-                q.options = q.options.slice(0, 4).map((opt: any, optIdx: number) => {
-                  const k = subKeys[optIdx] || 'a';
-                  const rawText = typeof opt === 'string' ? opt : (opt.text || '');
-                  const cleanText = rawText.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
-                  const isCorrect = /[a-d]\s*[:=-]/i.test(answerStr)
-                    ? new RegExp(`${k}\\s*[:=-]?\\s*(?:Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(answerStr)
-                    : (typeof opt === 'object' && opt !== null && opt.isCorrect !== undefined ? !!opt.isCorrect : optIdx % 2 === 0);
-                  return {
-                    key: k,
-                    text: cleanText || rawText,
-                    isCorrect,
-                  };
-                });
-              }
+              const healed = reconcileTrueFalseQuestion(q, false);
+              q.options = healed.options;
+              q.correctAnswer = healed.correctAnswer;
+              q.explanation = healed.explanation;
+            } else if (isEs) {
+              q.options = [];
+              q.correctAnswer = 'Xem hướng dẫn chấm và barem điểm';
             } else if (Array.isArray(q.options)) {
               q.options = q.options.map((opt: string) =>
                 typeof opt === 'string' ? opt.replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim() : opt
               );
-            }
-            q.content = typeof q.content === 'string' ? normalizeSvgGeometry(q.content) : q.content;
-            if (q.explanation && typeof q.explanation === 'string') {
-              q.explanation = normalizeSvgGeometry(q.explanation);
             }
             uniqueQuestions.push(q);
           }

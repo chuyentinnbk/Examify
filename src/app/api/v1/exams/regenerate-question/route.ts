@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { apiError, apiSuccess, parseAiJson } from '@/lib/utils';
 import { getCurriculumQuestion, extractCleanShortAnswerValue } from '@/lib/curriculum-questions';
 import { ExamPromptBuilder } from '@/core/ai/prompt-builder';
-import { normalizeSvgGeometry } from '@/lib/exam-sections';
+import { normalizeSvgGeometry, reconcileTrueFalseQuestion, cleanseInternalMonologue } from '@/lib/exam-sections';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -78,11 +78,14 @@ export async function POST(req: NextRequest) {
           model: process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim() || 'gemini-3.8-flash',
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.85,
+            temperature: 0.2,
           },
         });
 
         let typeInstruction = `Hãy tạo MỘT (1) câu hỏi trắc nghiệm 4 lựa chọn (A, B, C, D) HOÀN TOÀN MỚI VÀ ĐỘC NHẤT cho môn: ${subject}, khối: ${grade}, cấp độ tư duy Bloom: ${bloomLevel}.
+QUY TẮC KHỚP PHƯƠNG ÁN TUYỆT ĐỐI 100%:
+- Một trong 4 phương án A, B, C, D BẮT BUỘC phải trùng khớp chính xác 100% với giá trị tính toán của Lời giải.
+- TUYỆT ĐỐI NGHIÊM CẤM ngụy biện chọn phương án xấp xỉ gần nhất (CẤM: "tính ra 2.54 gần với 2.4 nhất nên chọn A").
 Định dạng JSON trả về:
 {
   "content": "Nội dung câu hỏi rõ ràng, chính xác...",
@@ -106,25 +109,35 @@ BẮT BUỘC PHÂN BỐ TỈ LỆ ĐÚNG / SAI CÂN BẰNG THỰC TẾ:
 }`;
         } else if (type === 'short_answer') {
           typeInstruction = `Hãy tạo MỘT (1) câu hỏi TRẮC NGHIỆM TRẢ LỜI NGẮN (chuẩn phần III đề thi tốt nghiệp THPT GDPT 2018 của Bộ GD&ĐT) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
-YÊU CẦU ĐẶC BIỆT (CHUẨN PHIẾU TÔ TRẮC NGHIỆM BỘ GD&ĐT):
-- Thí sinh tô đáp án vào Phiếu trắc nghiệm chỉ gồm các con số (tối đa 4 ký tự). KHÔNG CÓ CĂN THỨC, KHÔNG CÓ BIẾN SỐ.
-- BẮT BUỘC ĐỀ BÀI PHẢI MÃ HÓA CÂU HỎI VỀ MỘT CON SỐ CỤ THỂ (ví dụ: "kết quả có dạng (a\\sqrt{m})/n, tính m + n", hoặc "làm tròn đến hàng phần mười/phần trăm", hoặc "tìm số giá trị nguyên của m").
-- "correctAnswer" BẮT BUỘC LÀ CON SỐ ĐÃ MÃ HÓA (ví dụ: "15", "-3.5", "1.26", "6"). TUYỆT ĐỐI KHÔNG chứa căn thức (\\sqrt), chữ cái biến số, hoặc ký hiệu bất đẳng thức.
+QUY CHUẨN TÍNH TOÁN & ĐÁP SỐ CHUẨN MỰC:
+1. BẢO TOÀN THAM SỐ 100%: Dữ kiện ở đề bài là hằng số bất biến. Lời giải "explanation" BẮT BUỘC phải kế thừa và tính toán trung thực 100% theo đúng số liệu đó. TUYỆT ĐỐI NGHIÊM CẤM tự ý sửa đề trong lời giải (CẤM: "Để số đẹp hơn, chọn...", "Chọn lại...").
+2. ĐỘ CHÍNH XÁC TRUNG GIAN: Giữ từ 5 đến 6 chữ số thập phân ở các bước giữa chừng để triệt tiêu hoàn toàn sai số tích lũy.
+3. ĐÁP SỐ SONG HÀNH (correctAnswer):
+   - Nếu kết quả là phân số hoặc căn thức: Trục căn thức ở mẫu và tối giản phân số, kết hợp với giá trị số thập phân làm tròn 2 chữ số (ví dụ: "\\frac{24\\sqrt{89}}{89} \\approx 2.54" hoặc "\\frac{3}{4} = 0.75").
+   - Nếu kết quả là số nguyên: Ghi số nguyên thuần túy (ví dụ: "15", "-3", "5").
+4. ĐƠN NGHIỆM DUY NHẤT: Câu hỏi bắt buộc dẫn tới duy nhất 1 con số cụ thể (hỏi tổng, tích, min, max, đếm nghiệm). Tuyệt đối không ra đề dẫn đến đa nghiệm hay khoảng nghiệm.
+5. CẤM KÝ HIỆU CHU KỲ TUẦN HOÀN: Cấm viết "$0.(3)$", "$1.(6)$"; bắt buộc làm tròn 2 chữ số "$0.33$", "$1.67$".
 Định dạng JSON trả về:
 {
-  "content": "Nội dung bài toán đã mã hóa câu hỏi yêu cầu tìm đáp số con số...",
+  "content": "Nội dung bài toán rõ ràng, nếu là bài toán thực tế nêu rõ đơn vị cần điền...",
   "options": [],
-  "explanation": "Các bước tính toán chi tiết từng bước dẫn tới kết quả số đã mã hóa...",
-  "correctAnswer": "con_số_đã_mã_hóa"
+  "explanation": "Các bước tính toán chi tiết từng bước, giữ 5-6 số thập phân trung gian và chốt đáp số cuối cùng...",
+  "correctAnswer": "đáp_số_chuẩn_song_hành_hoặc_số_nguyên"
 }`;
         } else if (type === 'essay') {
-          typeInstruction = `Hãy tạo MỘT (1) bài tập TỰ LUẬN tự luận toàn diện kèm barem điểm chi tiết cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+          typeInstruction = `Hãy tạo MỘT (1) bài tập TỰ LUẬN (chuẩn phần IV cấu trúc đề thi Bộ GD&ĐT) cho môn: ${subject}, khối: ${grade}, cấp độ Bloom: ${bloomLevel}.
+QUY CHUẨN BAREM ĐIỂM SƯ PHẠM (BẮT BUỘC):
+- Lời giải "explanation" BẮT BUỘC phải phân rã thành Barem chấm điểm từng bước (Step-by-step Scoring Rubric) với mốc điểm chi tiết (0.25đ, 0.5đ, 0.75đ, 1.0đ...) chuẩn Bộ GD&ĐT:
+  * - Bước 1 (0.25đ): Nêu điều kiện xác định / đặt ẩn phụ / phân tích giả thiết...
+  * - Bước 2 (0.50đ): Lập luận biến đổi đại số / đạo hàm / lập bảng biến thiên / giải phương trình...
+  * - Bước 3 (0.25đ): Đối chiếu điều kiện và kết luận giá trị cuối cùng...
+- BẢO TOÀN THAM SỐ 100%: Dữ liệu đề bài là bất biến, Lời giải phải tính toán chuẩn xác 100% theo đúng số liệu đó.
 Định dạng JSON trả về:
 {
-  "content": "Nội dung bài toán tự luận...",
+  "content": "Nội dung bài toán tự luận rõ ràng...",
   "options": [],
   "correctAnswer": "Xem hướng dẫn chấm và barem điểm",
-  "explanation": "Barem chấm điểm chi tiết từng ý và các bước giải..."
+  "explanation": "Barem chấm điểm chi tiết từng bước kèm phân phối điểm cụ thể..."
 }`;
         }
 
@@ -202,9 +215,12 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
           new Set(
             [
               process.env.GEMINI_MODEL?.split(/[,;]+/)[0]?.trim(),
-              'gemini-3.7-flash',
               'gemini-3.5-flash',
+              'gemini-3.5-flash-lite',
               'gemini-3.8-flash',
+              'gemini-3.7-flash',
+              'gemini-3-flash-preview',
+              'gemini-3.1-flash-lite',
             ].filter(Boolean) as string[]
           )
         );
@@ -219,7 +235,7 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
               model: candidateModel,
               generationConfig: {
                 responseMimeType: 'application/json',
-                temperature: 0.85,
+                temperature: 0.2,
               },
             });
 
@@ -252,28 +268,10 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
 
           let formattedOptions: any[] = [];
           if (type === 'true_false') {
-            const subKeys = ['a', 'b', 'c', 'd'];
-            let opts = (parsed.options || []).map((opt: string, idx: number) => {
-              const key = subKeys[idx] || 'a';
-              const cleanText = String(opt || '').replace(/(?:^\([A-Da-d]\)|^[\[\{][A-Da-d][\]\}]|^[A-Da-d][\.\:\)\-–—])\s*/i, '').trim();
-              const isCorrect = parsed.correctAnswer
-                ? new RegExp(`${key}\\s*[:=-]?\\s*(Đ|Đúng|True|T|1)(?!\\w)`, 'i').test(parsed.correctAnswer)
-                : false;
-              return {
-                key,
-                text: cleanText || String(opt || ''),
-                isCorrect,
-              };
-            });
-
-            // Ensure 4 items
-            while (opts.length < 4) {
-              const k = subKeys[opts.length] || 'a';
-              opts.push({ key: k, text: `Khẳng định ý ${k}`, isCorrect: false });
-            }
-
-            parsed.correctAnswer = opts.map((o: any) => `${o.key}: ${o.isCorrect ? 'Đ' : 'S'}`).join(', ');
-            formattedOptions = opts;
+            const healed = reconcileTrueFalseQuestion(parsed, false);
+            formattedOptions = healed.options;
+            parsed.correctAnswer = healed.correctAnswer;
+            parsed.explanation = healed.explanation;
           } else if (type === 'multiple_choice') {
             formattedOptions = (parsed.options || []).map((opt: string, idx: number) => {
               const key = ['A', 'B', 'C', 'D'][idx] || 'A';
@@ -286,6 +284,28 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
             });
           }
 
+          let cleanExpl = cleanseInternalMonologue(normalizeSvgGeometry(parsed.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'));
+          let finalAnswer = parsed.correctAnswer;
+          if (type === 'true_false') {
+            const reconciled = reconcileTrueFalseQuestion({
+              id: Date.now(),
+              type,
+              content: normalizeSvgGeometry(parsed.content),
+              options: formattedOptions,
+              correctAnswer: parsed.correctAnswer || '',
+              explanation: cleanExpl,
+            });
+            formattedOptions = reconciled.options;
+            finalAnswer = reconciled.correctAnswer;
+            cleanExpl = reconciled.explanation;
+          } else if (type === 'short_answer') {
+            finalAnswer = extractCleanShortAnswerValue(null, cleanExpl, parsed.correctAnswer);
+          } else if (type === 'essay') {
+            finalAnswer = 'Xem hướng dẫn chấm và barem điểm';
+          } else {
+            finalAnswer = (parsed.correctAnswer || 'A').toUpperCase();
+          }
+
           const formattedQuestion = {
             id: Date.now(),
             order: 'Câu mới',
@@ -296,10 +316,8 @@ ${forbiddenList.length > 0 ? `Các câu hỏi khác đã từng xuất hiện tr
             content: normalizeSvgGeometry(parsed.content),
             options: formattedOptions,
             points: type === 'essay' ? 1.5 : type === 'true_false' ? 1.0 : type === 'short_answer' ? 0.5 : 0.25,
-            correctAnswer: type === 'short_answer'
-              ? extractCleanShortAnswerValue(null, parsed.explanation, parsed.correctAnswer)
-              : (parsed.correctAnswer || (type === 'essay' ? 'Xem hướng dẫn chấm' : 'A')),
-            explanation: normalizeSvgGeometry(parsed.explanation || 'Lời giải chi tiết biên soạn bởi mô hình AI.'),
+            correctAnswer: finalAnswer,
+            explanation: cleanExpl,
           };
 
           return apiSuccess(

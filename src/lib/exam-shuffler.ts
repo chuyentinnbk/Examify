@@ -6,7 +6,7 @@
  */
 
 import { ExamQuestion, QuestionOption } from '@/lib/store/app-store';
-import { normalizeQuestionType } from './exam-sections';
+import { normalizeQuestionType, reconcileTrueFalseQuestion } from './exam-sections';
 
 export type ExamOption = QuestionOption;
 export type BaseQuestion = ExamQuestion;
@@ -161,6 +161,14 @@ export function generateExamVariants(
         // dependency (e.g. part a computes derivative, part b computes extremum) and ensure 100%
         // alignment with step-by-step detailed explanations.
         // The True/False questions themselves are already shuffled within the section!
+        if (isTF) {
+          const rec = reconcileTrueFalseQuestion(q, true);
+          q.options = rec.options;
+          q.correctAnswer = rec.correctAnswer;
+          q.explanation = rec.explanation;
+        } else if (normType === 'essay') {
+          q.correctAnswer = 'Xem hướng dẫn chấm và barem điểm';
+        }
 
         // 4. Mathematical integrity guarantee:
         // Do NOT mutate numbers in question statements offline. Mutating numbers without

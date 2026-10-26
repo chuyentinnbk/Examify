@@ -2169,10 +2169,7 @@ export function getCurriculumQuestion(
     } else if (isEs) {
       points = 1.5;
       options = [];
-      const corrOpt = template.options.find(
-        (o) => o.key.toUpperCase() === template.correctAnswer.toUpperCase() || o.isCorrect
-      );
-      correctAnswer = `Đáp số: ${extractCleanShortAnswerValue(corrOpt?.text, template.explanation, template.correctAnswer)}`;
+      correctAnswer = 'Xem hướng dẫn chấm và barem điểm';
     }
 
     return {
