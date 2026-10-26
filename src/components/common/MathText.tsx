@@ -216,7 +216,17 @@ export default function MathText({ content, className = '', inline = false }: Ma
       });
       rowsHtml += `</tbody>`;
 
-      const tableBoxHtml = `
+      // Detect if this is a mathematical variation table (bảng biến thiên / bảng xét dấu)
+      const isVariationTable = headerCells.some((c) => /\$?x\$?/i.test(c)) &&
+        (lines.some((l) => /y'|f'\(x\)/i.test(l)) || lines.some((l) => /\\infty|\\nearrow|\\searrow/i.test(l)));
+
+      const tableBoxHtml = isVariationTable
+        ? `
+<div class="my-3 flex justify-center overflow-x-auto print:my-2 not-italic">
+  <table class="border-collapse border border-slate-400 dark:border-slate-600 text-xs font-serif text-center bg-white dark:bg-slate-900 shadow-sm print:shadow-none print:border-black">${rowsHtml}</table>
+</div>
+`.trim()
+        : `
 <div class="my-2.5 overflow-x-auto rounded-lg border border-slate-300 dark:border-slate-700 shadow-sm print:shadow-none print:border-black print:my-1.5 not-italic">
   <table class="w-full border-collapse text-xs not-italic text-center">${rowsHtml}</table>
 </div>

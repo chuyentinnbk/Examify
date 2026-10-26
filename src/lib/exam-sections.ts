@@ -302,6 +302,120 @@ function pointInPolygon(px: number, py: number, vertices: { x: number; y: number
 }
 
 /**
+ * Tự động phát hiện và chuyển đổi các thẻ SVG giả dạng Bảng Biến Thiên / Bảng xét dấu
+ * do AI sinh lỗi thành Bảng Markdown chuẩn đẹp (hỗ trợ KaTeX \nearrow, \searrow, -\infty, +\infty).
+ */
+export function healSvgVariationTable(content: string): string {
+  if (!content || !content.includes('<svg')) return content;
+
+  return content.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, (svgBlock) => {
+    // Kiểm tra xem SVG có phải là Bảng biến thiên hay không
+    const isVariationTable =
+      /<text[^>]*>\s*x\s*<\/text>/i.test(svgBlock) &&
+      (/<text[^>]*>\s*(?:y'|f'\(x\)|y|f\(x\))\s*<\/text>/i.test(svgBlock) ||
+       /\\infty/i.test(svgBlock));
+
+    if (!isVariationTable) return svgBlock;
+
+    // Bóc tách tất cả thẻ <text> có tọa độ x, y
+    const textTagRegex = /<text\b([^>]*)>([\s\S]*?)<\/text>/gi;
+    const items: { x: number; y: number; text: string }[] = [];
+    let m;
+    while ((m = textTagRegex.exec(svgBlock)) !== null) {
+      const attrs = m[1];
+      let text = m[2].trim();
+      text = text.replace(/-\\\\?\s*0/g, '-');
+      const xM = attrs.match(/\bx\s*=\s*["']?([0-9.]+)/i);
+      const yM = attrs.match(/\by\s*=\s*["']?([0-9.]+)/i);
+      if (xM && yM && text) {
+        items.push({
+          x: parseFloat(xM[1]),
+          y: parseFloat(yM[1]),
+          text,
+        });
+      }
+    }
+
+    if (items.length < 5) return svgBlock;
+
+    // Gom nhóm theo tọa độ y (dung sai 22px) thành các hàng
+    const rows: { y: number; items: typeof items }[] = [];
+    for (const item of items) {
+      let r = rows.find((row) => Math.abs(row.y - item.y) <= 22);
+      if (!r) {
+        r = { y: item.y, items: [] };
+        rows.push(r);
+      }
+      r.items.push(item);
+    }
+
+    rows.sort((a, b) => a.y - b.y);
+    rows.forEach((r) => r.items.sort((a, b) => a.x - b.x));
+
+    if (rows.length < 2) return svgBlock;
+
+    const formatCell = (val: string) => {
+      let v = val.trim();
+      if (!v) return '';
+      v = v.replace(/^[-−–]\s*\\?infty$/i, '-\\infty');
+      v = v.replace(/^\+\s*\\?infty$/i, '+\\infty');
+      if (!v.startsWith('$') && !v.endsWith('$')) {
+        return `$${v}$`;
+      }
+      return v;
+    };
+
+    // Hàng 1: x
+    const headerRow = rows[0];
+    const headerCells = headerRow.items.map((i) => formatCell(i.text));
+    const alignRow = headerCells.map(() => ':---:');
+
+    // Các hàng dữ liệu (y', y)
+    const bodyRows = rows.slice(1).map((r) => {
+      const rowLabel = r.items[0]?.text?.trim() || '';
+      const isYRow = /^(?:y|f\(x\))$/i.test(rowLabel);
+      let cells = r.items.map((i) => i.text);
+
+      if (isYRow && cells.length >= 4) {
+        const formatted: string[] = [];
+        cells.forEach((c, cIdx) => {
+          let cleanVal = c.replace(/\\?infty/g, '\\infty').trim();
+          if (cIdx === 0) {
+            formatted.push(formatCell(cleanVal));
+          } else if (cIdx === 1) {
+            formatted.push(`$${cleanVal} \\nearrow$`);
+          } else if (cIdx === 2) {
+            formatted.push(`$${cleanVal}$`);
+          } else if (cIdx === 3) {
+            formatted.push(`$\\searrow ${cleanVal}$`);
+          } else {
+            formatted.push(`$\\nearrow ${cleanVal}$`);
+          }
+        });
+        return formatted;
+      }
+
+      return cells.map((c) => formatCell(c));
+    });
+
+    const maxCols = Math.max(headerCells.length, ...bodyRows.map((r) => r.length));
+    while (headerCells.length < maxCols) headerCells.push('');
+    while (alignRow.length < maxCols) alignRow.push(':---:');
+    bodyRows.forEach((r) => {
+      while (r.length < maxCols) r.push('');
+    });
+
+    const markdownTable = [
+      `| ${headerCells.join(' | ')} |`,
+      `| ${alignRow.join(' | ')} |`,
+      ...bodyRows.map((r) => `| ${r.join(' | ')} |`),
+    ].join('\n');
+
+    return `\n\n${markdownTable}\n\n`;
+  });
+}
+
+/**
  * Chuẩn hóa và tối ưu hóa vị trí hình học SVG sinh bởi AI:
  * 1. Chuyển <line points="..."> thành <line x1="..." y1="..." x2="..." y2="..."> hợp lệ.
  * 2. Loại bỏ stroke halo trắng (stroke="white") gây đứt nét/cắt ngang đường kẻ.
@@ -312,6 +426,12 @@ function pointInPolygon(px: number, py: number, vertices: { x: number; y: number
  */
 export function normalizeSvgGeometry(content: string): string {
   if (!content || !content.includes('<svg')) {
+    return content;
+  }
+
+  // Tự động phát hiện và chuyển đổi SVG giả bảng biến thiên thành Bảng Markdown chuẩn
+  content = healSvgVariationTable(content);
+  if (!content.includes('<svg')) {
     return content;
   }
 

@@ -239,6 +239,18 @@ Your sole objective is to author high-quality, academically rigorous, and curric
 - BẮT BUỘC duy trì độ sâu sư phạm, các bước suy luận toán học/logic chi tiết, giải thích cặn kẽ và định dạng công thức LaTeX chuẩn mực ĐỒNG ĐỀU 100% TỪ CÂU ĐẦU TIÊN ĐẾN CÂU CUỐI CÙNG CỦA ĐỀ THI.
 - TUYỆT ĐỐI NGHIÊM CẤM hiện tượng "đuối sức" hoặc làm ẩu về các câu cuối (NGHIÊM CẤM: cắt ngắn lời giải, viết tóm tắt cẩu thả kiểu "Dễ thấy đáp án là...", "Tương tự câu trên...", bỏ qua bước giải thích, hoặc trả về đáp án sơ sài ở những câu gần cuối đề). Mọi câu hỏi dù là câu 1 hay câu 50 đều phải có đầy đủ lời giải sư phạm chi tiết và chuẩn xác tuyệt đối.`;
 
+    systemPrompt += `\n\n13. QUY TẮC BẢNG BIẾN THIÊN & BẢNG XÉT DẤU ĐẠO HÀM (BẢNG MARKDOWN CHUẨN, TUYỆT ĐỐI CẤM SVG):
+- TUYỆT ĐỐI NGHIÊM CẤM DÙNG THẺ <svg> ĐỂ VẼ BẢNG BIẾN THIÊN HOẶC BẢNG XÉT DẤU!
+  (Lý do: Thẻ <text> của SVG không thể hiển thị ký hiệu toán học LaTeX, dẫn đến lỗi -\\infty, +\\infty bị in thô thiển thành plain text và lệch nét).
+- BẮT BUỘC sử dụng ĐỊNH DẠNG BẢNG MARKDOWN (Markdown Table) chuẩn với công thức KaTeX đặt trong dấu $...$:
+  * Bảng biến thiên hàm số mẫu chuẩn:
+| $x$ | $-\\infty$ | $-1$ | $1$ | $+\\infty$ |
+| :---: | :---: | :---: | :---: | :---: |
+| $y'$ | $+$ | $0$ | $-$ | $+$ |
+| $y$ | $-\\infty \\nearrow$ | $3$ | $\\searrow -1$ | $\\nearrow +\\infty$ |
+  * Sử dụng ký hiệu KaTeX: $\\nearrow$ (\\nearrow) cho chiều tăng, $\\searrow$ (\\searrow) cho chiều giảm, $\\|$ (\\|) cho điểm gián đoạn không xác định.
+- Thẻ <svg> CHỈ ĐƯỢC PHÉP DÙNG DUY NHẤT CHO HÌNH HỌC KHÔNG GIAN VÀ HÌNH HỌC PHẲNG (tam giác, chóp, lăng trụ, nón, trụ, lập phương...) theo đúng hệ tọa độ chuẩn đã ban hành!`;
+
     if (payload.appliedSkills && payload.appliedSkills.length > 0) {
       systemPrompt += `\n\n### HIGHEST PRIORITY MANDATE - ENFORCE SPECIALIZED PEDAGOGICAL SKILLS & STRICT ZERO-DUPLICATION:
 You have been provided with specialized pedagogical skills extracted from official academic materials. You MUST apply the question styles, difficulty tiers, and pedagogical rigor defined in these skills:
