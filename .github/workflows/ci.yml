@@ -34,7 +34,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_ENV: production
   DATABASE_URL: "mysql://examify_ci:ci_password@127.0.0.1:3306/examify_db"
   JWT_SECRET: "ci_production_build_placeholder_secret_key_32chars"
   NEXT_PUBLIC_APP_URL: "http://localhost:3000"
@@ -65,7 +64,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install Node Dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: ⚙️ Generate Prisma Client
         run: npx prisma generate
@@ -98,7 +97,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install Dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: 🗄️ Restore Next.js Cache
         uses: actions/cache@v4
@@ -115,6 +114,8 @@ jobs:
 
       - name: 🏗️ Execute Production Build
         run: npm run build
+        env:
+          NODE_ENV: production
 
       - name: 📤 Archive Production Artifacts
         uses: actions/upload-artifact@v4
