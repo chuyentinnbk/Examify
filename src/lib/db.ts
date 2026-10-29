@@ -7,7 +7,11 @@ const globalForPrisma = globalThis as unknown as {
 const isDebug = process.env.DEBUG === 'true' || process.env.APP_DEBUG === 'true';
 
 export function createPrismaClient(databaseUrl?: string): PrismaClient {
-  const url = databaseUrl || process.env.DATABASE_URL;
+  let url = databaseUrl || process.env.DATABASE_URL;
+  if (url && !url.includes('connection_limit=')) {
+    const separator = url.includes('?') ? '&' : '?';
+    url = `${url}${separator}connection_limit=20&pool_timeout=60`;
+  }
   return new PrismaClient({
     datasources: url ? { db: { url } } : undefined,
     log: isDebug ? ['query', 'error', 'warn'] : ['error'],
