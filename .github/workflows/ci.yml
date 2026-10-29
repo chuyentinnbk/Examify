@@ -191,7 +191,7 @@ jobs:
             TRIGGER_DESC="Manual trigger (${{ github.event_name }})"
           fi
 
-          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          cat << EOF >> $GITHUB_STEP_SUMMARY
           # $EMOJI Examify Production Build Report: $STATUS_TEXT
 
           | Metric | Value |
@@ -206,6 +206,3 @@ jobs:
           ---
           *Automated by Examify CI/CD Engine*
           EOF
-          sed -i "s/\$EMOJI/$EMOJI/g" $GITHUB_STEP_SUMMARY
-          sed -i "s/\$STATUS_TEXT/$STATUS_TEXT/g" $GITHUB_STEP_SUMMARY
-          sed -i "s/\$TRIGGER_DESC/$TRIGGER_DESC/g" $GITHUB_STEP_SUMMARY
